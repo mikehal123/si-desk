@@ -15,8 +15,6 @@ public interface IOperatorClient
     Task<IReadOnlyList<DecisionRecord>> ListDecisionsAsync(string? query = null, DecisionAction? action = null, CancellationToken cancellationToken = default);
     Task<DecisionRecord?> GetDecisionAsync(string id, CancellationToken cancellationToken = default);
     Task<EvidenceDocument?> GetEvidenceAsync(string id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default);
-    Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ResearchJob>> ListJobsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default);

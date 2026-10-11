@@ -35,7 +35,7 @@ public static class ClosureWalkthrough
 
         await vm.RefreshAsync(cancellationToken).ConfigureAwait(false);
 
-        await Step("archive-decision-evidence-orders", "Open archive, decision, evidence, orders", async () =>
+        await Step("archive-decision-evidence", "Open archive, decision, and evidence", async () =>
         {
             var archive = Path.Combine(fixturesRoot, "archives", "valid-hash-consistent");
             await vm.SwitchModeAsync(ApplicationMode.EvidenceArchive, null, archive, cancellationToken).ConfigureAwait(false);
@@ -47,9 +47,8 @@ public static class ClosureWalkthrough
             var decision = vm.Decisions[0];
             await vm.SelectDecisionAsync(decision.Id, cancellationToken).ConfigureAwait(false);
             var evidenceOk = vm.SelectedEvidence is not null;
-            var orders = vm.Orders;
             return (evidenceOk,
-                $"mode={ModeLabels.Short(vm.Mode)} decision={decision.Id} action={decision.Action} evidence={(vm.SelectedEvidence?.Id ?? "none")} orders={orders.Count} events={vm.Events.Count}");
+                $"mode={ModeLabels.Short(vm.Mode)} decision={decision.Id} action={decision.Action} evidence={(vm.SelectedEvidence?.Id ?? "none")} events={vm.Events.Count}");
         }).ConfigureAwait(false);
 
         await Step("invalid-draft-correct-save-reopen", "Invalid draft, correct, save, reopen inactive", async () =>
@@ -96,7 +95,7 @@ public static class ClosureWalkthrough
             await vm.SelectDecisionAsync(vm.Decisions[0].Id, cancellationToken).ConfigureAwait(false);
             var previous = vm.AccountHeading;
             await vm.SwitchModeAsync(ApplicationMode.NativeConnection, null, null, cancellationToken).ConfigureAwait(false);
-            var leaked = vm.Account.IsKnown || vm.CashLabel.Contains("91100", StringComparison.Ordinal) || previous == vm.AccountHeading;
+            var leaked = vm.Account.IsKnown || previous == vm.AccountHeading;
             var ok = !leaked && vm.SelectedDecision is null && vm.Mode == ApplicationMode.NativeConnection && vm.Decisions.Count == 0;
             return (ok, "before=" + previous + " after=" + vm.AccountHeading + " banner=" + vm.ModeBanner);
         }).ConfigureAwait(false);

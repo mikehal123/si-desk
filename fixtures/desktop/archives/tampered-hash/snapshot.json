@@ -59,35 +59,7 @@
     "presence": "known",
     "account_id": "preview-paper-a",
     "environment": "offline-preview",
-    "balance_basis": "journal-derived",
     "observed_at": "2026-09-15T12:00:00Z",
-    "cash": {
-      "presence": "known",
-      "currency": "USD",
-      "minor_units": 91100
-    },
-    "holdings": [
-      {
-        "instrument": "AAA",
-        "quantity": {
-          "presence": "known",
-          "decimal": "11"
-        },
-        "mark": {
-          "presence": "known",
-          "currency": "USD",
-          "minor_units": 900
-        },
-        "quantity_source": "journal-derived"
-      }
-    ],
-    "reservations": {
-      "presence": "known",
-      "currency": "USD",
-      "minor_units": 0
-    },
-    "open_order_ids": [],
-    "incomplete_valuation_reasons": [],
     "source_label": "preview journal"
   },
   "decisions": [
@@ -98,11 +70,6 @@
       "quantity": {
         "presence": "known",
         "decimal": "5"
-      },
-      "price": {
-        "presence": "known",
-        "currency": "USD",
-        "minor_units": 910
       },
       "evidence_ids": [
         "ev-aaa-admission"
@@ -124,11 +91,9 @@
         "verdict": "Blocked",
         "reason": "No execution authority. Preview cannot override."
       },
-      "observed_at": "2026-09-15T12:00:00Z",
-      "related_order_id": null
+      "observed_at": "2026-09-15T12:00:00Z"
     }
   ],
-  "orders": [],
   "events": [
     {
       "id": "evt-1",
@@ -182,21 +147,6 @@
       "cost_status": "unknown",
       "last_outcome": null,
       "catalog_status": "preview"
-    },
-    {
-      "id": "paper.submit_order",
-      "version": "n3+",
-      "status": "unavailable",
-      "provider": "paper-transport",
-      "permission_scope": "paper-submit",
-      "required_capabilities": [
-        "authenticated-session",
-        "paper-grant"
-      ],
-      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
-      "cost_status": "not-applicable",
-      "last_outcome": null,
-      "catalog_status": "reference"
     }
   ],
   "evidence": [

@@ -75,7 +75,6 @@ public sealed class EventInbox
                     "resync",
                     "Update cursor gap detected. State is not current; resync required.",
                     null,
-                    null,
                     true)
             ];
         }

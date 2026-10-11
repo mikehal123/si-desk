@@ -26,29 +26,13 @@ public sealed record AttentionItem(
     string Severity,
     string Summary,
     string? NextStep,
-    string? RelatedDecisionId,
-    string? RelatedOrderId);
-
-public sealed record Holding(
-    string Instrument,
-    Presence<decimal> Quantity,
-    Presence<Money> Mark,
-    string QuantitySource,
-    string? IncompleteValuationReason);
+    string? RelatedDecisionId);
 
 public sealed record AccountView(
     string AccountId,
     string Environment,
-    string BalanceBasis,
     DateTimeOffset ObservedAt,
-    Presence<Money> Cash,
-    IReadOnlyList<Holding> Holdings,
-    Presence<Money> Reservations,
-    IReadOnlyList<string> OpenOrderIds,
-    IReadOnlyList<string> IncompleteValuationReasons,
-    string SourceLabel,
-    Presence<Money> EndingEquity,
-    string TradingAuthority);
+    string SourceLabel);
 
 public sealed record GateResult(
     string Name,
@@ -60,34 +44,13 @@ public sealed record DecisionRecord(
     DecisionAction Action,
     string Instrument,
     Presence<decimal> Quantity,
-    Presence<Money> Price,
     IReadOnlyList<string> EvidenceIds,
     string AccountRevision,
     IReadOnlyList<string> Reasons,
     GateResult Admission,
     GateResult Risk,
     GateResult Execution,
-    DateTimeOffset ObservedAt,
-    string? RelatedOrderId);
-
-public sealed record FillRecord(
-    string Id,
-    Presence<decimal> Quantity,
-    Presence<Money> Price,
-    DateTimeOffset At);
-
-public sealed record OrderRecord(
-    string Id,
-    string? ProposalId,
-    string? DecisionId,
-    string Instrument,
-    OrderLifecycle RequestedState,
-    Presence<OrderLifecycle> AcknowledgedState,
-    Presence<OrderLifecycle> CurrentState,
-    IReadOnlyList<FillRecord> Fills,
-    Presence<decimal> RemainingQuantity,
-    DateTimeOffset RequestedAt,
-    IReadOnlyList<string> AmbiguityReasons);
+    DateTimeOffset ObservedAt);
 
 public sealed record ClientEvent(
     string Id,
@@ -96,7 +59,6 @@ public sealed record ClientEvent(
     string Kind,
     string Summary,
     string? DecisionId,
-    string? OrderId,
     bool GapBefore);
 
 public sealed record ResearchJob(

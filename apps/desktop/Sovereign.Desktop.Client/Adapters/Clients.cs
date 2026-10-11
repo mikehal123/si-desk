@@ -54,12 +54,6 @@ public sealed class PreviewOperatorClient : IOperatorClient
     public Task<EvidenceDocument?> GetEvidenceAsync(string id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Evidence.FirstOrDefault(e => e.Id == id));
 
-    public Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Orders);
-
-    public Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Orders.FirstOrDefault(o => o.Id == id));
-
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_inbox.Snapshot());
 
@@ -184,12 +178,6 @@ public sealed class ArchiveOperatorClient : IOperatorClient
 
         return Task.FromResult<EvidenceDocument?>(null);
     }
-
-    public Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Orders);
-
-    public Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Orders.FirstOrDefault(o => o.Id == id));
 
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Events);

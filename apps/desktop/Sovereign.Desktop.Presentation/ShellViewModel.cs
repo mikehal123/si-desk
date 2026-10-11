@@ -24,7 +24,6 @@ public sealed class ShellViewModel : ObservableObject
     private string _selectedNav = "home";
     private string _query = "";
     private DecisionRecord? _selectedDecision;
-    private OrderRecord? _selectedOrder;
     private EvidenceDocument? _selectedEvidence;
     private MandateDraft _mandate;
     private ResearchDraft _research;
@@ -65,13 +64,11 @@ public sealed class ShellViewModel : ObservableObject
     public SystemHealth? Health { get; private set; }
     public Presence<AccountView> Account { get; private set; } = Presence<AccountView>.Unknown("not loaded");
     public IReadOnlyList<DecisionRecord> Decisions { get; private set; } = [];
-    public IReadOnlyList<OrderRecord> Orders { get; private set; } = [];
     public IReadOnlyList<ClientEvent> Events { get; private set; } = [];
     public IReadOnlyList<ResearchJob> Jobs { get; private set; } = [];
     public IReadOnlyList<CapabilityItem> Capabilities { get; private set; } = [];
     public EvaluationSummary? Evaluation { get; private set; }
     public DecisionRecord? SelectedDecision { get => _selectedDecision; private set => SetField(ref _selectedDecision, value); }
-    public OrderRecord? SelectedOrder { get => _selectedOrder; private set => SetField(ref _selectedOrder, value); }
     public EvidenceDocument? SelectedEvidence { get => _selectedEvidence; private set => SetField(ref _selectedEvidence, value); }
     public EvidenceDocument? ApiNegativeEvidence { get; private set; }
     public IReadOnlyList<MandateDraft> SavedMandates { get; private set; } = [];
@@ -84,10 +81,6 @@ public sealed class ShellViewModel : ObservableObject
     public string AccountHeading => Account.IsKnown
         ? $"Account {Account.Value!.AccountId} ({Account.Value.Environment}) — {ModeLabels.Short(Mode)}"
         : $"Account unknown — {ModeLabels.Short(Mode)} — {Account.Describe()}";
-
-    public string CashLabel => Account.IsKnown ? Account.Value!.Cash.Describe(m => m.Format()) : Account.Describe();
-    public string EquityLabel => Account.IsKnown ? Account.Value!.EndingEquity.Describe(m => m.Format()) : Account.Describe();
-    public string TradingAuthorityLabel => Account.IsKnown ? Account.Value!.TradingAuthority : "unknown";
 
     public bool IsNativeAuthenticated => false;
 
@@ -116,7 +109,6 @@ public sealed class ShellViewModel : ObservableObject
         Health = await _client.GetHealthAsync(cancellationToken).ConfigureAwait(false);
         Account = await _client.GetAccountAsync(cancellationToken).ConfigureAwait(false);
         Decisions = await _client.ListDecisionsAsync(Query, null, cancellationToken).ConfigureAwait(false);
-        Orders = await _client.ListOrdersAsync(cancellationToken).ConfigureAwait(false);
         Events = await _client.ListEventsAsync(cancellationToken).ConfigureAwait(false);
         Jobs = await _client.ListJobsAsync(cancellationToken).ConfigureAwait(false);
         Capabilities = await _client.ListCapabilitiesAsync(cancellationToken).ConfigureAwait(false);
@@ -127,7 +119,6 @@ public sealed class ShellViewModel : ObservableObject
         Raise(nameof(Health));
         Raise(nameof(Account));
         Raise(nameof(Decisions));
-        Raise(nameof(Orders));
         Raise(nameof(Events));
         Raise(nameof(Jobs));
         Raise(nameof(Capabilities));
@@ -139,9 +130,6 @@ public sealed class ShellViewModel : ObservableObject
         Raise(nameof(ReconciliationLabel));
         Raise(nameof(AuthorizationLabel));
         Raise(nameof(AccountHeading));
-        Raise(nameof(CashLabel));
-        Raise(nameof(EquityLabel));
-        Raise(nameof(TradingAuthorityLabel));
         Raise(nameof(ModeBanner));
         Raise(nameof(IsNativeAuthenticated));
         Raise(nameof(WorkspaceGuidance));
@@ -194,7 +182,6 @@ public sealed class ShellViewModel : ObservableObject
     public void ClearSelection(string reason)
     {
         SelectedDecision = null;
-        SelectedOrder = null;
         SelectedEvidence = null;
         StatusLine = "Selections cleared (" + reason + ")";
     }
@@ -202,11 +189,6 @@ public sealed class ShellViewModel : ObservableObject
     public async Task SelectDecisionAsync(string id, CancellationToken cancellationToken = default)
     {
         SelectedDecision = await _client.GetDecisionAsync(id, cancellationToken);
-        if (SelectedDecision?.RelatedOrderId is string orderId)
-        {
-            SelectedOrder = await _client.GetOrderAsync(orderId, cancellationToken);
-        }
-
         if (SelectedDecision?.EvidenceIds.FirstOrDefault() is string evidenceId)
         {
             SelectedEvidence = await _client.GetEvidenceAsync(evidenceId, cancellationToken);
@@ -355,7 +337,6 @@ public sealed class ShellViewModel : ObservableObject
     {
         "activate-session" => "Activation is host-gated. No authenticated session grant is present.",
         "pause-session" => "Pause requires host capability PAUSE_NEW_RISK and an authenticated session.",
-        "submit-order" => "The desktop does not submit orders. Paper transport is a host responsibility.",
         "store-secret" => "Credential storage is a future host-backed function. Preview will not accept secrets.",
         "start-research-job" => Mode == ApplicationMode.DesktopPreview
             ? "Preview can only show canned job states. It will not answer the typed question with fabricated research."

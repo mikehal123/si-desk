@@ -12,7 +12,6 @@ public sealed class ScenarioDocument
     public required SystemHealth Health { get; init; }
     public Presence<AccountView> Account { get; init; } = Presence<AccountView>.Missing("no account in this scenario");
     public IReadOnlyList<DecisionRecord> Decisions { get; init; } = [];
-    public IReadOnlyList<OrderRecord> Orders { get; init; } = [];
     public IReadOnlyList<ClientEvent> Events { get; init; } = [];
     public IReadOnlyList<ResearchJob> Jobs { get; init; } = [];
     public IReadOnlyList<CapabilityItem> Capabilities { get; init; } = [];
@@ -64,7 +63,6 @@ public static class ScenarioCatalog
             Health = MapHealth(dto.Health),
             Account = MapAccount(dto.Account),
             Decisions = (dto.Decisions ?? []).Select(MapDecision).ToArray(),
-            Orders = (dto.Orders ?? []).Select(MapOrder).ToArray(),
             Events = (dto.Events ?? []).Select(MapEvent).ToArray(),
             Jobs = (dto.Jobs ?? []).Select(MapJob).ToArray(),
             Capabilities = (dto.Capabilities ?? []).Select(MapCap).ToArray(),
@@ -98,7 +96,7 @@ public static class ScenarioCatalog
         MapState(dto?.Reconciliation, ReconciliationState.Unknown, "reconciliation"),
         MapState(dto?.Authorization, AuthorizationState.Unknown, "authorization"),
         MapTimePresence(dto?.NextCycle),
-        (dto?.UnresolvedIssues ?? []).Select(i => new AttentionItem(i.Id ?? "issue", i.Severity ?? "info", i.Summary ?? "", i.NextStep, i.RelatedDecisionId, i.RelatedOrderId)).ToArray(),
+        (dto?.UnresolvedIssues ?? []).Select(i => new AttentionItem(i.Id ?? "issue", i.Severity ?? "info", i.Summary ?? "", i.NextStep, i.RelatedDecisionId)).ToArray(),
         ParseTime(dto?.ObservationTimestamp));
 
     private static LabeledState<T> MapState<T>(StateDto? dto, T fallback, string name) where T : struct, Enum
@@ -129,26 +127,11 @@ public static class ScenarioCatalog
             return Presence<AccountView>.Missing(dto.Reason ?? "account missing");
         }
 
-        var holdings = (dto.Holdings ?? []).Select(h => new Holding(
-            h.Instrument ?? "UNKNOWN",
-            MapDecimal(h.Quantity),
-            MapMoney(h.Mark),
-            h.QuantitySource ?? "unspecified",
-            h.IncompleteValuationReason)).ToArray();
-
         var view = new AccountView(
             dto.AccountId ?? "unspecified",
             dto.Environment ?? "unspecified",
-            dto.BalanceBasis ?? "unspecified",
             ParseTime(dto.ObservedAt),
-            MapMoney(dto.Cash),
-            holdings,
-            MapMoney(dto.Reservations),
-            dto.OpenOrderIds ?? [],
-            dto.IncompleteValuationReasons ?? [],
-            dto.SourceLabel ?? "scenario",
-            Presence<Money>.Unknown("ending_equity_cents is not a preview accounting field"),
-            "preview");
+            dto.SourceLabel ?? "scenario");
         return Presence<AccountView>.Known(view);
     }
 
@@ -157,31 +140,16 @@ public static class ScenarioCatalog
         ParseEnum(d.Action, DecisionAction.Unknown),
         d.Instrument ?? "UNKNOWN",
         MapDecimal(d.Quantity),
-        MapMoney(d.Price),
         d.EvidenceIds ?? [],
         d.AccountRevision ?? "unknown-revision",
         d.Reasons ?? [],
         MapGate("admission", d.Admission),
         MapGate("risk", d.Risk),
         MapGate("execution", d.Execution),
-        ParseTime(d.ObservedAt),
-        d.RelatedOrderId);
+        ParseTime(d.ObservedAt));
 
     private static GateResult MapGate(string name, GateDto? dto) =>
         new(name, ParseEnum(dto?.Verdict, GateVerdict.Unknown), dto?.Reason ?? "gate value not supplied");
-
-    private static OrderRecord MapOrder(OrderDto o) => new(
-        o.Id ?? throw new InvalidOperationException("order id required"),
-        o.ProposalId,
-        o.DecisionId,
-        o.Instrument ?? "UNKNOWN",
-        ParseEnum(o.RequestedState, OrderLifecycle.Unknown),
-        MapEnumPresence<OrderLifecycle>(o.AcknowledgedState),
-        MapEnumPresence<OrderLifecycle>(o.CurrentState),
-        (o.Fills ?? []).Select(f => new FillRecord(f.Id ?? "fill", MapDecimal(f.Quantity), MapMoney(f.Price), ParseTime(f.At))).ToArray(),
-        MapDecimal(o.RemainingQuantity),
-        ParseTime(o.RequestedAt),
-        o.AmbiguityReasons ?? []);
 
     private static ClientEvent MapEvent(EventDto e) => new(
         e.Id ?? throw new InvalidOperationException("event id required"),
@@ -190,7 +158,6 @@ public static class ScenarioCatalog
         e.Kind ?? "note",
         e.Summary ?? "",
         e.DecisionId,
-        e.OrderId,
         e.GapBefore);
 
     private static ResearchJob MapJob(JobDto j) => new(
@@ -250,15 +217,6 @@ public static class ScenarioCatalog
         dto.Detail ?? "",
         dto.SimulatedPreviewAcknowledgement);
 
-    private static Presence<Money> MapMoney(ValueDto? dto) => dto?.Presence switch
-    {
-        "known" when dto.MinorUnits is long minor && !string.IsNullOrWhiteSpace(dto.Currency) =>
-            Presence<Money>.Known(new Money(dto.Currency, minor)),
-        "unknown" => Presence<Money>.Unknown(dto.Reason ?? "amount unknown"),
-        "missing" => Presence<Money>.Missing(dto.Reason ?? "amount missing"),
-        _ => Presence<Money>.Unknown("amount not supplied")
-    };
-
     private static Presence<decimal> MapDecimal(ValueDto? dto) => dto?.Presence switch
     {
         "known" when dto.Decimal is string s && decimal.TryParse(s, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var n) =>
@@ -292,14 +250,6 @@ public static class ScenarioCatalog
         _ => Presence<DateTimeOffset>.Unknown("next cycle not supplied")
     };
 
-    private static Presence<T> MapEnumPresence<T>(ValueDto? dto) where T : struct, Enum => dto?.Presence switch
-    {
-        "known" when dto.Text is not null => Presence<T>.Known(ParseEnum(dto.Text, default(T))),
-        "unknown" => Presence<T>.Unknown(dto.Reason ?? "state unknown"),
-        "missing" => Presence<T>.Missing(dto.Reason ?? "state missing"),
-        _ => Presence<T>.Unknown("state not supplied")
-    };
-
     private static T ParseEnum<T>(string? text, T fallback) where T : struct, Enum =>
         Enum.TryParse(text, ignoreCase: true, out T value) ? value : fallback;
 
@@ -317,7 +267,6 @@ public static class ScenarioCatalog
         public HealthDto? Health { get; set; }
         public AccountDto? Account { get; set; }
         public List<DecisionDto>? Decisions { get; set; }
-        public List<OrderDto>? Orders { get; set; }
         public List<EventDto>? Events { get; set; }
         public List<JobDto>? Jobs { get; set; }
         public List<CapDto>? Capabilities { get; set; }
@@ -362,7 +311,6 @@ public static class ScenarioCatalog
         public string? Summary { get; set; }
         public string? NextStep { get; set; }
         public string? RelatedDecisionId { get; set; }
-        public string? RelatedOrderId { get; set; }
     }
 
     private sealed class AccountDto
@@ -371,23 +319,8 @@ public static class ScenarioCatalog
         public string? Reason { get; set; }
         public string? AccountId { get; set; }
         public string? Environment { get; set; }
-        public string? BalanceBasis { get; set; }
         public string? ObservedAt { get; set; }
-        public ValueDto? Cash { get; set; }
-        public List<HoldingDto>? Holdings { get; set; }
-        public ValueDto? Reservations { get; set; }
-        public List<string>? OpenOrderIds { get; set; }
-        public List<string>? IncompleteValuationReasons { get; set; }
         public string? SourceLabel { get; set; }
-    }
-
-    private sealed class HoldingDto
-    {
-        public string? Instrument { get; set; }
-        public ValueDto? Quantity { get; set; }
-        public ValueDto? Mark { get; set; }
-        public string? QuantitySource { get; set; }
-        public string? IncompleteValuationReason { get; set; }
     }
 
     private sealed class DecisionDto
@@ -396,7 +329,6 @@ public static class ScenarioCatalog
         public string? Action { get; set; }
         public string? Instrument { get; set; }
         public ValueDto? Quantity { get; set; }
-        public ValueDto? Price { get; set; }
         public List<string>? EvidenceIds { get; set; }
         public string? AccountRevision { get; set; }
         public List<string>? Reasons { get; set; }
@@ -404,36 +336,12 @@ public static class ScenarioCatalog
         public GateDto? Risk { get; set; }
         public GateDto? Execution { get; set; }
         public string? ObservedAt { get; set; }
-        public string? RelatedOrderId { get; set; }
     }
 
     private sealed class GateDto
     {
         public string? Verdict { get; set; }
         public string? Reason { get; set; }
-    }
-
-    private sealed class OrderDto
-    {
-        public string? Id { get; set; }
-        public string? ProposalId { get; set; }
-        public string? DecisionId { get; set; }
-        public string? Instrument { get; set; }
-        public string? RequestedState { get; set; }
-        public ValueDto? AcknowledgedState { get; set; }
-        public ValueDto? CurrentState { get; set; }
-        public List<FillDto>? Fills { get; set; }
-        public ValueDto? RemainingQuantity { get; set; }
-        public string? RequestedAt { get; set; }
-        public List<string>? AmbiguityReasons { get; set; }
-    }
-
-    private sealed class FillDto
-    {
-        public string? Id { get; set; }
-        public ValueDto? Quantity { get; set; }
-        public ValueDto? Price { get; set; }
-        public string? At { get; set; }
     }
 
     private sealed class EventDto
@@ -444,7 +352,6 @@ public static class ScenarioCatalog
         public string? Kind { get; set; }
         public string? Summary { get; set; }
         public string? DecisionId { get; set; }
-        public string? OrderId { get; set; }
         public bool GapBefore { get; set; }
     }
 
@@ -519,8 +426,6 @@ public static class ScenarioCatalog
     {
         public string? Presence { get; set; }
         public string? Reason { get; set; }
-        public string? Currency { get; set; }
-        public long? MinorUnits { get; set; }
         public string? Decimal { get; set; }
         public int? Int { get; set; }
         public string? Text { get; set; }

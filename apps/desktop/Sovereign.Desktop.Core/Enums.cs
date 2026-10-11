@@ -80,18 +80,6 @@ public enum DecisionAction
     Abstain
 }
 
-public enum OrderLifecycle
-{
-    Unknown,
-    RequestAcceptedLocally,
-    SendAttempted,
-    BrokerAcknowledged,
-    PartialFill,
-    CancelPending,
-    Canceled,
-    Rejected
-}
-
 public enum CycleTiming
 {
     Unknown,

@@ -59,7 +59,6 @@
     "reason": "Grant expired; account view not authorized."
   },
   "decisions": [],
-  "orders": [],
   "events": [],
   "jobs": [
     {
@@ -99,21 +98,6 @@
       "cost_status": "unknown",
       "last_outcome": null,
       "catalog_status": "preview"
-    },
-    {
-      "id": "paper.submit_order",
-      "version": "n3+",
-      "status": "unavailable",
-      "provider": "paper-transport",
-      "permission_scope": "paper-submit",
-      "required_capabilities": [
-        "authenticated-session",
-        "paper-grant"
-      ],
-      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
-      "cost_status": "not-applicable",
-      "last_outcome": null,
-      "catalog_status": "reference"
     }
   ],
   "evidence": [],

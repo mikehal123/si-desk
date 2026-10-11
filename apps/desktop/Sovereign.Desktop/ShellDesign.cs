@@ -11,9 +11,6 @@ public sealed partial class MainWindow
 {
     private readonly TextBlock _pageTitle = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
     private readonly TextBlock _pageSubtitle = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _cashValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
-    private readonly TextBlock _equityValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
-    private readonly TextBlock _ordersValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
     private readonly TextBlock _emptyState = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(DeskTheme.Space16), FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Muted };
     private readonly StackPanel _draftPanel = new() { Spacing = DeskTheme.Space12 };
     private readonly StackPanel _inspectorPanel = new() { Spacing = DeskTheme.Space12 };
@@ -254,9 +251,6 @@ public sealed partial class MainWindow
             _ => "PREVIEW"
         };
         _account.Text = _vm.Account.IsKnown ? "Run loaded · " + _vm.Account.Value!.AccountId : "Inspect connection details in Settings.";
-        _cashValue.Text = _vm.Account.IsKnown ? _vm.CashLabel : "—";
-        _equityValue.Text = _vm.Account.IsKnown ? _vm.EquityLabel : "—";
-        _ordersValue.Text = _vm.Account.IsKnown ? _vm.Orders.Count.ToString() : "—";
         var nav = CurrentSection;
         foreach (ListViewItem item in _nav.Items) ApplyNavigationPresentation(item);
         _pageTitle.Text = Label(nav);
@@ -269,18 +263,18 @@ public sealed partial class MainWindow
         };
         _draftPanel.Visibility = nav == "mandate" ? Visibility.Visible : Visibility.Collapsed;
         _settingsPanel.Visibility = nav == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        _inspectorPanel.Visibility = nav is "decisions" or "orders" ? Visibility.Visible : Visibility.Collapsed;
+        _inspectorPanel.Visibility = nav == "decisions" ? Visibility.Visible : Visibility.Collapsed;
         _runPanel.Visibility = nav is "overview" or "evaluation" ? Visibility.Visible : Visibility.Collapsed;
         _homeActions.Visibility = nav == "home" ? Visibility.Visible : Visibility.Collapsed;
         _banner.Visibility = Visibility.Collapsed;
         if (_inspectorColumn is not null && _inspectorCard is not null)
         {
-            var shown = nav is "home" or "overview" or "evaluation" or "decisions" or "orders" or "mandate" or "connection";
+            var shown = nav is "home" or "overview" or "evaluation" or "decisions" or "mandate" or "connection";
             _inspectorColumn.Width = new GridLength(shown ? 300 : 0);
             _inspectorCard.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         }
         if (_recordToolbar is not null) _recordToolbar.Visibility = nav == "decisions" ? Visibility.Visible : Visibility.Collapsed;
-        if (_metrics is not null) _metrics.Visibility = nav is "overview" or "portfolio" ? Visibility.Visible : Visibility.Collapsed;
+        if (_metrics is not null) _metrics.Visibility = nav == "overview" ? Visibility.Visible : Visibility.Collapsed;
         _emptyState.Visibility = _main.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _emptyState.Text = "No records in this view.";
         if (_boundNav != nav) { _detail.Text = "Select a record to inspect its details."; _evidence.Text = "No evidence selected."; _boundNav = nav; }

@@ -11,12 +11,6 @@ ARCH = ROOT / "fixtures" / "desktop" / "archives"
 OBS = "2026-09-15T12:00:00Z"
 
 
-def money(cents, reason=None, presence="known"):
-    if presence != "known":
-        return {"presence": presence, "reason": reason}
-    return {"presence": "known", "currency": "USD", "minor_units": cents}
-
-
 def qty(value, reason=None, presence="known"):
     if presence != "known":
         return {"presence": presence, "reason": reason}
@@ -73,7 +67,7 @@ def eval_block(**kwargs):
     return base
 
 
-def scenario(sid, title, interp, health, account, decisions, orders, events, jobs, caps, evidence, evaluation, operations=None):
+def scenario(sid, title, interp, health, account, decisions, events, jobs, caps, evidence, evaluation, operations=None):
     return {
         "scenario_id": sid,
         "title": title,
@@ -82,7 +76,6 @@ def scenario(sid, title, interp, health, account, decisions, orders, events, job
         "health": health,
         "account": account,
         "decisions": decisions,
-        "orders": orders,
         "events": events,
         "jobs": jobs,
         "capabilities": caps,
@@ -104,18 +97,6 @@ COMMON_CAPS = [
         "cost_status": "unknown",
         "last_outcome": None,
         "catalog_status": "preview",
-    },
-    {
-        "id": "paper.submit_order",
-        "version": "n3+",
-        "status": "unavailable",
-        "provider": "paper-transport",
-        "permission_scope": "paper-submit",
-        "required_capabilities": ["authenticated-session", "paper-grant"],
-        "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
-        "cost_status": "not-applicable",
-        "last_outcome": None,
-        "catalog_status": "reference",
     },
 ]
 
@@ -154,7 +135,6 @@ def write_scenarios():
         [],
         [],
         [],
-        [],
         COMMON_CAPS,
         [],
         eval_block(sample_count={"presence": "missing", "reason": "no host campaign"}),
@@ -180,15 +160,7 @@ def write_scenarios():
             "presence": "known",
             "account_id": "preview-paper-a",
             "environment": "offline-preview",
-            "balance_basis": "journal-derived",
             "observed_at": OBS,
-            "cash": money(91100),
-            "holdings": [
-                {"instrument": "AAA", "quantity": qty("11"), "mark": money(900), "quantity_source": "journal-derived"}
-            ],
-            "reservations": money(0),
-            "open_order_ids": [],
-            "incomplete_valuation_reasons": [],
             "source_label": "preview journal",
         },
         [{
@@ -196,7 +168,6 @@ def write_scenarios():
             "action": "Buy",
             "instrument": "AAA",
             "quantity": qty("5"),
-            "price": money(910),
             "evidence_ids": ["ev-aaa-admission"],
             "account_revision": "rev-7",
             "reasons": ["Admitted on synthetic evidence.", "Execution blocked: no paper grant."],
@@ -204,9 +175,7 @@ def write_scenarios():
             "risk": gate("Pass", "Concentration within draft cap in preview numbers."),
             "execution": gate("Blocked", "No execution authority. Preview cannot override."),
             "observed_at": OBS,
-            "related_order_id": None,
         }],
-        [],
         [{"id": "evt-1", "cursor": "0001", "at": OBS, "kind": "decision", "summary": "AAA admitted, execution blocked", "decision_id": "dec-aaa-1", "gap_before": False}],
         [{"id": "job-1", "title": "AAA dossier (preview)", "status": "completed", "horizon": "3-12m",
           "thesis": text("Quiet beneficiary of fiscal spending (preview scenario)."),
@@ -238,13 +207,7 @@ def write_scenarios():
             "presence": "known",
             "account_id": "preview-paper-a",
             "environment": "offline-preview",
-            "balance_basis": "journal-derived",
             "observed_at": OBS,
-            "cash": money(50000),
-            "holdings": [],
-            "reservations": money(0),
-            "open_order_ids": [],
-            "incomplete_valuation_reasons": [],
             "source_label": "journal-derived",
         },
         [{
@@ -252,7 +215,6 @@ def write_scenarios():
             "action": "Buy",
             "instrument": "CCC",
             "quantity": qty("10"),
-            "price": money(1200),
             "evidence_ids": ["ev-aaa-admission"],
             "account_revision": "rev-4",
             "reasons": ["Blocked: universe evidence older than freshness window."],
@@ -260,9 +222,7 @@ def write_scenarios():
             "risk": gate("Unsupported", "Risk adapter not present in preview."),
             "execution": gate("Blocked", "Admission failed."),
             "observed_at": OBS,
-            "related_order_id": None,
         }],
-        [],
         [],
         [],
         COMMON_CAPS,
@@ -291,7 +251,6 @@ def write_scenarios():
             "observation_timestamp": OBS,
         },
         {"presence": "unknown", "reason": "Grant expired; account view not authorized."},
-        [],
         [],
         [],
         [{
@@ -329,7 +288,6 @@ def write_scenarios():
             "observation_timestamp": OBS,
         },
         {"presence": "missing", "reason": "Research workspace scenario does not imply an account."},
-        [],
         [],
         [
             {"id": "evt-run", "cursor": "0001", "at": OBS, "kind": "job", "summary": "Job running", "gap_before": False},
@@ -382,16 +340,9 @@ def write_scenarios():
             "presence": "known",
             "account_id": "preview-paper-a",
             "environment": "offline-preview",
-            "balance_basis": "journal-derived",
             "observed_at": OBS,
-            "cash": money(91100),
-            "holdings": [],
-            "reservations": money(0),
-            "open_order_ids": [],
-            "incomplete_valuation_reasons": [],
             "source_label": "journal-derived",
         },
-        [],
         [],
         [
             {"id": "evt-missed", "cursor": "0001", "at": OBS, "kind": "cycle", "summary": "Cycle MISSED", "gap_before": False},

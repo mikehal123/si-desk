@@ -130,7 +130,7 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedOrder" or "SelectedEvidence" or "Mandate" or "Research") return;
+        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedEvidence" or "Mandate" or "Research") return;
         if (_bindQueued)
         {
             return;
@@ -155,7 +155,7 @@ public sealed partial class MainWindow : Window
         _broker.Text = _vm.BrokerLabel;
         _recon.Text = _vm.ReconciliationLabel;
         _auth.Text = _vm.AuthorizationLabel;
-        _status.Text = _vm.StatusLine + " | cash " + _vm.CashLabel + " | equity " + _vm.EquityLabel;
+        _status.Text = _vm.StatusLine;
         _draftStatus.Text = _vm.DraftStatus;
         _draftError.Text = _vm.DraftErrors;
         _hint.Text = _vm.WorkspaceGuidance;
@@ -171,12 +171,10 @@ public sealed partial class MainWindow : Window
         IEnumerable<string> rows = nav switch
         {
             "decisions" => _vm.Decisions.Select(DescribeDecision),
-            "portfolio" => DescribePortfolio(),
-            "orders" => _vm.Orders.Select(DescribeOrder).Concat(_vm.Events.Select(e => $"EVENT {e.Cursor} {e.Kind}: {e.Summary}")),
             "research" => _vm.Jobs.Select(j => $"{j.Id} [{j.Status}] {j.Title} {(j.UnavailableReason ?? "")}"),
             "tools" => _vm.Capabilities.Select(c => $"{c.Id} {c.Version} status={c.CatalogStatus} avail={c.AvailabilityReason}"),
             "evaluation" => new[] { DescribeEval() },
-            "overview" => new[] { "Offline trading demonstration", "The installed engine produces a synthetic three-cycle book. These balances and orders are not from your broker, FMP charts, research reports or chat agents.", "Use the sections above to inspect the run, edit local drafts, or review the engine connection." },
+            "overview" => new[] { "Workspace overview", "Open Chat, Shared room, Grokbot, or Settings." },
             "connection" => new[]
             {
                 $"Version {_vm.AppTitle}",
@@ -202,36 +200,12 @@ public sealed partial class MainWindow : Window
 
     private IEnumerable<string> DescribeHome()
     {
-        yield return "Your xAI Desk workspace\nOne place for conversations, market charts, research and Python tools.";
+        yield return "Your xAI Desk workspace\nOne place for conversations, Shared room, Grokbot, and Settings.";
         yield return $"Conversations\n{_conversations.Count} saved chats on this PC. Open Chat or choose a recent conversation to continue.";
-        yield return "Research and tools\nRun research from your thesis, inspect saved findings, or open the options calculator. Each tool states its data source and requirements.";
-        yield return "Later · offline trading demo\nThe synthetic portfolio, orders and engine controls are grouped separately. They are not your live account.";
-    }
-
-    private IEnumerable<string> DescribePortfolio()
-    {
-        if (!_vm.Account.IsKnown)
-        {
-            yield return "Account: " + _vm.Account.Describe();
-            yield break;
-        }
-
-        var account = _vm.Account.Value!;
-        yield return $"Cash ({account.BalanceBasis}): {account.Cash.Describe(money => money.Format())}";
-        yield return $"Ending equity: {account.EndingEquity.Describe(money => money.Format())}";
-        yield return $"Trading authority: {account.TradingAuthority}";
-        yield return $"Reservations: {account.Reservations.Describe(money => money.Format())}";
-        foreach (var holding in account.Holdings)
-            yield return $"{holding.Instrument} qty={holding.Quantity.Describe()} mark={holding.Mark.Describe(money => money.Format())} source={holding.QuantitySource} {holding.IncompleteValuationReason}";
-        foreach (var reason in account.IncompleteValuationReasons)
-            yield return "Incomplete: " + reason;
     }
 
     private static string DescribeDecision(DecisionRecord d) =>
         $"{d.Id}  ·  {d.Action}  ·  {d.Instrument}\nQuantity: {d.Quantity.Describe()}\nAdmission: {d.Admission.Verdict}  ·  Risk: {d.Risk.Verdict}  ·  Execution: {d.Execution.Verdict}";
-
-    private static string DescribeOrder(OrderRecord o) =>
-        $"{o.Id}\nRequested: {o.RequestedState}  ·  Acknowledged: {o.AcknowledgedState.Describe()}\nCurrent: {o.CurrentState.Describe()}  ·  Remaining: {o.RemainingQuantity.Describe()} {string.Join(";", o.AmbiguityReasons)}";
 
     private string DescribeEval()
     {
@@ -315,7 +289,7 @@ public sealed partial class MainWindow : Window
             {
                 $"Decision {decision.Id}",
                 $"Action {decision.Action} {decision.Instrument}",
-                $"Qty {decision.Quantity.Describe()} Price {decision.Price.Describe(m => m.Format())}",
+                $"Qty {decision.Quantity.Describe()}",
                 $"Revision {decision.AccountRevision}",
                 $"Admission {decision.Admission.Verdict}: {decision.Admission.Reason}",
                 $"Risk {decision.Risk.Verdict}: {decision.Risk.Reason}",
@@ -326,13 +300,6 @@ public sealed partial class MainWindow : Window
             _evidence.Text = _vm.SelectedEvidence is null
                 ? "No evidence document."
                 : _vm.SelectedEvidence.Title + Environment.NewLine + _vm.SelectedEvidence.Text;
-            return;
-        }
-
-        var order = _vm.Orders.FirstOrDefault(o => row.StartsWith(o.Id, StringComparison.Ordinal));
-        if (order is not null)
-        {
-            _detail.Text = DescribeOrder(order) + Environment.NewLine + string.Join(Environment.NewLine, order.AmbiguityReasons);
         }
     }
 
