@@ -16,6 +16,20 @@ It is **not affiliated with, endorsed by, or supported by xAI.**
 - **Grok Bot connector** (optional) to add a main assistant.
 - **Shared room** to build together. Send an invite and other people can join.
 
+## Screenshots
+
+![Swarm tab](docs/screenshots/swarm.png)
+*Swarm: a goal split into engineer and verifier tasks, all done.*
+
+![Subagents tab](docs/screenshots/subagents.png)
+*Subagents: helper cards with model, status and run time.*
+
+![Changes review](docs/screenshots/changes.png)
+*Changes: line-by-line review of an agent's file edits before anything is applied.*
+
+![Grokbot tab](docs/screenshots/grokbot.png)
+*Grokbot: an assistant that reads your chats and can act inside xAI Desk when you allow it.*
+
 ## Requirements
 
 - Windows 10 or 11 (x64)
