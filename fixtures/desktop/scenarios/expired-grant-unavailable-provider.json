@@ -1,0 +1,143 @@
+{
+  "scenario_id": "expired-grant-unavailable-provider",
+  "title": "Expired grant, unavailable provider",
+  "ui_interpretation": "Authorization expired. Provider unavailable. Do not show green connected.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Stopped",
+      "label": "Engine: stopped",
+      "reason": "grant expired"
+    },
+    "provider": {
+      "value": "Unavailable",
+      "label": "Provider: unavailable",
+      "reason": "model endpoint not configured"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "no grant"
+    },
+    "reconciliation": {
+      "value": "Unknown",
+      "label": "Reconciliation: unknown",
+      "reason": "engine stopped"
+    },
+    "authorization": {
+      "value": "Expired",
+      "label": "Authorization: expired",
+      "reason": "grant ended 2026-09-01"
+    },
+    "next_cycle": {
+      "presence": "missing",
+      "reason": "expired grant"
+    },
+    "unresolved_issues": [
+      {
+        "id": "grant",
+        "severity": "warning",
+        "summary": "Grant expired.",
+        "next_step": "Create a new session draft. Desktop cannot activate it."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "unknown",
+    "reason": "Grant expired; account view not authorized."
+  },
+  "decisions": [],
+  "orders": [],
+  "events": [],
+  "jobs": [
+    {
+      "id": "job-blocked",
+      "title": "User question cannot start",
+      "status": "unavailable",
+      "horizon": "3-12m",
+      "thesis": {
+        "presence": "missing",
+        "reason": "job never started"
+      },
+      "counter_thesis": {
+        "presence": "missing",
+        "reason": "job never started"
+      },
+      "uncertainty": {
+        "presence": "missing",
+        "reason": "job never started"
+      },
+      "evidence_refs": [],
+      "review_triggers": [],
+      "unavailable_reason": "Provider unavailable and grant expired. Preview will not invent an answer.",
+      "preview_scenario": true
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "missing",
+      "reason": "expired grant"
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

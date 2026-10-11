@@ -1,0 +1,175 @@
+{
+  "scenario_id": "long-running-job-cancel-timeout",
+  "title": "Long-running job, cancel, timeout",
+  "ui_interpretation": "Cancellation request is local until acknowledged. Timeout stays unknown.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "preview"
+    },
+    "reconciliation": {
+      "value": "Current",
+      "label": "Reconciliation: current (preview)",
+      "reason": "preview"
+    },
+    "authorization": {
+      "value": "None",
+      "label": "Authorization: none",
+      "reason": "preview"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "job-timeout",
+        "severity": "warning",
+        "summary": "Job cancel not acknowledged.",
+        "next_step": "Treat status as unknown."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "missing",
+    "reason": "Research workspace scenario does not imply an account."
+  },
+  "decisions": [],
+  "orders": [],
+  "events": [
+    {
+      "id": "evt-run",
+      "cursor": "0001",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "job",
+      "summary": "Job running",
+      "gap_before": false
+    },
+    {
+      "id": "evt-cancel-req",
+      "cursor": "0002",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "job",
+      "summary": "Cancel requested locally",
+      "gap_before": false
+    },
+    {
+      "id": "evt-timeout",
+      "cursor": "0003",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "job",
+      "summary": "Timeout; acknowledgement unknown",
+      "gap_before": false
+    }
+  ],
+  "jobs": [
+    {
+      "id": "job-long",
+      "title": "Long-running preview job",
+      "status": "unknown",
+      "horizon": "0-3m",
+      "thesis": {
+        "presence": "unknown",
+        "reason": "job not completed"
+      },
+      "counter_thesis": {
+        "presence": "unknown",
+        "reason": "job not completed"
+      },
+      "uncertainty": {
+        "presence": "unknown",
+        "reason": "job not completed"
+      },
+      "evidence_refs": [],
+      "review_triggers": [],
+      "unavailable_reason": "Cancel requested; host acknowledgement not received. Timeout remains UNKNOWN.",
+      "preview_scenario": true
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {
+    "cancel-job": {
+      "operation": "cancel-job",
+      "status": "TimedOut",
+      "detail": "Local cancellation of the wait does not mean the backend canceled. Status UNKNOWN.",
+      "simulated_preview_acknowledgement": true
+    }
+  }
+}

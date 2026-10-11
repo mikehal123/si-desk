@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sovereign.Desktop.Presentation</RootNamespace>
+    <AssemblyName>Sovereign.Desktop.Presentation</AssemblyName>
+    <Description>View-models. No WinUI types. Views bind here; tests bind here.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
+  </ItemGroup>
+</Project>

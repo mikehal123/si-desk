@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sovereign.Desktop.Core</RootNamespace>
+    <AssemblyName>Sovereign.Desktop.Core</AssemblyName>
+    <Description>Desktop-owned models, draft validation, archive import and support export. No engine or WinUI dependency.</Description>
+</PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\.cursor\skills\work-doctrine\SKILL.md" LogicalName="Sovereign.Desktop.Core.work-doctrine.md" />
+  </ItemGroup>
+</Project>

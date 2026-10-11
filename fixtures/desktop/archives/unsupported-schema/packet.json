@@ -1,0 +1,10 @@
+{
+  "schema_version": "desktop-archive/v9",
+  "packet_type": "historical-evidence",
+  "declared_files": [
+    {
+      "path": "notes/admission.txt",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}

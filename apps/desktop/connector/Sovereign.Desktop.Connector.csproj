@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sovereign.Desktop.Connector</RootNamespace>
+    <AssemblyName>Sovereign.Desktop.Connector</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Local Grok Bot MCP connector. Off unless Settings enables it. Listens on 127.0.0.1 port 8790.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\.cursor\skills\verify-result\SKILL.md" LogicalName="Sovereign.Desktop.Connector.verify-result.md" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
+  </ItemGroup>
+</Project>

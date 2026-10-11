@@ -1,0 +1,153 @@
+{
+  "scenario_id": "missed-late-insufficient-eval",
+  "title": "Missed/late cycle, insufficient evaluation",
+  "ui_interpretation": "Missed and late are distinct. Investment verdict remains INSUFFICIENT_EVIDENCE. No success badge.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "preview"
+    },
+    "reconciliation": {
+      "value": "Stale",
+      "label": "Reconciliation: stale",
+      "reason": "missed cycle"
+    },
+    "authorization": {
+      "value": "None",
+      "label": "Authorization: none",
+      "reason": "preview"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "missed",
+        "severity": "warning",
+        "summary": "One missed and one late cycle."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 91100
+    },
+    "holdings": [],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 0
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [],
+    "source_label": "journal-derived"
+  },
+  "decisions": [],
+  "orders": [],
+  "events": [
+    {
+      "id": "evt-missed",
+      "cursor": "0001",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "cycle",
+      "summary": "Cycle MISSED",
+      "gap_before": false
+    },
+    {
+      "id": "evt-late",
+      "cursor": "0002",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "cycle",
+      "summary": "Cycle LATE",
+      "gap_before": false
+    }
+  ],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 2
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "missed=1 late=1 on-time=0"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 1,
+    "late_count": 1,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

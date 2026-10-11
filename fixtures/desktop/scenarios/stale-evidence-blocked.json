@@ -1,0 +1,189 @@
+{
+  "scenario_id": "stale-evidence-blocked",
+  "title": "Stale evidence blocked proposal",
+  "ui_interpretation": "Proposal blocked on stale evidence. Unknown gates stay unknown.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "preview"
+    },
+    "reconciliation": {
+      "value": "Stale",
+      "label": "Reconciliation: stale",
+      "reason": "evidence older than freshness"
+    },
+    "authorization": {
+      "value": "None",
+      "label": "Authorization: none",
+      "reason": "preview"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "stale",
+        "severity": "warning",
+        "summary": "CCC evidence stale.",
+        "related_decision_id": "dec-ccc-1"
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 50000
+    },
+    "holdings": [],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 0
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [],
+    "source_label": "journal-derived"
+  },
+  "decisions": [
+    {
+      "id": "dec-ccc-1",
+      "action": "Buy",
+      "instrument": "CCC",
+      "quantity": {
+        "presence": "known",
+        "decimal": "10"
+      },
+      "price": {
+        "presence": "known",
+        "currency": "USD",
+        "minor_units": 1200
+      },
+      "evidence_ids": [
+        "ev-aaa-admission"
+      ],
+      "account_revision": "rev-4",
+      "reasons": [
+        "Blocked: universe evidence older than freshness window."
+      ],
+      "admission": {
+        "verdict": "Fail",
+        "reason": "Evidence observed_at outside freshness."
+      },
+      "risk": {
+        "verdict": "Unsupported",
+        "reason": "Risk adapter not present in preview."
+      },
+      "execution": {
+        "verdict": "Blocked",
+        "reason": "Admission failed."
+      },
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": null
+    }
+  ],
+  "orders": [],
+  "events": [],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-aaa-admission",
+      "title": "AAA admission note",
+      "media_type": "text/plain",
+      "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
+      "allowed_uri_schemes": [
+        "https",
+        "http"
+      ],
+      "source_uris": [
+        "https://example.invalid/research/aaa",
+        "javascript:alert(1)",
+        "file:///C:/Windows/win.ini"
+      ]
+    }
+  ],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 1,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
+    <Product>xAI Desk</Product>
+    <Company>xAI Desk</Company>
+    <Authors>xAI Desk</Authors>
+    <Copyright>Copyright (c) xAI Desk</Copyright>
+    <Version>0.3.60</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <InformationalVersion>$(Version)-desk-foundation</InformationalVersion>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
+  </PropertyGroup>
+</Project>
+

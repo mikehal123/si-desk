@@ -1,0 +1,120 @@
+{
+  "scenario_id": "disconnected-drafts",
+  "title": "Disconnected host with saved drafts",
+  "ui_interpretation": "Home must not fill balances from preview. Drafts remain usable. Engine/provider/broker/recon/auth stay unknown or disconnected.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Unknown",
+      "label": "Engine: unknown",
+      "reason": "host disconnected"
+    },
+    "provider": {
+      "value": "Disconnected",
+      "label": "Provider: disconnected",
+      "reason": "no host session"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "no host session"
+    },
+    "reconciliation": {
+      "value": "Unknown",
+      "label": "Reconciliation: unknown",
+      "reason": "no host snapshot"
+    },
+    "authorization": {
+      "value": "Unknown",
+      "label": "Authorization: unknown",
+      "reason": "no grant"
+    },
+    "next_cycle": {
+      "presence": "unknown",
+      "reason": "host disconnected"
+    },
+    "unresolved_issues": [
+      {
+        "id": "host",
+        "severity": "warning",
+        "summary": "Native host disconnected.",
+        "next_step": "Edit local drafts or wait for an agreed host."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "missing",
+    "reason": "Disconnected mode does not display preview balances."
+  },
+  "decisions": [],
+  "orders": [],
+  "events": [],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "missing",
+      "reason": "no host campaign"
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

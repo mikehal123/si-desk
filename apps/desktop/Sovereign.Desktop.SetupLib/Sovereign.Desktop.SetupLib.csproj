@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Sovereign.Desktop.SetupLib</RootNamespace>
+    <AssemblyName>Sovereign.Desktop.SetupLib</AssemblyName>
+    <Description>Preview installer engine. Distinct product IDs for tests. No machine-wide PATH changes.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
+  </ItemGroup>
+</Project>

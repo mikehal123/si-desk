@@ -1,0 +1,21 @@
+{
+  "schema_version": "desktop-archive/v1",
+  "packet_type": "historical-evidence",
+  "observation_window": {
+    "start": "2026-08-01T00:00:00Z",
+    "end": "2026-09-01T00:00:00Z"
+  },
+  "declared_files": [
+    {
+      "path": "notes/admission.txt",
+      "sha256": "f295db5d4dc045f0a9a9c2dad62dd01e24396dea022380d66d55d7c9afaf1a64"
+    },
+    {
+      "path": "snapshot.json",
+      "sha256": "23f9d134e2d0ee29b4922c0220195fb9d8bca3e7b24c0f32b0e8e9eeadaacc80"
+    }
+  ],
+  "result_references": [
+    "dec-aaa-1"
+  ]
+}

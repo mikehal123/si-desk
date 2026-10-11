@@ -1,0 +1,242 @@
+{
+  "scenario_id": "admitted-blocked-execution",
+  "title": "Admitted decision, blocked execution",
+  "ui_interpretation": "Admission pass, execution blocked. No override can accept the proposal. Quantity and blocking reason stay visible.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview scenario"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "scenario"
+    },
+    "broker": {
+      "value": "Disconnected",
+      "label": "Broker: disconnected",
+      "reason": "preview has no broker"
+    },
+    "reconciliation": {
+      "value": "Current",
+      "label": "Reconciliation: current (preview journal)",
+      "reason": "scenario"
+    },
+    "authorization": {
+      "value": "None",
+      "label": "Authorization: none",
+      "reason": "preview cannot grant"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "exec-block",
+        "severity": "warning",
+        "summary": "AAA execution blocked.",
+        "next_step": "Inspect execution gate.",
+        "related_decision_id": "dec-aaa-1"
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 91100
+    },
+    "holdings": [
+      {
+        "instrument": "AAA",
+        "quantity": {
+          "presence": "known",
+          "decimal": "11"
+        },
+        "mark": {
+          "presence": "known",
+          "currency": "USD",
+          "minor_units": 900
+        },
+        "quantity_source": "journal-derived"
+      }
+    ],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 0
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [],
+    "source_label": "preview journal"
+  },
+  "decisions": [
+    {
+      "id": "dec-aaa-1",
+      "action": "Buy",
+      "instrument": "AAA",
+      "quantity": {
+        "presence": "known",
+        "decimal": "5"
+      },
+      "price": {
+        "presence": "known",
+        "currency": "USD",
+        "minor_units": 910
+      },
+      "evidence_ids": [
+        "ev-aaa-admission"
+      ],
+      "account_revision": "rev-7",
+      "reasons": [
+        "Admitted on synthetic evidence.",
+        "Execution blocked: no paper grant."
+      ],
+      "admission": {
+        "verdict": "Pass",
+        "reason": "Evidence packet hash-consistent in preview."
+      },
+      "risk": {
+        "verdict": "Pass",
+        "reason": "Concentration within draft cap in preview numbers."
+      },
+      "execution": {
+        "verdict": "Blocked",
+        "reason": "No execution authority. Preview cannot override."
+      },
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": null
+    }
+  ],
+  "orders": [],
+  "events": [
+    {
+      "id": "evt-1",
+      "cursor": "0001",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "decision",
+      "summary": "AAA admitted, execution blocked",
+      "decision_id": "dec-aaa-1",
+      "gap_before": false
+    }
+  ],
+  "jobs": [
+    {
+      "id": "job-1",
+      "title": "AAA dossier (preview)",
+      "status": "completed",
+      "horizon": "3-12m",
+      "thesis": {
+        "presence": "known",
+        "text": "Quiet beneficiary of fiscal spending (preview scenario)."
+      },
+      "counter_thesis": {
+        "presence": "known",
+        "text": "Crowding and multiple expansion."
+      },
+      "uncertainty": {
+        "presence": "known",
+        "text": "Synthetic; not a real answer."
+      },
+      "evidence_refs": [
+        "ev-aaa-admission"
+      ],
+      "review_triggers": [
+        "grant expiry"
+      ],
+      "unavailable_reason": null,
+      "preview_scenario": true
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-research-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-aaa-admission",
+      "title": "AAA admission note",
+      "media_type": "text/plain",
+      "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
+      "allowed_uri_schemes": [
+        "https",
+        "http"
+      ],
+      "source_uris": [
+        "https://example.invalid/research/aaa",
+        "javascript:alert(1)",
+        "file:///C:/Windows/win.ini"
+      ]
+    }
+  ],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 1,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

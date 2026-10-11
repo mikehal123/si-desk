@@ -1,0 +1,14 @@
+{
+  "schema_version": "desktop-archive/v1",
+  "packet_type": "historical-evidence",
+  "declared_files": [
+    {
+      "path": "../secret.txt",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "observation_window": {
+    "start": "2026-09-15T12:00:00Z",
+    "end": "2026-09-15T12:00:00Z"
+  }
+}

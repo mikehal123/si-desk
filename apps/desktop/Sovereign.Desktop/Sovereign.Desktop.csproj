@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Sovereign.Desktop</RootNamespace>
+    <AssemblyName>xAIDesk</AssemblyName>
+    <ApplicationTitle>xAI Desk</ApplicationTitle>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\xAIDesk.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="..\..\..\.cursor\skills\**\*" Link=".cursor\skills\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\xAIDesk.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="account-service.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\logo.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="skill-chroma\embed384.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\SubagentAvatars\*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\..\scripts\Install-CursorConnection.ps1" Link="setup\Install-CursorConnection.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\room-tunnel\*" Link="room-tunnel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\connector\Sovereign.Desktop.Connector.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.Presentation\Sovereign.Desktop.Presentation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="UIAutomationClient">
+      <HintPath>C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\10.0.12\UIAutomationClient.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="UIAutomationTypes">
+      <HintPath>C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\10.0.12\UIAutomationTypes.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\..\fixtures\desktop\**\*" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DeskRuntimeInventory)' != ''">
+    <EmbeddedResource Include="$(DeskRuntimeInventory)" LogicalName="Sovereign.DeskRuntimeInventory" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DocumentExtractionInventory)' != ''">
+    <EmbeddedResource Include="$(DocumentExtractionInventory)" LogicalName="Sovereign.DocumentExtractionInventory" />
+  </ItemGroup>
+  <!-- A custom OutputPath skips the WinUI copy of App.xbf. Without that file the
+       control theme never loads and the first layout dies on TabViewScrollButtonBackground. -->
+  <Target Name="CopyAppXamlBinary" AfterTargets="Build">
+    <Copy SourceFiles="$(IntermediateOutputPath)App.xbf" DestinationFiles="$(OutDir)App.xbf" SkipUnchangedFiles="true" Condition="Exists('$(IntermediateOutputPath)App.xbf')" />
+    <Copy SourceFiles="Assets\xAIDesk.ico" DestinationFiles="$(OutDir)Assets\xAIDesk.ico" SkipUnchangedFiles="true" Condition="Exists('Assets\xAIDesk.ico')" />
+  </Target>
+</Project>
