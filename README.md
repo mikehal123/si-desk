@@ -63,7 +63,7 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Author
 
-Built by a self-taught longshoreman from BC. Find me on X: [@grokbuildAI](https://x.com/grokbuildAI)
+Built by Michael Louvris. Find me on X: [@grokbuildAI](https://x.com/grokbuildAI)
 
 ## License
 
