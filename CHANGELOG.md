@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.63
+
+- Classic chat view, with rounded bubbles and cleaner panels, is now on by default.
+
 ## 0.3.62
 
 - Easy install (`bfc6992`): the .NET 10 SDK rolls forward within the 10.0 band, `scripts/publish-release.ps1` builds a self-contained win-x64 zip, and setup does a real per-user install.
