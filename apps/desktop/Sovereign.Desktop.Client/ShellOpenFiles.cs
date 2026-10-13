@@ -90,8 +90,8 @@ public sealed class ShellOpenHost : IDisposable
 {
     private const int MaxFrameBytes = 32768;
     private const int ConnectTimeoutMilliseconds = 2000;
-    private const string MutexPrefix = @"Local\xAIDesk.SingleInstance.";
-    private const string PipePrefix = "xAIDesk.SingleInstance.";
+    private const string MutexPrefix = @"Local\SIDesk.SingleInstance.";
+    private const string PipePrefix = "SIDesk.SingleInstance.";
 
     // WaitOne is recursive for the owning thread. A second Start in this process must hand the file
     // off instead of taking that extra ownership and opening another listener.

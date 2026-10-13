@@ -425,9 +425,7 @@ public sealed partial class MainWindow
         {
             try
             {
-                var credential = new PasswordVault().Retrieve(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-                credential.RetrievePassword();
-                return string.IsNullOrEmpty(credential.Password) ? null : credential.Password;
+                return DeskVault.ReadPassword(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
             }
             catch { return null; }
         }
@@ -435,10 +433,8 @@ public sealed partial class MainWindow
         public string Generate()
         {
             var token = ConnectorToken.Create();
-            var vault = new PasswordVault();
-            try { vault.Remove(vault.Retrieve(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount)); }
-            catch { /* No token stored yet. */ }
-            vault.Add(new PasswordCredential(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount, token));
+            DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
+            new PasswordVault().Add(new PasswordCredential(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount, token));
             return token;
         }
 
@@ -446,8 +442,7 @@ public sealed partial class MainWindow
         {
             try
             {
-                var vault = new PasswordVault();
-                vault.Remove(vault.Retrieve(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount));
+                DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
             }
             catch { /* Already revoked. */ }
         }

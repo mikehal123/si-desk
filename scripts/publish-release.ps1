@@ -69,9 +69,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "Publish failed with exit code $LASTEXITCODE."
 }
 
-$exePath = Join-Path $publishDir 'xAIDesk.exe'
+$exePath = Join-Path $publishDir 'SIDesk.exe'
 if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
-    throw 'Publish did not produce xAIDesk.exe.'
+    throw 'Publish did not produce SIDesk.exe.'
 }
 
 $xbfPath = Join-Path $publishDir 'App.xbf'
@@ -90,14 +90,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Setup publish failed with exit code $LASTEXITCODE."
 }
 # Publish names the exe after PreviewSetup's AssemblyName. The zip still
-# ships xAIDesk.Setup.exe: SetupEngine only accepts a process path that ends
+# ships SIDesk.Setup.exe: SetupEngine only accepts a process path that ends
 # with that file name, and that is the installer users run.
 $setupOutputName = 'SovereignAI.DesktopPreview.Setup.exe'
 $setupExe = Join-Path $setupDir $setupOutputName
 if (-not (Test-Path -LiteralPath $setupExe -PathType Leaf)) {
     throw "Setup publish did not produce $setupOutputName."
 }
-Copy-Item -LiteralPath $setupExe -Destination (Join-Path $publishDir 'xAIDesk.Setup.exe') -Force
+Copy-Item -LiteralPath $setupExe -Destination (Join-Path $publishDir 'SIDesk.Setup.exe') -Force
 
 $scanOutput = @(& $scanPath -Root $publishDir 2>&1)
 $scanExit = $LASTEXITCODE
@@ -124,7 +124,7 @@ if ($scanExit -ne 0) {
     throw "Public scan failed with exit code $scanExit."
 }
 
-$zipPath = Join-Path $repoRoot ("xAIDesk-{0}-win-x64.zip" -f $version)
+$zipPath = Join-Path $repoRoot ("SIDesk-{0}-win-x64.zip" -f $version)
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }

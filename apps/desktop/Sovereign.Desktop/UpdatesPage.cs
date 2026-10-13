@@ -10,7 +10,7 @@ namespace Sovereign.Desktop;
 public sealed partial class MainWindow
 {
     private readonly InfoBar _updateBanner = new() { IsOpen = false, IsClosable = true, Severity = InfoBarSeverity.Informational, Title = "Update available" };
-    private readonly TextBlock _updateStatus = Note("Check for new xAI Desk versions.");
+    private readonly TextBlock _updateStatus = Note("Check for new SI Desk versions.");
     private readonly Button _updateAction = new() { Content = "Download update", Visibility = Visibility.Collapsed };
     private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(6) };
     private UpdateRelease? _availableUpdate;
@@ -61,7 +61,7 @@ public sealed partial class MainWindow
             if (_availableUpdate is not null && UpdatePackage.ParseVersion(release.Version) < UpdatePackage.ParseVersion(_availableUpdate.Version)) return;
             _availableUpdate = release; _updateEnvelope = envelope;
             _updateStatus.Text = $"Version {release.Version} · {release.Bytes / 1_000_000} MB\n{release.Notes}";
-            _updateBanner.Message = $"xAI Desk {release.Version} is ready to download.";
+            _updateBanner.Message = $"SI Desk {release.Version} is ready to download.";
             _updateBanner.IsOpen = true; _updateAction.Visibility = Visibility.Visible;
         }
         catch (OperationCanceledException) { if (!quiet) _updateStatus.Text = "Update check timed out. Try again when connected."; }
@@ -93,7 +93,7 @@ public sealed partial class MainWindow
                 _updateStatus.Text = "Update downloaded and verified. Finish active agents and calculations, and leave any shared room, then click Update and restart.";
                 return;
             }
-            var dialog = new ContentDialog { XamlRoot = Content.XamlRoot, Title = "Update and restart xAI Desk?", Content = $"Install {_availableUpdate.Version}. Your chats, settings and profile stay on this PC. The previous app is kept for recovery.", PrimaryButtonText = "Update and restart", CloseButtonText = "Later", DefaultButton = ContentDialogButton.Close };
+            var dialog = new ContentDialog { XamlRoot = Content.XamlRoot, Title = "Update and restart SI Desk?", Content = $"Install {_availableUpdate.Version}. Your chats, settings and profile stay on this PC. The previous app is kept for recovery.", PrimaryButtonText = "Update and restart", CloseButtonText = "Later", DefaultButton = ContentDialogButton.Close };
             await _chatDialogs.WaitAsync();
             ContentDialogResult result;
             try { result = await dialog.ShowAsync(); } finally { _chatDialogs.Release(); }

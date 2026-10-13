@@ -173,6 +173,6 @@ public static class InstalledHostSupervisor
     {
         var material = Path.GetFullPath(engineRoot).ToUpperInvariant() + "|" + Path.GetFullPath(profileRoot).ToUpperInvariant();
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.Unicode.GetBytes(material)))[..16];
-        return @"Local\xAIDesk.host." + hash;
+        return @"Local\SIDesk.host." + hash;
     }
 }

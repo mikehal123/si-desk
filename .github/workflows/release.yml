@@ -47,7 +47,7 @@ jobs:
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: xAIDesk-${{ env.VERSION }}-win-x64.zip
+          files: SIDesk-${{ env.VERSION }}-win-x64.zip
           prerelease: true
           fail_on_unmatched_files: true
 
@@ -55,6 +55,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: xAIDesk-${{ env.VERSION }}-win-x64
-          path: xAIDesk-${{ env.VERSION }}-win-x64.zip
+          name: SIDesk-${{ env.VERSION }}-win-x64
+          path: SIDesk-${{ env.VERSION }}-win-x64.zip
           if-no-files-found: error

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.SetupLib;
 
@@ -170,9 +171,9 @@ public static class InstalledHostShutdown
         {
         }
 
-        AddPreviewChildren(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xAIDesk"),
-            profiles);
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        AddPreviewChildren(Path.Combine(local, XaiDeskIdentity.DataFolderName), profiles);
+        AddPreviewChildren(Path.Combine(local, XaiDeskIdentity.LegacyDataFolderName), profiles);
     }
 
     private static void AddPreviewChildren(string root, HashSet<string> profiles)

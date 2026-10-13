@@ -1,12 +1,13 @@
-# xAI Desk
+# SI Desk
 
-xAI Desk is an unofficial, community-built Windows desktop app for Grok.
+SI Desk (SI = super intelligence) is an unofficial, community-built Windows desktop app for Grok.
 It is **not affiliated with, endorsed by, or supported by xAI.**
 SpaceXSI, xAI and Grok are trademarks of their respective owners. This project is independent and is not affiliated with or endorsed by them.
 
 ## Quick install
 
-Download the zip from the latest release, unzip, run xAIDesk.exe.
+Download the zip from the latest release, unzip, run SIDesk.exe.
+Source and releases: https://github.com/mikehal123/si-desk
 Windows 10 or 11 x64, nothing else to install.
 The build is unsigned, so Windows SmartScreen will warn: click More info, then Run anyway.
 
@@ -35,7 +36,7 @@ The build is unsigned, so Windows SmartScreen will warn: click More info, then R
 *Changes: line-by-line review of an agent's file edits before anything is applied.*
 
 ![Grokbot tab](docs/screenshots/grokbot.png)
-*Grokbot: an assistant that reads your chats and can act inside xAI Desk when you allow it.*
+*Grok Bot: an assistant that reads your chats and can act inside SI Desk when you allow it.*
 
 ## Requirements
 
@@ -57,7 +58,7 @@ This is the expected build command. Please check it against the project files be
 
 ## Shared room setup
 
-Shared room invites need cloudflared, which is not included in this repo. On first use it is downloaded automatically, pinned to 2026.10.0, SHA256 verified, and saved to `%LOCALAPPDATA%\xai-desk\tools\cloudflared.exe`.
+Shared room invites need cloudflared, which is not included in this repo. The app checks the copy it runs and verifies its SHA256. Tunnel state is kept in the SI Desk profile at `%LOCALAPPDATA%\SIDesk`.
 
 ## Status
 

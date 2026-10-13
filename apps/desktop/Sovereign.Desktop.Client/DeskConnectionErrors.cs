@@ -15,7 +15,7 @@ public static class DeskConnectionErrors
         "The xAI API rejected the saved key (auth failed). Open Settings, replace the key, save it, then click Connect / refresh models.";
 
     public const string XaiNetwork =
-        "xAI Desk could not reach the xAI API (network). Check this PC's connection, then click Connect / refresh models.";
+        "SI Desk could not reach the xAI API (network). Check this PC's connection, then click Connect / refresh models.";
 
     public const string XaiRefreshFailed =
         "Could not refresh xAI models. Save an xAI API key in Settings, check the network, then click Connect / refresh models.";

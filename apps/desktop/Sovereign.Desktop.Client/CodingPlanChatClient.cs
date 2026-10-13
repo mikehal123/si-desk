@@ -22,7 +22,7 @@ public sealed partial class CodingPlanChatClient : IDisposable
         _provider = provider;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(endpoint), Timeout = Timeout.InfiniteTimeSpan };
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("xAI Desk/0.3.1");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("SI Desk/0.3.1");
     }
     public async Task<string[]> ModelsAsync(CancellationToken ct)
     {

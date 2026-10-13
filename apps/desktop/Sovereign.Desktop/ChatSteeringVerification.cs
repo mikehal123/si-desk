@@ -42,7 +42,7 @@ public sealed partial class MainWindow
         }
         try
         {
-            Title = "xAI Desk · synthetic Cursor steering QA · no provider calls";
+            Title = "SI Desk · synthetic Cursor steering QA · no provider calls";
             AppWindow.Resize(new Windows.Graphics.SizeInt32(1440, 950));
             await Task.Delay(400);
             OpenChat();

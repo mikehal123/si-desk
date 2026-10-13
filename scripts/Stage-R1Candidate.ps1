@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $source = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $previous = [IO.Path]::GetFullPath($PreviousPackage)
-$previousVersion = [regex]::Match([IO.Path]::GetFileName($previous), '^xAIDesk-Windows-(\d+\.\d+\.\d+)$').Groups[1].Value
+$previousVersion = [regex]::Match([IO.Path]::GetFileName($previous), '^SIDesk-Windows-(\d+\.\d+\.\d+)$').Groups[1].Value
 if (-not $previousVersion) { throw 'Previous package version is unavailable.' }
 if (Test-Path -LiteralPath $output) { throw 'Candidate staging requires a fresh output directory.' }
 $changes = @(& git -C $source status --porcelain --untracked-files=all)

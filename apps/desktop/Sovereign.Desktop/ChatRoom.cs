@@ -420,12 +420,10 @@ internal sealed partial class ChatConversation
     {
         try
         {
-            var credential = new Windows.Security.Credentials.PasswordVault().Retrieve(
+            return DeskVault.ReadPassword(
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialResource,
-                Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount);
-            credential.RetrievePassword();
-            if (string.IsNullOrWhiteSpace(credential.Password)) throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing);
-            return credential.Password;
+                Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount)
+                ?? throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing);
         }
         catch (InvalidOperationException) { throw; }
         catch { throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing); }

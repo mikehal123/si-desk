@@ -39,14 +39,14 @@ public static class CommandPresentation
             title = "Windows could not start the WindowsApps PowerShell alias";
             output = title + (command.Length == 0 ? "" : "\nCommand: " + Clip(command, 500))
                 + "\nCodex launched the Microsoft Store pwsh.exe alias. That file is an execution alias, and the sandbox refused to start it."
-                + "\nThis command did not start. xAI Desk did not automatically retry it.";
+                + "\nThis command did not start. SI Desk did not automatically retry it.";
         }
         else if (!started)
         {
             title = "Windows could not start this command";
             output = title + (exit is int failed ? $"\nExit: {failed}" : "")
                 + (command.Length == 0 ? "" : "\nCommand: " + Clip(command, 500))
-                + "\nThis command did not start. xAI Desk did not automatically retry it.";
+                + "\nThis command did not start. SI Desk did not automatically retry it.";
         }
         else if (status == "failed" && IsNoMatch(command, evidence, exit))
             output = "No matches" + (exit is int searchExit ? $"\nExit: {searchExit}" : "");

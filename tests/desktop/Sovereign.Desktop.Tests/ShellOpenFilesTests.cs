@@ -18,7 +18,7 @@ public sealed class ShellOpenFilesTests
         var afterMode = @"C:\notes\after-mode.md";
         var parsed = ShellOpenFiles.Parse(
         [
-            @"C:\Program Files\xAIDesk\xAIDesk.exe",
+            @"C:\Program Files\SIDesk\SIDesk.exe",
             markdown,
             text,
             json,
@@ -50,8 +50,8 @@ public sealed class ShellOpenFilesTests
         Assert.Throws<ArgumentException>(() => ShellOpenFiles.InstanceKey(""));
         Assert.Throws<ArgumentException>(() => ShellOpenFiles.InstanceKey(null!));
 
-        var main = @"C:\Program Files\xAIDesk\xAIDesk.exe";
-        var qa = @"C:\Program Files\xAIDesk\qa\xAIDesk.exe";
+        var main = @"C:\Program Files\SIDesk\SIDesk.exe";
+        var qa = @"C:\Program Files\SIDesk\qa\SIDesk.exe";
         var first = ShellOpenFiles.InstanceKey(main);
         Assert.Equal(first, ShellOpenFiles.InstanceKey(main));
         Assert.Equal(32, first.Length);

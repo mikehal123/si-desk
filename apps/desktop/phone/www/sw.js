@@ -1,5 +1,5 @@
 /* Shell cache only. Never cache /api/. No push subscription. No background sync. */
-var CACHE = "xai-desk-phone-v2";
+var CACHE = "si-desk-phone-v3";
 /* index.html is served at /. Cache that response under /index.html. */
 var SHELL = [
   { path: "/", key: "/index.html" },
@@ -69,7 +69,7 @@ function networkThenCache(request, key) {
   }).catch(function () {
     return caches.match(key).then(function (cached) {
       if (cached) return cached;
-      return new Response("xAI Desk is offline.", {
+      return new Response("SI Desk is offline.", {
         status: 503,
         headers: { "Content-Type": "text/plain; charset=utf-8" }
       });
@@ -80,7 +80,7 @@ function networkThenCache(request, key) {
 self.addEventListener("message", function (event) {
   var data = event.data;
   if (!data || data.type !== "notify") return;
-  var title = typeof data.title === "string" && data.title ? data.title : "xAI Desk";
+  var title = typeof data.title === "string" && data.title ? data.title : "SI Desk";
   var body = typeof data.body === "string" ? data.body : "";
   event.waitUntil(
     self.registration.showNotification(title, {

@@ -15,7 +15,7 @@ public sealed partial class MainWindow
     internal async Task<byte[]> CaptureGrokbotPngAsync()
     {
         if (Content is not UIElement root)
-            throw new InvalidOperationException("The xAI Desk window could not be captured.");
+            throw new InvalidOperationException("The SI Desk window could not be captured.");
         var bitmap = new Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap();
         await bitmap.RenderAsync(root);
         var pixels = await bitmap.GetPixelsAsync();
@@ -31,7 +31,7 @@ public sealed partial class MainWindow
         using var reader = new DataReader(stream.GetInputStreamAt(0));
         await reader.LoadAsync((uint)stream.Size);
         reader.ReadBytes(bytes);
-        if (bytes.Length < 8) throw new InvalidOperationException("The xAI Desk window could not be captured.");
+        if (bytes.Length < 8) throw new InvalidOperationException("The SI Desk window could not be captured.");
         return bytes;
     }
 
@@ -39,7 +39,7 @@ public sealed partial class MainWindow
     {
         var hwnd = WindowNative.GetWindowHandle(this);
         if (hwnd == 0 || !GetWindowRect(hwnd, out var rect))
-            throw new InvalidOperationException("The xAI Desk window is not available.");
+            throw new InvalidOperationException("The SI Desk window is not available.");
         return new GrokbotWindowBounds(rect.Left, rect.Top, Math.Max(0, rect.Right - rect.Left), Math.Max(0, rect.Bottom - rect.Top));
     }
 
@@ -68,7 +68,7 @@ public sealed partial class MainWindow
         GrokbotControl? control = null;
         if (!string.IsNullOrWhiteSpace(controlId))
             control = controls.FirstOrDefault(item => string.Equals(item.Id, controlId, StringComparison.Ordinal))
-                ?? throw new KeyNotFoundException("That control is not in the xAI Desk window.");
+                ?? throw new KeyNotFoundException("That control is not in the SI Desk window.");
         GrokbotControl? hit = null;
         if (x is int px && y is int py)
             hit = GrokbotWindow.SmallestHit(controls, px, py);
@@ -77,7 +77,7 @@ public sealed partial class MainWindow
         var pointY = control is null ? y!.Value : control.Y + control.Height / 2;
         RequirePointOnThisWindow(pointX, pointY);
         if (!SetCursorPos(pointX, pointY))
-            throw new InvalidOperationException("The click did not land on the xAI Desk window.");
+            throw new InvalidOperationException("The click did not land on the SI Desk window.");
         mouse_event(LeftDown, 0, 0, 0, UIntPtr.Zero);
         mouse_event(LeftUp, 0, 0, 0, UIntPtr.Zero);
         return "Clicked.";
@@ -88,12 +88,12 @@ public sealed partial class MainWindow
         var window = GrokbotWindowBounds();
         var controls = ReadGrokbotControls();
         var control = controls.FirstOrDefault(item => string.Equals(item.Id, controlId, StringComparison.Ordinal))
-            ?? throw new KeyNotFoundException("That control is not in the xAI Desk window.");
+            ?? throw new KeyNotFoundException("That control is not in the SI Desk window.");
         GrokbotWindow.RequireType(control.Id, control.Type, control.Label, text, control.Password);
         GrokbotWindow.RequireInside(window, control);
         var hwnd = WindowNative.GetWindowHandle(this);
-        var root = AutomationElement.FromHandle(hwnd) ?? throw new InvalidOperationException("The xAI Desk window is not available.");
-        var element = FindAutomation(root, control.Id) ?? throw new KeyNotFoundException("That control is not in the xAI Desk window.");
+        var root = AutomationElement.FromHandle(hwnd) ?? throw new InvalidOperationException("The SI Desk window is not available.");
+        var element = FindAutomation(root, control.Id) ?? throw new KeyNotFoundException("That control is not in the SI Desk window.");
         if (element.TryGetCurrentPattern(ValuePattern.Pattern, out var pattern) && pattern is ValuePattern value)
         {
             if (element.GetCurrentPropertyValue(ValuePattern.IsReadOnlyProperty) is true)
@@ -132,7 +132,7 @@ public sealed partial class MainWindow
         var hwnd = WindowNative.GetWindowHandle(this);
         var hit = GetAncestor(WindowFromPoint(new POINT { X = x, Y = y }), GaRoot);
         if (hit != hwnd)
-            throw new InvalidOperationException("That point is not on the xAI Desk window.");
+            throw new InvalidOperationException("That point is not on the SI Desk window.");
     }
 
     private static void WalkAutomation(AutomationElement node, int depth, List<GrokbotControl> list, GrokbotWindowBounds window)

@@ -8,8 +8,8 @@ public sealed class SharedRoomTests
     [Fact(Timeout = 20000)]
     public async Task Host_and_guest_exchange_a_human_post_on_loopback()
     {
-        var profile = Path.Combine(Path.GetTempPath(), "xAIDesk", "room-" + Guid.NewGuid().ToString("N"));
-        Assert.Contains("xAIDesk", profile);
+        var profile = Path.Combine(Path.GetTempPath(), "SIDesk", "room-" + Guid.NewGuid().ToString("N"));
+        Assert.Contains("SIDesk", profile);
         Assert.DoesNotContain("Sovereign" + "AI", profile);
 
         SharedRoomHost? host = null;

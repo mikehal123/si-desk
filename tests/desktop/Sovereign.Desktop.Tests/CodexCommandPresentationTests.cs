@@ -22,7 +22,7 @@ public sealed class CodexCommandPresentationTests
         Assert.Contains("execution alias", denied.Output);
         Assert.DoesNotContain("Access denied (5)", denied.Title);
         Assert.Equal("failed", denied.Status);
-        Assert.Contains("xAI Desk did not automatically retry it", denied.Output);
+        Assert.Contains("SI Desk did not automatically retry it", denied.Output);
         Assert.DoesNotContain("sign in", denied.Output, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("api_key [redacted]", denied.Diagnostics);
         Assert.DoesNotContain("sekret", denied.Diagnostics);

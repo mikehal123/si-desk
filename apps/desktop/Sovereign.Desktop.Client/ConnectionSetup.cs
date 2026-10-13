@@ -3,7 +3,7 @@ namespace Sovereign.Desktop.Client;
 /// <summary>Non-secret, per-Windows-user connector configuration, outside the install tree.</summary>
 public static class ConnectionSetup
 {
-    public static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xAIDesk", "Connections");
+    public static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SIDesk", "Connections");
     public static void SaveCodexPath(string path)
     {
         path = Path.GetFullPath(path);

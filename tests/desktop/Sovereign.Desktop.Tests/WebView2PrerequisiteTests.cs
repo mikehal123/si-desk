@@ -69,7 +69,7 @@ public sealed class WebView2PrerequisiteTests
     [Fact]
     public void Prerequisite_failure_preserves_existing_app_and_profile_before_shutdown()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xAI Desk prerequisite 测试 " + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "SI Desk prerequisite 测试 " + Guid.NewGuid().ToString("N"));
         var payload = Path.Combine(root, "payload");
         var app = Path.Combine(root, "app");
         var profile = Path.Combine(root, "profile");

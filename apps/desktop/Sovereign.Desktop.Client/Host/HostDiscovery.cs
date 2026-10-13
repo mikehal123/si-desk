@@ -74,7 +74,8 @@ public static class HostDiscovery
         string[] allowed =
         [
             Path.GetFullPath(Path.GetTempPath()),
-            Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xAIDesk"))
+            Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), XaiDeskIdentity.DataFolderName)),
+            Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), XaiDeskIdentity.LegacyDataFolderName))
         ];
         string[] forbidden = [];
 
@@ -99,7 +100,7 @@ public static class HostDiscovery
             }
         }
 
-        reason = "Host profile is outside the authorized writable roots (TEMP and LocalAppData\\xAIDesk).";
+        reason = "Host profile is outside the authorized writable roots (TEMP and LocalAppData\\SIDesk).";
         return false;
     }
 

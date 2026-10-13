@@ -22,6 +22,7 @@ public partial class App : Application
 
     public App()
     {
+        XaiDeskIdentity.MigrateLegacyProfile();
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             CrashLog("APPDOMAIN " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) =>
@@ -99,9 +100,8 @@ public partial class App : Application
                     return;
                 }
             }
-            var profile = options.ProfileDirectory
-                          ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                              "xAIDesk");
+            XaiDeskIdentity.MigrateLegacyProfile();
+            var profile = options.ProfileDirectory ?? XaiDeskIdentity.DataDirectory();
             profile = Path.GetFullPath(profile);
             if (options.CodexChatVerification is not null || options.OllamaChatVerification is not null || options.ChatLayoutVerification is not null || options.ChatSteeringVerification is not null) MainWindow.ValidateCodexQaProfile(profile);
             var installDir = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\') + "\\";
@@ -276,7 +276,8 @@ public partial class App : Application
     {
         try
         {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xAIDesk");
+            XaiDeskIdentity.MigrateLegacyProfile();
+            var dir = XaiDeskIdentity.DataDirectory();
             Directory.CreateDirectory(dir);
             var line = DateTimeOffset.Now.ToString("o") + " " + message + Environment.NewLine;
             using var stream = new FileStream(Path.Combine(dir, "crash.log"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
@@ -312,7 +313,7 @@ public partial class App : Application
     {
         try
         {
-            var dir = Path.Combine(Path.GetTempPath(), "xAIDesk.diag");
+            var dir = Path.Combine(Path.GetTempPath(), "SIDesk.diag");
             Directory.CreateDirectory(dir);
             File.AppendAllText(
                 Path.Combine(dir, "startup.log"),
