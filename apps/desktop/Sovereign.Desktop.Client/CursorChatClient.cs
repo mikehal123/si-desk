@@ -62,7 +62,7 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     {
         var runtime = RuntimeDirectory;
         if (!IsRuntime(runtime))
-            throw new FileNotFoundException("Cursor connection cannot find its runtime at " + runtime + ". Install the Cursor connector, then connect again.");
+            throw new FileNotFoundException(DeskConnectionErrors.CursorNotInstalled);
         Directory.CreateDirectory(workspace);
         var info = new ProcessStartInfo(Path.Combine(runtime, "node.exe")) {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
@@ -83,7 +83,7 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
         try {
             await process.WaitForExitAsync(ct);
             await Task.WhenAll(output, error); // Drain without exposing login URLs/tokens in application logs.
-            if (process.ExitCode != 0) throw new IOException("Cursor sign-in did not finish. Try Sign in with Cursor again.");
+            if (process.ExitCode != 0) throw new IOException(DeskConnectionErrors.CursorAuthFailed);
         } finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
     }
 
@@ -135,6 +135,15 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     {
         try { while (await process.StandardError.ReadLineAsync() is not null) { } }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
+    }
+
+    public static string SwarmHireCatalog(bool? mixed, string? roleModelsDirectory, IReadOnlyList<CursorChatModel> models, string? chatModelId)
+    {
+        if (mixed == true && !string.IsNullOrWhiteSpace(roleModelsDirectory))
+            return SwarmRoleModels.Catalog(models, chatModelId, SwarmRoleModels.Load(roleModelsDirectory));
+        if (mixed == true)
+            return SwarmModelHire.Catalog(models, chatModelId);
+        return SwarmRoleModels.SingleCatalog(models, chatModelId);
     }
 
     public async Task<CursorChatModel[]> ModelsAsync(CancellationToken ct)
@@ -251,13 +260,7 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
         var swarmHire = "";
         if (swarmBrief is { Length: > 0 })
         {
-            var directory = project?.SwarmRoleModelsDirectory;
-            var swarmCatalog = project?.SwarmMixedModels switch
-            {
-                true when !string.IsNullOrWhiteSpace(directory) => SwarmRoleModels.Catalog(Models, model, SwarmRoleModels.Load(directory)),
-                false => SwarmRoleModels.SingleCatalog(Models, model),
-                _ => SwarmModelHire.Catalog(Models, model)
-            };
+            var swarmCatalog = CursorChatClient.SwarmHireCatalog(project?.SwarmMixedModels, project?.SwarmRoleModelsDirectory, Models, model);
             swarmHire = swarmBrief + "\n\n" + swarmCatalog + "\n\n";
         }
         var helperModelClause = swarmHire.Length > 0

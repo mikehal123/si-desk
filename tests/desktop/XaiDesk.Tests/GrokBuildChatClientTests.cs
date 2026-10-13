@@ -360,6 +360,11 @@ public sealed class GrokBuildChatClientTests
         var error = await Assert.ThrowsAsync<IOException>(() => send.WaitAsync(TimeSpan.FromSeconds(4)));
         Assert.Contains("incomplete", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("silence", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PATH", error.Message);
+        Assert.Contains("signed in", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Connect / refresh models", error.Message);
+        Assert.Equal(error.Message, ProjectAgentException.Describe(error));
+        Assert.DoesNotContain("run failed locally", ProjectAgentException.Describe(error), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact(Timeout = 15000)]

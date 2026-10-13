@@ -12,6 +12,7 @@ public sealed class ProjectAgentException(string message) : IOException(message)
         HttpRequestException => "The provider connection failed. Completed edits are kept; check the connection before continuing.",
         IOException io when io.Message.StartsWith("Provider returned HTTP ", StringComparison.Ordinal)
             => ParseHttpStatus(io.Message),
+        IOException io when DeskConnectionErrors.IsAuthored(io.Message) => io.Message,
         _ => "The run failed locally. Completed edits are kept. Review activity and the current connection status before continuing."
     };
 

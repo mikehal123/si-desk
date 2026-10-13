@@ -412,7 +412,7 @@ internal sealed partial class ChatConversation
             _chatStatus.Text = "Cursor sign-in finished. Click Connect / refresh models.";
             return true;
         }
-        catch (Exception ex) { _chatStatus.Text = "Sign-in unavailable: " + ex.Message; return false; }
+        catch (Exception ex) { _chatStatus.Text = DeskConnectionErrors.ForConnect(ex, CurrentConnectKind()); return false; }
         finally { SetChatBusy(false); }
     }
 
@@ -424,12 +424,18 @@ internal sealed partial class ChatConversation
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialResource,
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount);
             credential.RetrievePassword();
-            if (string.IsNullOrWhiteSpace(credential.Password)) throw new InvalidOperationException("Save an xAI API key in Settings first.");
+            if (string.IsNullOrWhiteSpace(credential.Password)) throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing);
             return credential.Password;
         }
         catch (InvalidOperationException) { throw; }
-        catch { throw new InvalidOperationException("Save an xAI API key in Settings first."); }
+        catch { throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing); }
     }
+
+    private DeskConnectKind CurrentConnectKind() =>
+        XaiApiChat ? DeskConnectKind.XaiApi :
+        CursorChat ? DeskConnectKind.Cursor :
+        GrokBuildChat ? DeskConnectKind.GrokBuild :
+        DeskConnectKind.Other;
 
     internal async Task ConnectChatAsync()
     {
@@ -486,7 +492,7 @@ internal sealed partial class ChatConversation
                     if (grokModels.Length > 0) _chatModel.SelectedIndex = 0;
                     _chatReady = grokModels.Length > 0;
                     var grokStatus = _chatReady ? (_projectFolder is null ? "Grok Build connected. Open Folder to work on files."
-                        : ProjectConnectionStatus("Grok Build can edit files in this folder.")) : "Grok Build returned no Grok models. Check that the Grok CLI is signed in.";
+                        : ProjectConnectionStatus("Grok Build can edit files in this folder.")) : DeskConnectionErrors.GrokNotSignedIn;
                     if (grok.ModeWarning is { Length: > 0 } modeWarning) grokStatus += " " + modeWarning;
                     _chatStatus.Text = grokStatus;
                     return;
@@ -513,12 +519,14 @@ internal sealed partial class ChatConversation
                         RequestPermission = RequestProjectPermissionAsync
                     }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } });
                 CursorChatModel[]? live = null;
+                string? cursorError = null;
                 try
                 {
                     live = await _cursorChat.ModelsAsync(timeout.Token);
                 }
-                catch (Exception) when (!PhoneSendCancelled)
+                catch (Exception ex) when (!PhoneSendCancelled)
                 {
+                    cursorError = DeskConnectionErrors.ForConnect(ex, DeskConnectKind.Cursor);
                     _cursorChat?.Dispose();
                     _cursorChat = null;
                 }
@@ -530,12 +538,13 @@ internal sealed partial class ChatConversation
                 var pick = CursorModelCatalog.SelectDefault(cursorModels, _saved.Model, null);
                 if (pick is not null) SelectChatModel(pick);
                 _chatReady = !usingCache && cursorModels.Length > 0;
+                var cursorStatus = cursorError ?? DeskConnectionErrors.CursorNotSignedIn;
                 _chatStatus.Text = _chatReady
                     ? (_projectFolder is null ? "Cursor chat connected. Open Folder to work on files."
                         : ProjectConnectionStatus("Uses your Cursor account. Tools, subagents, and file edits stay in this folder."))
                     : usingCache && cursorModels.Length > 0
-                        ? "Cursor is offline. Showing the last saved model list. Connect again to send."
-                        : "Cursor returned no models. Sign in with Cursor, then Connect again.";
+                        ? DeskConnectionErrors.WithCachedModels(cursorStatus)
+                        : cursorStatus;
                 return;
             }
             if(PlanChat)
@@ -573,7 +582,7 @@ internal sealed partial class ChatConversation
                 : "No models available. Install a local Ollama model or check your Codex account access.";
         }
         catch (OperationCanceledException) when (PhoneSendCancelled) { _chatStatus.Text = "Phone send stopped before dispatch."; }
-        catch (Exception ex) { _chatStatus.Text = "Connection failed: " + ex.Message; }
+        catch (Exception ex) { _chatStatus.Text = DeskConnectionErrors.ForConnect(ex, CurrentConnectKind()); }
         finally { if (agentConnection) _cursorConnecting = false; RestoreModelSelection(); if (_chatReady) _reconnectOnSend = false; SetChatBusy(false); Save(); if (_chatReady) _connectionFlyout?.Hide(); }
     }
     internal void SetChatBusy(bool busy)

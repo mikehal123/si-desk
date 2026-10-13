@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.64
+
+- Single model mode uses the selected model for every swarm role. A missing model is an error instead of a silent fallback to another provider.
+- Connect, refresh, and Grok Build silence errors name what is missing (xAI API key, Cursor sign-in, Grok CLI on PATH, auth, or network) and the next step.
+- First launch and Settings include a setup check for the xAI API key, Cursor login, and Grok Build. Each line is OK or Missing. Secret values are not shown.
+
 ## 0.3.62
 
 - Easy install (`bfc6992`): the .NET 10 SDK rolls forward within the 10.0 band, `scripts/publish-release.ps1` builds a self-contained win-x64 zip, and setup does a real per-user install.

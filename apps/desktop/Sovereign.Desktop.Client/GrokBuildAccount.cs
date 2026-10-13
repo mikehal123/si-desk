@@ -15,7 +15,7 @@ public static class GrokBuildAccount
     {
         var executable = GrokBuildChatClient.FindExecutable();
         if (executable is null)
-            return new GrokBuildStatusReport("not found", "not logged in", "unknown", "Grok CLI was not found.");
+            return new GrokBuildStatusReport("not found", "not logged in", "unknown", DeskConnectionErrors.GrokNotInstalled);
 
         var version = await CaptureAsync(executable, "--version", TimeSpan.FromSeconds(15), ct);
         var auth = ReadAuthFile();
@@ -29,7 +29,7 @@ public static class GrokBuildAccount
         var signedInAs = string.IsNullOrWhiteSpace(email) ? "not logged in" : email;
         var probe = ProbeLine(modelsOutput) ?? ProbeLine(modelsError);
         string? error = probe is null ? null : GrokBuildJson.Redact(probe);
-        if (error is null && signedInAs == "not logged in") error = "not logged in";
+        if (error is null && signedInAs == "not logged in") error = DeskConnectionErrors.GrokNotSignedIn;
         var plan = PlanOf((modelsOutput ?? "") + "\n" + (modelsError ?? ""));
         return new GrokBuildStatusReport(VersionOf(versionOutput), signedInAs, plan, error);
     }
