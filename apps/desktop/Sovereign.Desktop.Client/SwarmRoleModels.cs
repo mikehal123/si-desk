@@ -162,21 +162,30 @@ public static class SwarmRoleModels
 
     public static string SingleCatalog(IReadOnlyList<CursorChatModel> advertised, string? chatModelId)
     {
-        var id = string.IsNullOrWhiteSpace(chatModelId) ? "(none)" : chatModelId;
+        if (string.IsNullOrWhiteSpace(chatModelId))
+            throw new IOException("No swarm model is selected. Single model mode will not fall back to another provider.");
+        if (AdvertisedId(advertised, chatModelId) is not { } id)
+            throw new IOException("Selected model \"" + chatModelId + "\" is not available. Single model mode will not fall back to another provider.");
+
+        string? name = null;
+        foreach (var model in advertised)
+        {
+            if (model is null || !string.Equals(model.Id, id, StringComparison.Ordinal)) continue;
+            name = model.Name;
+            break;
+        }
+
         var lines = new StringBuilder();
         lines.Append("Swarm hire catalog. Pass the modelId on the helper tool's model field. Do not pass the display name.\n");
         lines.Append("Parent modelId: ").Append(id).Append('\n');
-        if (advertised.Count == 0) lines.Append("(no advertised models)\n");
-        foreach (var model in advertised)
-        {
-            if (model is null) continue;
-            lines.Append("- ").Append(model.Id).Append(" | ").Append(model.Name).Append('\n');
-        }
+        lines.Append("- ").Append(id).Append(" | ").Append(name).Append('\n');
         foreach (var role in CatalogRoles)
             lines.Append(role).Append(" modelId: ").Append(id).Append('\n');
-        lines.Append("Every worker uses the chat's selected model. ");
-        lines.Append("grokbot-research and grokbot-ops take no modelId. ");
-        lines.Append("If the helper tool rejects the model field, fall back to the parent modelId.\n");
+        lines.Append("Single model mode; every role uses only this modelId, including the manager, workers, verifier, helpers, fallbacks, and retries; ");
+        lines.Append("the verifier uses this same modelId; ");
+        lines.Append("grokbot-research and grokbot-ops take no modelId; ");
+        lines.Append("if the helper tool rejects the model field, retry this same modelId; ");
+        lines.Append("do not substitute another model or provider.\n");
         return lines.ToString();
     }
 

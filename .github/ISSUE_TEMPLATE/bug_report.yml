@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: xAI Desk version
-      placeholder: "0.3.62"
+      placeholder: "0.3.64"
     validations:
       required: true
   - type: input

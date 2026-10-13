@@ -17,7 +17,8 @@ public sealed class GrokBuildAccountTests
         Assert.Equal("not logged in", report.SignedInAs);
         Assert.Equal("unknown", report.Plan);
         Assert.NotNull(report.Error);
-        Assert.Contains("not logged in", report.Error);
+        Assert.Equal(DeskConnectionErrors.GrokNotSignedIn, report.Error);
+        Assert.Contains("Sign in", report.Error);
         Assert.False(report.Ok);
     }
 

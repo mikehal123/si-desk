@@ -1,6 +1,6 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 
 namespace Sovereign.Desktop.Client;
@@ -14,7 +14,7 @@ public sealed class XaiApiChatClient : IDisposable
 
     public XaiApiChatClient(string apiKey, HttpMessageHandler? handler = null, string? baseUrl = null)
     {
-        if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("Save an xAI API key in Settings first.");
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing);
         _apiKey = apiKey.Trim();
         _http = handler is null ? new HttpClient() : new HttpClient(handler);
         _http.BaseAddress = new Uri(string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl);
@@ -27,17 +27,22 @@ public sealed class XaiApiChatClient : IDisposable
     {
         using var response = await _http.GetAsync("models", ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw new IOException("xAI API model list failed (" + (int)response.StatusCode + "). " + Safe(body));
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new IOException(DeskConnectionErrors.XaiAuthFailed);
+        if (!response.IsSuccessStatusCode)
+            throw new IOException((int)response.StatusCode >= 500
+                ? DeskConnectionErrors.XaiNetwork
+                : DeskConnectionErrors.XaiRefreshFailed);
         using var json = JsonDocument.Parse(body);
         if (!json.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
-            throw new IOException("xAI API model list was empty.");
+            throw new IOException(DeskConnectionErrors.XaiRefreshFailed);
         var models = data.EnumerateArray()
             .Select(m => m.TryGetProperty("id", out var id) ? id.GetString() : null)
             .Where(Sovereign.Desktop.Core.XaiDeskIdentity.IsGrokModel)
             .Select(m => m!)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        if (models.Length == 0) throw new IOException("xAI API did not advertise a Grok model.");
+        if (models.Length == 0) throw new IOException("xAI API did not advertise a Grok model. Check the account, then click Connect / refresh models.");
         return models;
     }
 
@@ -59,10 +64,14 @@ public sealed class XaiApiChatClient : IDisposable
             Content = JsonContent.Create(payload)
         };
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new IOException(DeskConnectionErrors.XaiAuthFailed);
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(ct);
-            throw new IOException("xAI API chat failed (" + (int)response.StatusCode + "). " + Safe(error));
+            throw new IOException((int)response.StatusCode >= 500
+                ? DeskConnectionErrors.XaiNetwork
+                : "xAI API chat failed (" + (int)response.StatusCode + "). Check the saved key and the network, then try again. " + Safe(error));
         }
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);

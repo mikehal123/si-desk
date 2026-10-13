@@ -86,6 +86,9 @@ public sealed partial class MainWindow
         ConnectionRow(section, "Grok Build", _statusGrokBuild, grokActions, _grokBuildProgress);
         ConnectionRow(section, "xAI API", _statusXaiApi, Button("Save", SaveXaiApiKey));
         section.Children.Add(_xaiApiKey);
+        var checkSetup = Button("Check setup", ShowSetupCheckAsync);
+        AutomationName(checkSetup, "Check setup");
+        section.Children.Add(checkSetup);
         return section;
     }
     private StackPanel DataSection()
@@ -192,7 +195,7 @@ public sealed partial class MainWindow
             await login.LoginAsync(timeout.Token);
             _statusCursor.Text = "Sign-in finished. Connect in Chat to refresh models.";
         }
-        catch (Exception ex) { _statusCursor.Text = "Sign-in unavailable: " + ex.Message; }
+        catch (Exception ex) { _statusCursor.Text = DeskConnectionErrors.ForConnect(ex, DeskConnectKind.Cursor); }
     }
     private Task SignInGrokBuildAsync() => RunGrokBuildAsync("Opening Grok sign-in…", static ct => GrokBuildChatClient.LoginAsync(ct));
     private Task SignOutGrokBuildAsync() => RunGrokBuildAsync("Opening Grok sign-out…", static ct => GrokBuildChatClient.LogoutAsync(ct));
@@ -214,8 +217,9 @@ public sealed partial class MainWindow
         }
         catch (Exception ex)
         {
-            _statusGrokBuild.Text = ex.Message;
-            throw;
+            var message = DeskConnectionErrors.ForConnect(ex, DeskConnectKind.GrokBuild);
+            _statusGrokBuild.Text = message;
+            throw new IOException(message);
         }
         finally
         {
@@ -253,5 +257,78 @@ public sealed partial class MainWindow
     {
         var data = new DataPackage(); data.SetText(_vm.ProfileDirectory); Clipboard.SetContent(data);
         _settingsDataStatus.Text = "Profile path copied.";
+    }
+
+    private async Task MaybeShowFirstRunSetupAsync()
+    {
+        try
+        {
+            if (!DeskSetupPrompt.ShouldShow(_vm.ProfileDirectory)) return;
+            if (Content is not FrameworkElement { XamlRoot: not null }) return;
+            DeskSetupPrompt.MarkShown(_vm.ProfileDirectory);
+            await ShowSetupCheckAsync();
+        }
+        catch (Exception)
+        {
+            // First launch still opens if the check cannot run. Settings can run it again.
+        }
+    }
+
+    private async Task ShowSetupCheckAsync()
+    {
+        if (Content is not FrameworkElement root || root.XamlRoot is null) return;
+        while (true)
+        {
+            var report = await DeskSetupCheck.CollectAsync(new DeskSetupSources
+            {
+                XaiApiKey = ReadSavedXaiKey(),
+                CursorRuntimeInstalled = CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory),
+                CursorSignedIn = CursorLoginProbe.IsSignedIn(),
+                GrokFound = GrokBuildChatClient.FindExecutable() is not null
+            }, CancellationToken.None);
+            var lines = new StackPanel { Spacing = DeskTheme.Space8 };
+            foreach (var item in report.Items)
+            {
+                var row = new TextBlock
+                {
+                    Text = item.Name + " — " + item.Line,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontFamily = DeskTheme.UiFont,
+                    FontSize = DeskTheme.SizeBody,
+                    Foreground = item.Ok ? DeskTheme.Success : DeskTheme.Warning,
+                    LineHeight = DeskTheme.Space24
+                };
+                AutomationName(row, item.Name + " " + item.State);
+                lines.Children.Add(row);
+            }
+            var body = new StackPanel { Spacing = DeskTheme.Space12 };
+            body.Children.Add(Note("Each item is OK or Missing. Secret values stay on this PC and are not shown."));
+            body.Children.Add(lines);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = root.XamlRoot,
+                Title = "Setup check",
+                Content = body,
+                PrimaryButtonText = "Check again",
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close
+            };
+            dialog.Resources["ContentDialogMaxWidth"] = 640d;
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        }
+    }
+
+    private static string? ReadSavedXaiKey()
+    {
+        try
+        {
+            var credential = new PasswordVault().Retrieve(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount);
+            credential.RetrievePassword();
+            return string.IsNullOrWhiteSpace(credential.Password) ? null : credential.Password;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
