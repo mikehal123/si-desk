@@ -23,7 +23,7 @@ internal static class Program
                 return parseError.ExitCode;
             }
 
-            var result = new SetupResult(1, "The installer engine is not in this copy.", []);
+            var result = SetupEngine.Run(request!);
             foreach (var line in result.Log)
             {
                 Console.WriteLine(line);

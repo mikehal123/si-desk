@@ -1,10 +1,28 @@
+using System.Globalization;
+
 namespace Sovereign.Desktop.SetupLib;
 
 public static class SetupCli
 {
     public const string ProductionProductId = "xAIDesk";
     public const string ProductionProductName = "xAI Desk";
-    public const string CurrentVersion = "0.3.3";
+    public static string CurrentVersion
+    {
+        get
+        {
+            var version = typeof(SetupCli).Assembly.GetName().Version;
+            if (version is null)
+                return "0.0.0";
+            var build = version.Build < 0 ? 0 : version.Build;
+            return version.Major.ToString(CultureInfo.InvariantCulture)
+                + "." + version.Minor.ToString(CultureInfo.InvariantCulture)
+                + "." + build.ToString(CultureInfo.InvariantCulture);
+        }
+    }
+
+    public static string DefaultInstallDir() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", ProductionProductName);
+
     public const int MissingInstallDirExitCode = 6;
 
     public static SetupResult? ParseOrError(string[] args, out SetupRequest? request)
@@ -22,12 +40,21 @@ public static class SetupCli
                           ?? (testInstance is null ? ProductionProductName : ProductionProductName + " " + testInstance);
         var startMenu = Get(args, "--start-menu-name") ?? productName;
         var version = Get(args, "--version") ?? CurrentVersion;
-        if (!TryGetRequired(args, "--install-dir", out var installDir, out var flagPresent) || string.IsNullOrWhiteSpace(installDir))
+        var desktopShortcut = Has(args, "--desktop-shortcut");
+        string installDir;
+        if (!TryGetRequired(args, "--install-dir", out var givenDir, out var flagPresent) || string.IsNullOrWhiteSpace(givenDir))
         {
-            var why = flagPresent
-                ? "MISSING_REQUIRED_ARGUMENT: --install-dir was present without a value. Default LocalAppData install is refused."
-                : "MISSING_REQUIRED_ARGUMENT: --install-dir is required. Default LocalAppData install is refused.";
-            return new SetupResult(MissingInstallDirExitCode, why, [why]);
+            if (flagPresent)
+            {
+                var why = "MISSING_REQUIRED_ARGUMENT: --install-dir was present without a value.";
+                return new SetupResult(MissingInstallDirExitCode, why, [why]);
+            }
+
+            installDir = DefaultInstallDir();
+        }
+        else
+        {
+            installDir = givenDir;
         }
 
         var payload = Get(args, "--payload") ?? Path.Combine(AppContext.BaseDirectory, "payload");
@@ -35,7 +62,7 @@ public static class SetupCli
         int? failAfter = int.TryParse(Get(args, "--fail-after-files"), out var n) ? n : null;
         var sentinel = Get(args, "--sentinel");
         var action = uninstall ? SetupAction.Uninstall : repair ? SetupAction.Repair : upgrade ? SetupAction.Upgrade : SetupAction.Install;
-        request = new SetupRequest(action, installDir, payload, productId, productName, version, profile, startMenu, keepData, failAfter, sentinel);
+        request = new SetupRequest(action, installDir, payload, productId, productName, version, profile, startMenu, keepData, failAfter, sentinel, desktopShortcut);
         return null;
     }
 

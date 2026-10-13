@@ -1,6 +1,29 @@
 $root = Split-Path -Parent $PSScriptRoot
-$env:DOTNET_ROOT = Join-Path $root ".tools\dotnet"
-$env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+$local = Join-Path $root ".tools\dotnet\dotnet.exe"
+$dotnet = $null
+if (Test-Path -LiteralPath $local) {
+    $env:DOTNET_ROOT = Split-Path -Parent $local
+    $env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+    $dotnet = $local
+} else {
+    $cmd = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $dotnet = $cmd.Source
+        $env:DOTNET_ROOT = Split-Path -Parent $dotnet
+    } else {
+        $userDotnet = Join-Path $env:USERPROFILE ".dotnet\dotnet.exe"
+        if (Test-Path -LiteralPath $userDotnet) {
+            $dotnet = $userDotnet
+            $env:DOTNET_ROOT = Split-Path -Parent $userDotnet
+            $env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+        }
+    }
+}
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
 $env:DOTNET_NOLOGO = "1"
-& "$env:DOTNET_ROOT\dotnet.exe" @args
+if (-not $dotnet) {
+    Write-Error "dotnet was not found. Install the .NET SDK, put dotnet on PATH, or place dotnet.exe at .tools\dotnet\dotnet.exe."
+    exit 1
+}
+& $dotnet @args
+if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }

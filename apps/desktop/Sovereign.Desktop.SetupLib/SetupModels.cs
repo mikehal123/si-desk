@@ -11,7 +11,8 @@ public sealed record SetupRequest(
     string StartMenuName,
     bool KeepData,
     int? FailAfterFileCount,
-    string? SentinelPath);
+    string? SentinelPath,
+    bool DesktopShortcut);
 
 public enum SetupAction
 {

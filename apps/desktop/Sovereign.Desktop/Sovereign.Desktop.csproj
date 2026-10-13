@@ -38,16 +38,71 @@
     <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
     <ProjectReference Include="..\Sovereign.Desktop.Presentation\Sovereign.Desktop.Presentation.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="UIAutomationClient">
-      <HintPath>C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\10.0.12\UIAutomationClient.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="UIAutomationTypes">
-      <HintPath>C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\10.0.12\UIAutomationTypes.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-  </ItemGroup>
+  <UsingTask TaskName="ResolveWindowsDesktopAutomationTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <NetCoreRoot ParameterType="System.String" />
+      <WindowsDesktopAutomationDir ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        WindowsDesktopAutomationDir = string.Empty;
+        if (!string.IsNullOrWhiteSpace(NetCoreRoot))
+        {
+          string packRoot = Path.Combine(NetCoreRoot, "shared", "Microsoft.WindowsDesktop.App");
+          if (Directory.Exists(packRoot))
+          {
+            Version bestVersion = new Version(0, 0);
+            string bestDirectory = string.Empty;
+            bool found = false;
+            foreach (string directory in Directory.GetDirectories(packRoot))
+            {
+              Version parsed;
+              if (!Version.TryParse(Path.GetFileName(directory), out parsed))
+              {
+                continue;
+              }
+
+              if (!File.Exists(Path.Combine(directory, "UIAutomationClient.dll")) ||
+                  !File.Exists(Path.Combine(directory, "UIAutomationTypes.dll")))
+              {
+                continue;
+              }
+
+              if (!found || parsed > bestVersion)
+              {
+                found = true;
+                bestVersion = parsed;
+                bestDirectory = directory;
+              }
+            }
+
+            if (found)
+            {
+              WindowsDesktopAutomationDir = bestDirectory;
+            }
+          }
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="ResolveWindowsDesktopAutomation" BeforeTargets="ResolveAssemblyReferences">
+    <ResolveWindowsDesktopAutomationTask NetCoreRoot="$(NetCoreRoot)">
+      <Output TaskParameter="WindowsDesktopAutomationDir" PropertyName="WindowsDesktopAutomationDir" />
+    </ResolveWindowsDesktopAutomationTask>
+    <ItemGroup Condition="'$(WindowsDesktopAutomationDir)' != ''">
+      <Reference Include="UIAutomationClient">
+        <HintPath>$(WindowsDesktopAutomationDir)\UIAutomationClient.dll</HintPath>
+        <Private>true</Private>
+      </Reference>
+      <Reference Include="UIAutomationTypes">
+        <HintPath>$(WindowsDesktopAutomationDir)\UIAutomationTypes.dll</HintPath>
+        <Private>true</Private>
+      </Reference>
+    </ItemGroup>
+    <Message Importance="high" Text="WindowsDesktopAutomationDir=$(WindowsDesktopAutomationDir)" />
+  </Target>
   <ItemGroup>
     <Content Include="..\..\..\fixtures\desktop\**\*" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Manifest Include="$(ApplicationManifest)" />

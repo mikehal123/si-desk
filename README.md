@@ -3,6 +3,12 @@
 xAI Desk is an unofficial, community-built Windows desktop app for Grok.
 It is **not affiliated with, endorsed by, or supported by xAI.**
 
+## Quick install
+
+Download the zip from the latest release, unzip, run xAIDesk.exe.
+Windows 10 or 11 x64, nothing else to install.
+The build is unsigned, so Windows SmartScreen will warn: click More info, then Run anyway.
+
 ## Features
 
 - **Chat** with File > Open Folder, so Grok can work on your code.
@@ -33,8 +39,10 @@ It is **not affiliated with, endorsed by, or supported by xAI.**
 ## Requirements
 
 - Windows 10 or 11 (x64)
-- .NET 10 SDK
-- At least one connection: a Cursor subscription, a Grok Build CLI subscription, or an xAI API key
+- One connection: a Cursor subscription, a Grok Build CLI subscription, or an xAI API key
+- Cursor users run `scripts\Install-CursorConnection.ps1` once
+- Shared Room downloads cloudflared on first use
+- The .NET SDK is only needed to build from source
 
 ## Build
 
