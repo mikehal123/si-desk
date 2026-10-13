@@ -35,6 +35,12 @@ jobs:
       - name: Test (Sovereign.Desktop.Tests)
         run: dotnet test tests/desktop/Sovereign.Desktop.Tests -c Release -p:Platform=x64
 
+      # setup-dotnet does not install workload packs. The WinUI app targets
+      # net10.0-windows10.0.26100.0, and that versioned TFM is resolved from
+      # microsoft-windows-sdk-net before the Windows SDK BuildTools package runs.
+      - name: Install Windows SDK workload
+        run: dotnet workload install microsoft-windows-sdk-net
+
       - name: Publish release zip
         run: ./scripts/publish-release.ps1
 

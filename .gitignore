@@ -27,7 +27,19 @@ preserved/lab/
 preserved/desktop/
 contracts/
 docs/desktop/evidence/
-.cursor/
+# Ignore the rest of .cursor/. These three skill files are embedded by the
+# desktop projects and read by XaiDesk.Tests, so a fresh clone must contain them.
+.cursor/*
+!.cursor/skills/
+.cursor/skills/*
+!.cursor/skills/index.json
+!.cursor/skills/work-doctrine/
+.cursor/skills/work-doctrine/*
+!.cursor/skills/work-doctrine/SKILL.md
+!.cursor/skills/verify-result/
+.cursor/skills/verify-result/*
+!.cursor/skills/verify-result/SKILL.md
+
 .*-backup/
 
 docs/desktop/

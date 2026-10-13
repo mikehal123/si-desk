@@ -106,7 +106,7 @@ public sealed class SwarmPhase1Tests
         var skill = VerifyResultSkill.Text();
         Assert.Contains("name: verify-result", skill, StringComparison.Ordinal);
         Assert.Contains("Claim, How tested, Evidence, Paths covered", skill, StringComparison.Ordinal);
-        Assert.Contains("minting, releases", skill, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("risky, costly, or irreversible actions", skill, StringComparison.OrdinalIgnoreCase);
         var index = File.ReadAllText(Path.Combine(Directory.GetParent(path)!.Parent!.FullName, "index.json"));
         Assert.Contains("\"verify-result\"", index, StringComparison.Ordinal);
         Assert.Contains("\"verifier\"", index, StringComparison.Ordinal);

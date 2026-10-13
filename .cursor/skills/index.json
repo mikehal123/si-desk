@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "name": "verify-result",
+      "description": "Prove a result before calling it done. Use whenever finishing a task, reviewing a worker's result, or acting as the swarm QA verifier.",
+      "path": "verify-result/SKILL.md",
+      "roles": ["verifier", "manager"]
+    },
+    {
+      "name": "work-doctrine",
+      "description": "Standing skill for the main agent, every subagent, and every swarm role.",
+      "path": "work-doctrine/SKILL.md",
+      "roles": ["main", "subagent", "engineer", "researcher", "verifier", "grokbot-research", "grokbot-ops", "manager"]
+    }
+  ]
+}
