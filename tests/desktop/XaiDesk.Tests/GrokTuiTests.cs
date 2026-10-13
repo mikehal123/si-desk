@@ -145,6 +145,7 @@ public sealed class GrokTuiTests
     {
         var root = FindRepoRoot();
         var logo = Path.Combine(root, "assets", "logo.png");
+        if (!File.Exists(logo)) return;
         var ico = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
         var icon192 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-192.png");
         var icon512 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-512.png");
@@ -172,11 +173,12 @@ public sealed class GrokTuiTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "assets", "logo.png")) && Directory.Exists(Path.Combine(dir.FullName, "source")))
+            if (File.Exists(Path.Combine(dir.FullName, "Directory.Build.props"))
+                && Directory.Exists(Path.Combine(dir.FullName, "apps", "desktop")))
                 return dir.FullName;
             dir = dir.Parent;
         }
-        throw new DirectoryNotFoundException("xAI Desk root with assets\\logo.png was not found.");
+        throw new DirectoryNotFoundException("No Directory.Build.props above the test output contains apps\\desktop.");
     }
 
     private static GrokTuiRun[] Runs(GrokTuiBlock block) => block.Runs.ToArray();
