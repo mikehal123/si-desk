@@ -2,6 +2,7 @@
 
 xAI Desk is an unofficial, community-built Windows desktop app for Grok.
 It is **not affiliated with, endorsed by, or supported by xAI.**
+SpaceXSI, xAI and Grok are trademarks of their respective owners. This project is independent and is not affiliated with or endorsed by them.
 
 ## Quick install
 
@@ -13,9 +14,9 @@ The build is unsigned, so Windows SmartScreen will warn: click More info, then R
 
 - **Chat** with File > Open Folder, so Grok can work on your code.
 - **Three ways to connect:**
-  - your Cursor subscription, using Grok models
-  - your Grok Build CLI subscription
-  - a paid xAI API key
+  - a Cursor subscription on this PC, which can select Grok models
+  - the Grok Build CLI on this PC, using the subscription that CLI is signed in with
+  - an API key sent to the xAI API
 - **Subagents** that help with parts of a task.
 - **Swarm mode.** A manager splits a goal into parallel engineer, fact-finding and verifier tasks. Nothing counts as done until a verifier proves it. If a worker fails, you can press Respawn to retry it once.
 - **Changes review tab** to look over edits before you keep them.
@@ -39,7 +40,7 @@ The build is unsigned, so Windows SmartScreen will warn: click More info, then R
 ## Requirements
 
 - Windows 10 or 11 (x64)
-- One connection: a Cursor subscription, a Grok Build CLI subscription, or an xAI API key
+- One connection: a Cursor subscription, the Grok Build CLI, or an API key for the xAI API
 - Cursor users run `scripts\Install-CursorConnection.ps1` once
 - Shared Room downloads cloudflared on first use
 - The .NET SDK is only needed to build from source

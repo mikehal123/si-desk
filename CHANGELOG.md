@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.65
+
+- App and phone icons no longer use the SpaceXSI / xAI mark. They use this project's own artwork. Third-party notices now include PdfPig and the Windows App SDK.
+
 ## 0.3.64
 
 - Single model mode uses the selected model for every swarm role. A missing model is an error instead of a silent fallback to another provider.
