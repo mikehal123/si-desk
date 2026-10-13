@@ -39,3 +39,17 @@ SOFTWARE.
 - Use: Shared room invites run through a cloudflared tunnel.
 - cloudflared is **not bundled** in this repository. You download it separately from Cloudflare's releases page (see README). It is covered by its own Apache-2.0 license and any NOTICE file Cloudflare ships with it, at https://github.com/cloudflare/cloudflared/blob/master/LICENSE.
 
+## PdfPig
+
+- Source: https://github.com/UglyToad/PdfPig
+- Package: PdfPig 0.1.16
+- License: Apache-2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+- Use: `ChatAttachments` reads text out of PDF files attached to a chat.
+
+## Windows App SDK
+
+- Source: https://github.com/microsoft/WindowsAppSDK
+- Package: Microsoft.WindowsAppSDK 2.4.0
+- License: Microsoft Software License Terms for Microsoft Windows App SDK (`license.txt` in the NuGet package). Those terms are not Apache-2.0 or MIT.
+- Use: the desktop shell is a WinUI app and publishes the Windows App SDK self-contained.
+

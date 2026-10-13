@@ -177,23 +177,27 @@ public sealed class GrokTuiTests
     }
 
     [Fact]
-    public void SpaceXai_icons_are_in_place()
+    public void Desk_icons_are_in_place()
     {
         var root = FindRepoRoot();
-        var logo = Path.Combine(root, "assets", "logo.png");
-        if (!File.Exists(logo)) return;
-        var ico = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
-        var icon192 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-192.png");
-        var icon512 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-512.png");
-        var asset = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
-        Assert.True(File.Exists(logo));
+        var ico = Path.Combine(root, "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
+        var icon192 = Path.Combine(root, "apps", "desktop", "phone", "www", "icon-192.png");
+        var icon512 = Path.Combine(root, "apps", "desktop", "phone", "www", "icon-512.png");
+        var asset = Path.Combine(root, "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
         Assert.True(File.Exists(asset));
-        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(logo).AsSpan(0, 4).ToArray());
+        Assert.True(File.Exists(ico));
+        Assert.True(File.Exists(icon192));
+        Assert.True(File.Exists(icon512));
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(asset).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon192).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon512).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x00, 0x00, 0x01, 0x00 }, File.ReadAllBytes(ico).AsSpan(0, 4).ToArray());
+        Assert.Equal((512, 512), PngSize(asset));
         Assert.Equal((192, 192), PngSize(icon192));
         Assert.Equal((512, 512), PngSize(icon512));
+        var splash = File.ReadAllText(Path.Combine(root, "apps", "desktop", "phone", "www", "index.html"));
+        Assert.Contains("alt=\"xAI Desk\"", splash, StringComparison.Ordinal);
+        Assert.DoesNotContain("SpaceX", splash, StringComparison.OrdinalIgnoreCase);
     }
 
     private static (int Width, int Height) PngSize(string path)
