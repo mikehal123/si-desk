@@ -10,7 +10,7 @@ namespace Sovereign.Desktop.Presentation;
 
 public sealed class ShellViewModel : ObservableObject
 {
-    public const string AppDisplayName = "xAI Desk";
+    public const string AppDisplayName = "SI Desk";
     public static string AppVersion { get; } = System.Reflection.CustomAttributeExtensions
         .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(ShellViewModel).Assembly)!
         .InformationalVersion.Split('+')[0];

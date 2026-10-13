@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-xAI Desk uses or was inspired by the following third-party work.
+SI Desk uses or was inspired by the following third-party work.
 
 ## RongleCat/grok-app
 

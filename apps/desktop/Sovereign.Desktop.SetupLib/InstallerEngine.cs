@@ -6,8 +6,8 @@ namespace Sovereign.Desktop.SetupLib;
 
 public static class InstallerEngine
 {
-    public const string ProductionProductId = "xAIDesk";
-    public const string ProductionProductName = "xAI Desk";
+    public const string ProductionProductId = "SIDesk";
+    public const string ProductionProductName = "SI Desk";
     public const string CurrentVersion = "0.3.3";
     public const int EngineVerifyFailedExitCode = 7;
     public const int HostShutdownFailedExitCode = InstalledHostShutdown.HostShutdownFailedExitCode;
@@ -319,7 +319,7 @@ public static class InstallerEngine
         {
             var startDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", request.StartMenuName);
             Directory.CreateDirectory(startDir);
-            var exe = Path.Combine(installDir, "xAIDesk.exe");
+            var exe = Path.Combine(installDir, "SIDesk.exe");
             var cmd = Path.Combine(startDir, request.ProductName + ".cmd");
             File.WriteAllText(cmd, "@echo off" + Environment.NewLine + "start \"\" \"" + exe + "\"" + Environment.NewLine);
             log.Add("wrote cmd shortcut " + cmd);
@@ -334,7 +334,7 @@ public static class InstallerEngine
             var shortcut = shell.CreateShortcut(lnk);
             shortcut.TargetPath = exe;
             shortcut.WorkingDirectory = installDir;
-            shortcut.Description = "xAI Desk unsigned internal";
+            shortcut.Description = "SI Desk unsigned internal";
             shortcut.Save();
             log.Add("wrote lnk " + lnk);
         }
@@ -346,11 +346,11 @@ public static class InstallerEngine
 
     private static void WriteUninstallKey(SetupRequest request, string installDir, List<string> log)
     {
-        var setup = Environment.ProcessPath ?? "xAIDesk.Setup.exe";
+        var setup = Environment.ProcessPath ?? "SIDesk.Setup.exe";
         var uninstall = $"\"{setup}\" --uninstall --install-dir \"{installDir}\" --product-id \"{request.ProductId}\" --start-menu-name \"{request.StartMenuName}\" --keep-data";
         using var hkcu = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + request.ProductId);
         hkcu.SetValue("DisplayName", request.ProductName + " " + request.Version + " (unsigned internal preview)");
-        hkcu.SetValue("Publisher", "xAI Desk - not a signed publisher");
+        hkcu.SetValue("Publisher", "SI Desk - not a signed publisher");
         hkcu.SetValue("DisplayVersion", request.Version);
         hkcu.SetValue("UninstallString", uninstall);
         hkcu.SetValue("InstallLocation", installDir);

@@ -17,10 +17,7 @@ public sealed partial class MainWindow
             Content = new ScrollViewer { Content = page, MaxHeight = 540, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Enabled } };
         dialog.Resources["ContentDialogMaxWidth"] = 720d;
         dialog.Closing += (_, _) => lifetime.Cancel();
-        string? Key(string resource, string user)
-        {
-            try { var credential = new PasswordVault().Retrieve(resource, user); credential.RetrievePassword(); return credential.Password; } catch { return null; }
-        }
+        string? Key(string resource, string user) => DeskVault.ReadPassword(resource, user);
         StackPanel Section(string name, string initial, out TextBlock state)
         {
             var section = new StackPanel { Spacing = DeskTheme.Space8 }; section.Children.Add(Head(name));
@@ -93,19 +90,20 @@ public sealed partial class MainWindow
         });
         foreach (var provider in new[] { "glm", "kimi", "moonshot" })
         {
-            var section = Section(provider == "moonshot" ? "Kimi Platform API · usage billed" : provider.ToUpperInvariant() + " · coding plan", Key("xAIDesk.Unused", provider) is null ? "No saved key." : "Key saved · not tested yet.", out var status);
+            var section = Section(provider == "moonshot" ? "Kimi Platform API · usage billed" : provider.ToUpperInvariant() + " · coding plan", Key("SIDesk.Unused", provider) is null ? "No saved key." : "Key saved · not tested yet.", out var status);
             var secret = new PasswordBox { PlaceholderText = provider == "moonshot" ? "Your platform.kimi.ai API key" : "Your coding-plan key" }; section.Children.Add(secret);
             if (provider == "moonshot") section.Children.Add(Note("Uses your Kimi Platform API balance. Separate from Kimi Code subscription credentials."));
             var endpoint = new ComboBox { ItemsSource = CodingPlanChatClient.Endpoints(provider), SelectedItem = ConnectionSetup.Endpoint(provider), HorizontalAlignment = HorizontalAlignment.Stretch }; section.Children.Add(endpoint);
             Action(section, "Save " + provider.ToUpperInvariant() + " connection", status, _ => {
-                var key = string.IsNullOrWhiteSpace(secret.Password) ? Key("xAIDesk.Unused", provider) : secret.Password.Trim();
+                var key = string.IsNullOrWhiteSpace(secret.Password) ? Key("SIDesk.Unused", provider) : secret.Password.Trim();
                 if (key is null) return Task.FromResult("Enter your key first.");
                 ConnectionSetup.SaveEndpoint(provider, (string)endpoint.SelectedItem);
-                new PasswordVault().Add(new PasswordCredential("xAIDesk.Unused", provider, key)); secret.Password = "";
+                DeskVault.Remove("SIDesk.Unused", provider);
+                new PasswordVault().Add(new PasswordCredential("SIDesk.Unused", provider, key)); secret.Password = "";
                 return Task.FromResult("Key and endpoint saved. Reconnect existing chats to apply the change.");
             });
             Action(section, "Test " + provider.ToUpperInvariant() + " model listing", status, async ct => {
-                var key = Key("xAIDesk.Unused", provider); if (key is null) return "Save the connection first.";
+                var key = Key("SIDesk.Unused", provider); if (key is null) return "Save the connection first.";
                 using var client = new CodingPlanChatClient(provider, ConnectionSetup.Endpoint(provider), key);
                 var models = await client.ModelsAsync(ct);
                 return models.Length == 0 ? "Model listing unavailable. Credentials and chat access are not yet verified." : $"Connected · {models.Length} models returned. A chat request verifies message delivery.";

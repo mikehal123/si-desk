@@ -1,6 +1,6 @@
-# Contributing to xAI Desk
+# Contributing to SI Desk
 
-Thanks for helping out! xAI Desk is an unofficial, community-built Windows app for Grok and is in public beta, so bug reports and small focused PRs are very welcome.
+Thanks for helping out! SI Desk is an unofficial, community-built Windows app for Grok and is in public beta, so bug reports and small focused PRs are very welcome.
 
 ## What you need
 - Windows 10 or 11 (x64)

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Sovereign.Desktop.Client;
+using Sovereign.Desktop.Core;
 using Windows.Security.Credentials;
 
 namespace Sovereign.Desktop;
@@ -19,7 +20,18 @@ public sealed partial class MainWindow
     private CancellationTokenSource? _signInCancel;
     private bool _accountBusy;
     private bool _accountInitialized;
-    private string AccountVaultResource => "SovereignAI.Account."+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(_vm.ProfileDirectory).ToUpperInvariant())))[..24];
+    private string AccountVaultResource => "SovereignAI.Account." + ProfileHash(_vm.ProfileDirectory);
+
+    private IEnumerable<string> AccountVaultResources()
+    {
+        yield return AccountVaultResource;
+        var legacy = XaiDeskIdentity.LegacyDefaultProfile(_vm.ProfileDirectory);
+        if (legacy is null) yield break;
+        yield return "SovereignAI.Account." + ProfileHash(legacy);
+    }
+
+    private static string ProfileHash(string profile) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(profile).ToUpperInvariant())))[..24];
 
     private async Task InitializeAccountAsync()
     {
@@ -39,13 +51,26 @@ public sealed partial class MainWindow
     }
     private AccountSession? ReadAccountSession()
     {
-        try { var vault=new PasswordVault(); string Read(string name) { var c=vault.Retrieve(AccountVaultResource,name); c.RetrievePassword(); return c.Password; }
-            return new(Read("access"),Read("refresh"),Read("identity"),DateTimeOffset.Parse(Read("expiry"),System.Globalization.CultureInfo.InvariantCulture));
-        } catch { return null; }
+        foreach (var resource in AccountVaultResources())
+        {
+            try
+            {
+                var vault = new PasswordVault();
+                string Read(string name) { var c = vault.Retrieve(resource, name); c.RetrievePassword(); return c.Password; }
+                return new(Read("access"), Read("refresh"), Read("identity"), DateTimeOffset.Parse(Read("expiry"), System.Globalization.CultureInfo.InvariantCulture));
+            }
+            catch { /* Try the previous profile hash. */ }
+        }
+        return null;
     }
     private void ClearAccountSession()
     {
-        var vault=new PasswordVault(); foreach(var name in new[]{"access","refresh","identity","expiry"}) { try { vault.Remove(vault.Retrieve(AccountVaultResource,name)); } catch { } }
+        var vault = new PasswordVault();
+        foreach (var resource in AccountVaultResources())
+            foreach (var name in new[] { "access", "refresh", "identity", "expiry" })
+            {
+                try { vault.Remove(vault.Retrieve(resource, name)); } catch { }
+            }
     }
     private void StoreAccountSession(AccountSession session)
     {

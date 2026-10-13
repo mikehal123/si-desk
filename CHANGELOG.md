@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.66
+
+- The product name is SI Desk (SI = super intelligence). The program is SIDesk.exe, and setup installs to `%LOCALAPPDATA%\Programs\SI Desk`.
+- On startup, if `%LOCALAPPDATA%\SIDesk` is missing and `%LOCALAPPDATA%\xAIDesk` exists, the old profile is copied and left in place so chats and settings carry over. Credential Manager reads the previous key names when the new names are empty.
+- The Grok Bot tab stays Grok Bot.
+- The window, installer, and phone icons use the SI mark: a navy rounded square with transparent corners.
+
 ## 0.3.65
 
 - App and phone icons no longer use the SpaceXSI / xAI mark. They use this project's own artwork. Third-party notices now include PdfPig and the Windows App SDK.

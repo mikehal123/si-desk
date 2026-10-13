@@ -6,7 +6,7 @@ public readonly record struct GrokbotWindowBounds(int X, int Y, int Width, int H
 
 public readonly record struct GrokbotPng(string Text, byte[]? Bytes);
 
-/// <summary>Window-only checks for Grokbot. Coordinates outside the xAI Desk window are refused, and secret fields are blocked.</summary>
+/// <summary>Window-only checks for Grokbot. Coordinates outside the SI Desk window are refused, and secret fields are blocked.</summary>
 public static class GrokbotWindow
 {
     private static readonly string[] BlockedIds =
@@ -47,7 +47,7 @@ public static class GrokbotWindow
         if (x is int px && y is int py)
         {
             if (!ContainsPoint(window, px, py))
-                throw new InvalidOperationException("Those coordinates are outside the xAI Desk window.");
+                throw new InvalidOperationException("Those coordinates are outside the SI Desk window.");
             if (hit is not null && IsSecret(hit.Id, hit.Type, hit.Label, hit.Password))
                 throw new InvalidOperationException("That control is blocked.");
             return;
@@ -71,12 +71,12 @@ public static class GrokbotWindow
         var cx = control.X + control.Width / 2;
         var cy = control.Y + control.Height / 2;
         if (!ContainsPoint(window, cx, cy))
-            throw new InvalidOperationException("That control is outside the xAI Desk window.");
+            throw new InvalidOperationException("That control is outside the SI Desk window.");
     }
 
     public static void RequireFocused(bool insideWindow, bool secret)
     {
-        if (!insideWindow) throw new InvalidOperationException("Focus is outside the xAI Desk window.");
+        if (!insideWindow) throw new InvalidOperationException("Focus is outside the SI Desk window.");
         if (secret) throw new InvalidOperationException("That control is blocked.");
     }
 
@@ -103,7 +103,7 @@ public static class GrokbotWindow
         var alt = parsed.Modifiers.Contains((ushort)0x12);
         var ctrl = parsed.Modifiers.Contains((ushort)0x11);
         if ((alt && parsed.Key is 0x09 or 0x1B) || (ctrl && parsed.Key == 0x1B))
-            throw new InvalidOperationException("That key would leave the xAI Desk window.");
+            throw new InvalidOperationException("That key would leave the SI Desk window.");
     }
 
     public static (ushort[] Modifiers, ushort Key) ParseKeys(string keys)

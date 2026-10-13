@@ -5,7 +5,7 @@ using Windows.UI;
 
 namespace Sovereign.Desktop;
 
-/// <summary>One set of chrome, typography, spacing and motion tokens for xAI Desk.</summary>
+/// <summary>One set of chrome, typography, spacing and motion tokens for SI Desk.</summary>
 internal static class DeskTheme
 {
     public const double Space4 = 4, Space8 = 8, Space12 = 12, Space16 = 16, Space24 = 24;

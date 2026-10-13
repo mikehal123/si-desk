@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         try
         {
             ValidateCodexQaProfile(_vm.ProfileDirectory);
-            Title = "xAI Desk · UI sample";
+            Title = "SI Desk · UI sample";
             ClassicChatPreference.Save(_vm.ProfileDirectory, false);
             var time = DateTimeOffset.UtcNow.AddMinutes(-2);
             var answer = "## Project review\n\nThe app keeps the conversation separate from provider connections.\n\n- Read the source files.\n- Preserve the existing agent behavior.\n\n```python\nprint(\"Ready for review\")\n```\n\nThe changes are ready to inspect.";

@@ -75,7 +75,12 @@ public sealed class DeskChatConnectionTests
         try
         {
             Assert.Equal(installed, CursorChatClient.ResolveRuntimeDirectory(root));
-            var own = Path.Combine(root, "xAIDesk", "Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
+            var legacy = Path.Combine(root, "xAIDesk", "Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
+            Directory.CreateDirectory(legacy);
+            File.WriteAllText(Path.Combine(legacy, "node.exe"), "legacy");
+            File.WriteAllText(Path.Combine(legacy, "index.js"), "legacy");
+            Assert.Equal(legacy, CursorChatClient.ResolveRuntimeDirectory(root));
+            var own = Path.Combine(root, "SIDesk", "Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
             Directory.CreateDirectory(own);
             File.WriteAllText(Path.Combine(own, "node.exe"), "own");
             File.WriteAllText(Path.Combine(own, "index.js"), "own");

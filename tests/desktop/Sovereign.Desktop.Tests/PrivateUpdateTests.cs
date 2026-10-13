@@ -19,7 +19,7 @@ public sealed class PrivateUpdateTests
     [Fact(Skip = DisabledSkip)] public async Task Private_archive_uses_API_bearer_and_strips_it_on_CDN_redirect()
     {
         var bytes = Encoding.UTF8.GetBytes("verified archive bytes");
-        var url = "https://github.com/mikehal123/xai-desk/releases/download/v0.3.21/xAIDesk-Windows-0.3.21.zip";
+        var url = "https://github.com/mikehal123/si-desk/releases/download/v0.3.21/SIDesk-Windows-0.3.21.zip";
         var release = new UpdateRelease("0.3.21", url, Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "test", DateTimeOffset.UtcNow.AddDays(1));
         var count = 0;
         using var client = new UpdateClient("test-token", new Handler(request =>
@@ -29,7 +29,7 @@ public sealed class PrivateUpdateTests
             {
                 Assert.Equal(UpdateClient.RepositoryApi + "/releases/tags/v0.3.21", request.RequestUri!.AbsoluteUri);
                 Assert.Equal("test-token", request.Headers.Authorization!.Parameter);
-                return Task.FromResult(Json(new { draft = false, prerelease = false, assets = new[] { new { name = "xAIDesk-Windows-0.3.21.zip", id = 123, size = bytes.Length, browser_download_url = url } } }));
+                return Task.FromResult(Json(new { draft = false, prerelease = false, assets = new[] { new { name = "SIDesk-Windows-0.3.21.zip", id = 123, size = bytes.Length, browser_download_url = url } } }));
             }
             if (count == 2)
             {
@@ -47,7 +47,7 @@ public sealed class PrivateUpdateTests
     }
     [Theory(Skip = DisabledSkip)]
     [InlineData("https://evil.example/download")]
-    [InlineData("http://api.github.com/repos/mikehal123/xai-desk/releases/latest")]
+    [InlineData("http://api.github.com/repos/mikehal123/si-desk/releases/latest")]
     [InlineData("https://api.github.com/repos/someone/private/releases/latest")]
     public async Task Unsafe_redirect_is_rejected_before_sending_token(string location)
     {

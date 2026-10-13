@@ -29,7 +29,7 @@ public sealed class GitHubSignIn : IDisposable
         _clientId = clientId;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
         _http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("xAI Desk-Updater/1.0");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("SI Desk-Updater/1.0");
     }
     private async Task<JsonDocument> PostAsync(string path, Dictionary<string, string> fields, CancellationToken ct)
     {

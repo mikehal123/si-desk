@@ -38,9 +38,9 @@ namespace Sovereign.Desktop.Tests
                 var expected = new List<OpenWithValue>();
                 foreach (var (progId, extension, friendly) in new (string ProgId, string Extension, string Friendly)[]
                 {
-                    (OpenWithRegistration.MarkdownProgId, ".md", "xAI Desk Markdown"),
-                    (OpenWithRegistration.TextProgId, ".txt", "xAI Desk Text"),
-                    (OpenWithRegistration.JsonProgId, ".json", "xAI Desk JSON")
+                    (OpenWithRegistration.MarkdownProgId, ".md", "SI Desk Markdown"),
+                    (OpenWithRegistration.TextProgId, ".txt", "SI Desk Text"),
+                    (OpenWithRegistration.JsonProgId, ".json", "SI Desk JSON")
                 })
                 {
                     var progIdKey = @"Software\Classes\" + progId;
@@ -52,8 +52,8 @@ namespace Sovereign.Desktop.Tests
 
                 Assert.Equal(expected.Count, store.Sets.Count);
                 Assert.Equal(Sorted(expected), Sorted(store.Sets));
-                Assert.Equal("\"" + launcher + "\" \"%1\"", store.Get(@"Software\Classes\xAIDesk.md\shell\open\command", ""));
-                Assert.Contains("%1", store.Get(@"Software\Classes\xAIDesk.md\shell\open\command", "")!, StringComparison.Ordinal);
+                Assert.Equal("\"" + launcher + "\" \"%1\"", store.Get(@"Software\Classes\SIDesk.md\shell\open\command", ""));
+                Assert.Contains("%1", store.Get(@"Software\Classes\SIDesk.md\shell\open\command", "")!, StringComparison.Ordinal);
                 Assert.Equal("Cursor.md", store.Get(@"Software\Classes\.md", ""));
                 Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", "Cursor.md"));
                 Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", OpenWithRegistration.MarkdownProgId));
@@ -158,15 +158,15 @@ namespace Sovereign.Desktop.Tests
 
                 OpenWithRegistration.Unregister(install, store);
 
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.md"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.md\DefaultIcon"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.md\shell\open\command"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.txt"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.txt\DefaultIcon"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.txt\shell\open\command"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.json"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.json\DefaultIcon"));
-                Assert.False(store.ContainsKey(@"Software\Classes\xAIDesk.json\shell\open\command"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.md"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.md\DefaultIcon"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.md\shell\open\command"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.txt"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.txt\DefaultIcon"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.txt\shell\open\command"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.json"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.json\DefaultIcon"));
+                Assert.False(store.ContainsKey(@"Software\Classes\SIDesk.json\shell\open\command"));
                 Assert.Null(store.Get(@"Software\Classes\.md\OpenWithProgids", OpenWithRegistration.MarkdownProgId));
                 Assert.Null(store.Get(@"Software\Classes\.txt\OpenWithProgids", OpenWithRegistration.TextProgId));
                 Assert.Null(store.Get(@"Software\Classes\.json\OpenWithProgids", OpenWithRegistration.JsonProgId));
@@ -192,7 +192,7 @@ namespace Sovereign.Desktop.Tests
                 Assert.NotEqual(Path.Combine(Path.GetFullPath(install), OpenWithRegistration.LauncherFileName), launcher);
                 Assert.False(launcher.StartsWith(Path.GetFullPath(install) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
                 Assert.Equal(
-                    Path.Combine(Path.GetFullPath(install), "xAIDesk.exe"),
+                    Path.Combine(Path.GetFullPath(install), "SIDesk.exe"),
                     OpenWithRegistration.ExecutablePath(install));
             });
         }
@@ -212,7 +212,7 @@ namespace Sovereign.Desktop.Tests
 
         private static void WithTemp(Action<string> body)
         {
-            var root = Path.Combine(Path.GetTempPath(), "xAI Desk-openwith-" + Guid.NewGuid().ToString("N"));
+            var root = Path.Combine(Path.GetTempPath(), "SI Desk-openwith-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             try
             {

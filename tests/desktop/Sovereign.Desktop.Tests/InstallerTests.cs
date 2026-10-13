@@ -17,11 +17,11 @@ public sealed class InstallerTests
                 SetupAction.Install,
                 repo,
                 Path.GetTempPath(),
-                "xAIDesk.TEST",
-                "xAI Desk TEST",
+                "SIDesk.TEST",
+                "SI Desk TEST",
                 "0.1.1",
                 null,
-                "xAI Desk TEST",
+                "SI Desk TEST",
                 true,
                 null,
                 null));
@@ -71,10 +71,10 @@ public sealed class InstallerTests
             "  ",
             Path.GetTempPath(),
             "SovereignAI.DesktopPreview.TEST",
-            "xAI Desk Desktop Preview TEST",
+            "SI Desk Desktop Preview TEST",
             "0.1.7",
             null,
-            "xAI Desk Desktop Preview TEST",
+            "SI Desk Desktop Preview TEST",
             true,
             null,
             null));
@@ -99,7 +99,7 @@ public sealed class InstallerTests
     [Fact]
     public void Fresh_unicode_repair_upgrade_uninstall_interrupt_and_sentinel()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xAI Desk Desktop 测试 " + Guid.NewGuid().ToString("N")[..8]);
+        var root = Path.Combine(Path.GetTempPath(), "SI Desk Desktop 测试 " + Guid.NewGuid().ToString("N")[..8]);
         var payloadA = Path.Combine(root, "payload-a");
         var payloadB = Path.Combine(root, "payload-b");
         var install = Path.Combine(root, "install dir");
@@ -116,7 +116,7 @@ public sealed class InstallerTests
         File.WriteAllText(Path.Combine(profile, "drafts-keep.txt"), "draft");
         File.WriteAllText(sentinel, "untouched");
         var product = "SovereignAI.DesktopPreview.DESK16-" + Guid.NewGuid().ToString("N")[..8];
-        var start = "xAI Desk Desktop Preview " + product;
+        var start = "SI Desk Desktop Preview " + product;
         try
         {
             var interrupted = InstallerEngine.Run(new SetupRequest(SetupAction.Install, install, payloadA, product, start, "0.1.0", profile, start, true, 0, sentinel));
@@ -174,7 +174,7 @@ public sealed class InstallerTests
     [Fact]
     public void Repair_fails_explicitly_when_owned_python_cannot_be_stopped()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xAI Desk shutdown " + Guid.NewGuid().ToString("N")[..8]);
+        var root = Path.Combine(Path.GetTempPath(), "SI Desk shutdown " + Guid.NewGuid().ToString("N")[..8]);
         var payload = Path.Combine(root, "payload");
         var install = Path.Combine(root, "install");
         var profile = Path.Combine(root, "profile");

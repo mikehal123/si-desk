@@ -196,7 +196,7 @@ public sealed class GrokTuiTests
         Assert.Equal((192, 192), PngSize(icon192));
         Assert.Equal((512, 512), PngSize(icon512));
         var splash = File.ReadAllText(Path.Combine(root, "apps", "desktop", "phone", "www", "index.html"));
-        Assert.Contains("alt=\"xAI Desk\"", splash, StringComparison.Ordinal);
+        Assert.Contains("alt=\"SI Desk\"", splash, StringComparison.Ordinal);
         Assert.DoesNotContain("SpaceX", splash, StringComparison.OrdinalIgnoreCase);
     }
 

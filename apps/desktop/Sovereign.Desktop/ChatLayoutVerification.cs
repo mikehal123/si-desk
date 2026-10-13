@@ -433,8 +433,8 @@ internal sealed partial class ChatConversation
             var model = "synthetic-agent";
             if (live)
             {
-                var credential = new Windows.Security.Credentials.PasswordVault().Retrieve("xAIDesk.Unused", PlanProvider); credential.RetrievePassword();
-                _planChat = new CodingPlanChatClient(PlanProvider, ConnectionSetup.Endpoint(PlanProvider), credential.Password);
+                var password = DeskVault.ReadPassword("SIDesk.Unused", PlanProvider) ?? throw new InvalidOperationException("Coding plan key is not saved.");
+                _planChat = new CodingPlanChatClient(PlanProvider, ConnectionSetup.Endpoint(PlanProvider), password);
                 model = PlanProvider == "glm" ? "glm-5.3" : "kimi-k2.6";
                 File.WriteAllText(Path.Combine(_projectFolder, "ui-proof.md"), "UI-PROOF-before");
             }
