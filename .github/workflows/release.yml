@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Check tag matches Directory.Build.props version
+        run: |
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = $props.SelectSingleNode('//Version').InnerText.Trim()
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -ne $tag) { throw "Tag v$tag does not match Directory.Build.props Version $version." }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Test (XaiDesk.Tests)
+        run: dotnet test tests/desktop/XaiDesk.Tests -c Release
+
+      - name: Test (Sovereign.Desktop.Tests)
+        run: dotnet test tests/desktop/Sovereign.Desktop.Tests -c Release -p:Platform=x64
+
+      # setup-dotnet does not install workload packs. The WinUI app targets
+      # net10.0-windows10.0.26100.0, and that versioned TFM is resolved from
+      # microsoft-windows-sdk-net before the Windows SDK BuildTools package runs.
+      - name: Install Windows SDK workload
+        run: dotnet workload install microsoft-windows-sdk-net
+
+      - name: Publish release zip
+        run: ./scripts/publish-release.ps1
+
+      - name: Upload zip to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: xAIDesk-${{ env.VERSION }}-win-x64.zip
+          prerelease: true
+          fail_on_unmatched_files: true

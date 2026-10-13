@@ -84,9 +84,13 @@ New-Item -ItemType Directory -Path $setupDir | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw "Setup publish failed with exit code $LASTEXITCODE."
 }
-$setupExe = Join-Path $setupDir 'xAIDesk.Setup.exe'
+# Publish names the exe after PreviewSetup's AssemblyName. The zip still
+# ships xAIDesk.Setup.exe: SetupEngine only accepts a process path that ends
+# with that file name, and that is the installer users run.
+$setupOutputName = 'SovereignAI.DesktopPreview.Setup.exe'
+$setupExe = Join-Path $setupDir $setupOutputName
 if (-not (Test-Path -LiteralPath $setupExe -PathType Leaf)) {
-    throw 'Setup publish did not produce xAIDesk.Setup.exe.'
+    throw "Setup publish did not produce $setupOutputName."
 }
 Copy-Item -LiteralPath $setupExe -Destination (Join-Path $publishDir 'xAIDesk.Setup.exe') -Force
 
