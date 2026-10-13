@@ -20,7 +20,7 @@ public sealed partial class MainWindow
     private readonly PasswordBox _xaiApiKey = new() { Header = "API key", PlaceholderText = "xAI API key", MaxWidth = 440, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, DeskTheme.Space4, 0, 0) };
     private readonly TextBlock _settingsDataStatus = Note("");
     private readonly CheckBox _lineReviewOption = new() { Content = "Line review for plans and diffs" };
-    private readonly CheckBox _classicChatOption = new() { Content = "Classic chat view" };
+    private readonly CheckBox _classicChatOption = new() { Content = "Classic chat view", IsChecked = true };
     private readonly TextBlock _settingsProfilePath = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, LineHeight = DeskTheme.Space24 };
     private readonly StackPanel _githubWait = new() { Spacing = DeskTheme.Space8 };
     private readonly Button _cancelSignInButton = new() { Visibility = Visibility.Collapsed, Content = "Cancel sign-in" };
