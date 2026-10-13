@@ -23,7 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\fixtures\desktop\**\*" CopyToOutputDirectory="PreserveNewest" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" />
-    <None Include="..\..\..\contracts\observed\**\*" CopyToOutputDirectory="PreserveNewest" Link="contracts\observed\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="..\..\..\contracts\observed\**\*" CopyToOutputDirectory="PreserveNewest" Link="contracts\observed\%(RecursiveDir)%(Filename)%(Extension)" Condition="Exists('..\..\..\contracts\observed')" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="$(PrivateTestsCompileRemove)" Condition="'$(PrivateTestsCompileRemove)' != ''" />
