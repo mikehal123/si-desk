@@ -74,6 +74,11 @@ if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
     throw 'Publish did not produce xAIDesk.exe.'
 }
 
+$xbfPath = Join-Path $publishDir 'App.xbf'
+if (-not (Test-Path -LiteralPath $xbfPath -PathType Leaf)) {
+    throw 'Publish did not produce App.xbf. WinUI skips that copy when publish uses -o.'
+}
+
 $setupProject = Join-Path $repoRoot 'apps\desktop\Sovereign.Desktop.PreviewSetup\Sovereign.Desktop.PreviewSetup.csproj'
 $setupDir = Join-Path $repoRoot 'artifacts\publish\setup'
 if (Test-Path -LiteralPath $setupDir) {
