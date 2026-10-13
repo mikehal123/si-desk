@@ -12,7 +12,7 @@ public sealed record SetupRequest(
     bool KeepData,
     int? FailAfterFileCount,
     string? SentinelPath,
-    bool DesktopShortcut);
+    bool DesktopShortcut = false);
 
 public enum SetupAction
 {

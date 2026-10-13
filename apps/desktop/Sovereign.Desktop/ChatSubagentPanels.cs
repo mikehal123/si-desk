@@ -570,7 +570,7 @@ internal sealed partial class ChatConversation
             _transcript.Children.RemoveAt(0);
             _transcript.Children.Insert(0, _owner.UserMessage(SubagentCardText.TaskLine(child)));
             var previous = _view;
-            _view = new ChatActivityView(SubagentCardText.IdentityLine(child), _ => { }, () => { }, _ => { }, () => { }, classicChat: _owner.ClassicChat);
+            _view = new ChatActivityView(SubagentCardText.CardLine(child), _ => { }, () => { }, _ => { }, () => { }, classicChat: _owner.ClassicChat);
             _view.BindLineReview(() => _owner.OpenLineReview(_view, "subagent:" + _id, -1, null), () => _owner.LineReviewOn);
             _activityHost.Child = _view.Root;
             _view.Root.Margin = new Thickness(0, DeskTheme.Space4, 0, DeskTheme.Space8);
@@ -596,7 +596,7 @@ internal sealed partial class ChatConversation
             _face.Apply(child.SessionId, child.Name);
             _face.SetLife(child.State);
             _name.Text = string.IsNullOrWhiteSpace(child.Name) ? "Subagent" : child.Name.Trim();
-            _model.Text = SubagentCardText.IdentityLine(child);
+            _model.Text = SubagentCardText.CardLine(child);
             SetSkills(_owner.SkillCaption(_id));
             _state = child.State ?? "";
             _status.Text = SubagentStatusLabel(child.State);

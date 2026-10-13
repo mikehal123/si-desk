@@ -93,7 +93,16 @@ public static class SwarmLoop
 
     public static string WakeJson(SwarmBoard board, SwarmTask task)
     {
-        var payload = new SwarmWakePayload(task.Id, false, GrokbotWake.Preview(task.Title), board.Id, task.Id, task.Title, task.Details ?? "");
+        var swarmId = board.Id;
+        string? runId = null;
+        var root = (board.Root ?? "").TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (Path.GetFileName(root).Equals("runs", StringComparison.OrdinalIgnoreCase))
+        {
+            runId = board.Id;
+            var swarm = Path.GetFileName(Path.GetDirectoryName(root) ?? "");
+            if (!string.IsNullOrEmpty(swarm)) swarmId = swarm;
+        }
+        var payload = new SwarmWakePayload(task.Id, false, GrokbotWake.Preview(task.Title), swarmId, task.Id, task.Title, task.Details ?? "", runId);
         return JsonSerializer.Serialize(payload);
     }
 
@@ -122,5 +131,7 @@ public static class SwarmLoop
         [property: JsonPropertyName("swarm_id")] string SwarmId,
         [property: JsonPropertyName("task_id")] string TaskId,
         [property: JsonPropertyName("title")] string Title,
-        [property: JsonPropertyName("details")] string Details);
+        [property: JsonPropertyName("details")] string Details,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [property: JsonPropertyName("run_id")] string? RunId = null);
 }

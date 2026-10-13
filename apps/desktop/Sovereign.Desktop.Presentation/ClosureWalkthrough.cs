@@ -35,7 +35,7 @@ public static class ClosureWalkthrough
 
         await vm.RefreshAsync(cancellationToken).ConfigureAwait(false);
 
-        await Step("archive-decision-evidence", "Open archive, decision, and evidence", async () =>
+        await Step("archive-decision-evidence-orders", "Open archive, decision, evidence, orders", async () =>
         {
             var archive = Path.Combine(fixturesRoot, "archives", "valid-hash-consistent");
             await vm.SwitchModeAsync(ApplicationMode.EvidenceArchive, null, archive, cancellationToken).ConfigureAwait(false);
@@ -47,17 +47,18 @@ public static class ClosureWalkthrough
             var decision = vm.Decisions[0];
             await vm.SelectDecisionAsync(decision.Id, cancellationToken).ConfigureAwait(false);
             var evidenceOk = vm.SelectedEvidence is not null;
+            var orders = vm.Orders;
             return (evidenceOk,
-                $"mode={ModeLabels.Short(vm.Mode)} decision={decision.Id} action={decision.Action} evidence={(vm.SelectedEvidence?.Id ?? "none")} events={vm.Events.Count}");
+                $"mode={ModeLabels.Short(vm.Mode)} decision={decision.Id} action={decision.Action} evidence={(vm.SelectedEvidence?.Id ?? "none")} orders={orders.Count} events={vm.Events.Count}");
         }).ConfigureAwait(false);
 
         await Step("invalid-draft-correct-save-reopen", "Invalid draft, correct, save, reopen inactive", async () =>
         {
             await vm.SwitchModeAsync(ApplicationMode.DesktopPreview, "admitted-blocked-execution", null, cancellationToken).ConfigureAwait(false);
-            vm.SetMandateFields("", "", "lifetime", "whenever", null, 100, 200, -1, 50_000, "", -5);
+            vm.SetMandateFields("", "", "lifetime", "whenever", null, 100, 200, -1, 50_000, "");
             await vm.SaveMandateAsync(cancellationToken).ConfigureAwait(false);
             var invalid = vm.DraftErrors.Contains("Name", StringComparison.Ordinal) && vm.DraftStatus.Contains("NOT ACTIVATED", StringComparison.Ordinal);
-            vm.SetMandateFields("Closure sleeve", "AAA,BBB", "3-12m", "weekly", "America/Los_Angeles", 1500, 800, 25_000, 200, "sec-edgar", 1000);
+            vm.SetMandateFields("Closure sleeve", "AAA,BBB", "3-12m", "weekly", "America/Los_Angeles", 1500, 800, 25_000, 200, "sec-edgar");
             await vm.SaveMandateAsync(cancellationToken).ConfigureAwait(false);
             var id = vm.Mandate.Id;
             var revision = vm.Mandate.Revision;
@@ -95,9 +96,25 @@ public static class ClosureWalkthrough
             await vm.SelectDecisionAsync(vm.Decisions[0].Id, cancellationToken).ConfigureAwait(false);
             var previous = vm.AccountHeading;
             await vm.SwitchModeAsync(ApplicationMode.NativeConnection, null, null, cancellationToken).ConfigureAwait(false);
-            var leaked = vm.Account.IsKnown || previous == vm.AccountHeading;
+            var leaked = vm.Account.IsKnown || vm.CashLabel.Contains("91100", StringComparison.Ordinal) || previous == vm.AccountHeading;
             var ok = !leaked && vm.SelectedDecision is null && vm.Mode == ApplicationMode.NativeConnection && vm.Decisions.Count == 0;
             return (ok, "before=" + previous + " after=" + vm.AccountHeading + " banner=" + vm.ModeBanner);
+        }).ConfigureAwait(false);
+
+        await Step("hold-abstain-blocked-incomplete-unknown", "HOLD, ABSTAIN, blocked, incomplete, unknown stay distinct", async () =>
+        {
+            await vm.SwitchModeAsync(ApplicationMode.DesktopPreview, "hold-and-abstain", null, cancellationToken).ConfigureAwait(false);
+            var hold = vm.Decisions.Any(d => d.Action == DecisionAction.Hold);
+            var abstain = vm.Decisions.Any(d => d.Action == DecisionAction.Abstain);
+            await vm.SwitchScenarioAsync("admitted-blocked-execution", cancellationToken).ConfigureAwait(false);
+            var blocked = vm.Decisions.Any(d => d.Execution.Verdict == GateVerdict.Blocked);
+            await vm.SwitchScenarioAsync("missing-valuation", cancellationToken).ConfigureAwait(false);
+            var incomplete = vm.Account.IsKnown && vm.Account.Value!.Cash.Kind == PresenceKind.Missing
+                             && vm.Account.Value.Holdings.Any(h => h.Mark.Kind == PresenceKind.Missing && h.Quantity.Kind == PresenceKind.Known);
+            await vm.SwitchScenarioAsync("unknown-order-lost-response", cancellationToken).ConfigureAwait(false);
+            var unknown = vm.Orders.Any(o => o.CurrentState.Kind == PresenceKind.Unknown);
+            var ok = hold && abstain && blocked && incomplete && unknown;
+            return (ok, $"hold={hold} abstain={abstain} blocked={blocked} incomplete={incomplete} unknown={unknown}");
         }).ConfigureAwait(false);
 
         var passed = steps.All(s => s.Passed);

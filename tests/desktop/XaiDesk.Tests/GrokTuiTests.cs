@@ -18,8 +18,7 @@ public sealed class GrokTuiTests
     [Fact]
     public void Markdown_parses_heading_bold_bullet_code_fence_and_path()
     {
-        var samplePath = Path.Combine(Path.GetTempPath(), "xai-desk-sample");
-        var source = "# Title\n## Section\n### Sub\n\nSay **bold** and `code`.\n\n- item `tick`\n\n```\nalpha\nbeta\n```\n\nSee " + samplePath + " and /src/app\n";
+        var source = "# Title\n## Section\n### Sub\n\nSay **bold** and `code`.\n\n- item `tick`\n\n```\nalpha\nbeta\n```\n\nSee F:\\xai-desk\\source and /src/app\n";
         var blocks = GrokTuiPresentation.Markdown(source);
 
         Assert.Equal(7, blocks.Count);
@@ -52,7 +51,7 @@ public sealed class GrokTuiTests
         Assert.Equal(
         [
             new GrokTuiRun("See ", GrokTuiStyle.Plain),
-            new GrokTuiRun(samplePath, GrokTuiStyle.InlineCode),
+            new GrokTuiRun(@"F:\xai-desk\source", GrokTuiStyle.InlineCode),
             new GrokTuiRun(" and ", GrokTuiStyle.Plain),
             new GrokTuiRun("/src/app", GrokTuiStyle.InlineCode)
         ], Runs(blocks[6]));
@@ -144,26 +143,40 @@ public sealed class GrokTuiTests
     [Fact]
     public void SpaceXai_icons_are_in_place()
     {
-        var beta = FindBetaRoot();
-        var logo = Path.Combine(beta, "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
-        var ico = Path.Combine(beta, "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
+        var root = FindRepoRoot();
+        var logo = Path.Combine(root, "assets", "logo.png");
+        var ico = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
+        var icon192 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-192.png");
+        var icon512 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-512.png");
+        var asset = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
         Assert.True(File.Exists(logo));
+        Assert.True(File.Exists(asset));
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(logo).AsSpan(0, 4).ToArray());
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon192).AsSpan(0, 4).ToArray());
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon512).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x00, 0x00, 0x01, 0x00 }, File.ReadAllBytes(ico).AsSpan(0, 4).ToArray());
+        Assert.Equal((192, 192), PngSize(icon192));
+        Assert.Equal((512, 512), PngSize(icon512));
     }
 
-    private static string FindBetaRoot()
+    private static (int Width, int Height) PngSize(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        var width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+        var height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+        return (width, height);
+    }
+
+    private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "Directory.Build.props"))
-                && File.Exists(Path.Combine(dir.FullName, "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico")))
+            if (File.Exists(Path.Combine(dir.FullName, "assets", "logo.png")) && Directory.Exists(Path.Combine(dir.FullName, "source")))
                 return dir.FullName;
             dir = dir.Parent;
         }
-
-        throw new DirectoryNotFoundException("Repo root with apps\\desktop\\Sovereign.Desktop\\Assets\\xAIDesk.ico was not found.");
+        throw new DirectoryNotFoundException("xAI Desk root with assets\\logo.png was not found.");
     }
 
     private static GrokTuiRun[] Runs(GrokTuiBlock block) => block.Runs.ToArray();

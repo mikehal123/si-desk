@@ -6,9 +6,9 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <AssemblyName>xAIDesk.Setup</AssemblyName>
+    <AssemblyName>SovereignAI.DesktopPreview.Setup</AssemblyName>
     <RootNamespace>Sovereign.Desktop.PreviewSetup</RootNamespace>
-    <Description>Unsigned internal preview installer for xAI Desk.</Description>
+    <Description>Unsigned internal preview installer. Distinct from any other Sovereign product.</Description>
     <UseWindowsForms>false</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

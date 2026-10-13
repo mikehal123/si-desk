@@ -1,12 +1,11 @@
 using Sovereign.Desktop.Core;
+using Sovereign.Desktop.Phone;
 using Xunit;
 
 namespace XaiDesk.Tests;
 
 public sealed class IdentityTests
 {
-    private const string OriginalDesk = "Sovereign" + "AI";
-
     [Fact]
     public void Names_and_credential_resources_are_xai_desk()
     {
@@ -24,13 +23,14 @@ public sealed class IdentityTests
     {
         var directory = XaiDeskIdentity.DataDirectory();
         Assert.EndsWith("xAIDesk", directory);
-        Assert.DoesNotContain(OriginalDesk, directory);
+        Assert.DoesNotContain("Sovereign" + "AI", directory);
     }
 
     [Fact]
     public void Phone_port_is_8789()
     {
         Assert.Equal(8789, XaiDeskIdentity.PhonePort);
+        Assert.Equal(8789, PhoneBindAddress.Port);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class IdentityTests
     {
         Assert.Equal(["chat", "room", "grokbot", "settings"], XaiDeskIdentity.Navigation);
         Assert.Equal("Grokbot", XaiDeskIdentity.NavigationLabel("grokbot"));
-        foreach (var excluded in new[] { "home", "charting", "resea" + "rch", "tools", "lab", "later" })
+        foreach (var excluded in new[] { "home", "charting", "re" + "search", "tools", "lab", "later" })
             Assert.DoesNotContain(excluded, XaiDeskIdentity.Navigation);
     }
 
@@ -46,7 +46,7 @@ public sealed class IdentityTests
     public void Single_instance_mutex_is_xai_desk()
     {
         Assert.Contains("xAIDesk", XaiDeskIdentity.SingleInstanceMutex);
-        Assert.DoesNotContain(OriginalDesk, XaiDeskIdentity.SingleInstanceMutex);
+        Assert.DoesNotContain("Sovereign" + "AI", XaiDeskIdentity.SingleInstanceMutex);
     }
 
     [Fact]

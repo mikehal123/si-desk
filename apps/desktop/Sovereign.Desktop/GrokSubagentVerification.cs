@@ -54,6 +54,7 @@ internal sealed partial class ChatConversation
         var reopenId = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_REOPEN_CHAT_ID");
         if (!string.IsNullOrWhiteSpace(reopenId)) return await VerifyTinySubagentReopenAsync(reopenId, capture, output);
         if (Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_TINY") == "1") return await VerifyTinyNativeSubagentAsync(capture, output);
+        var codex = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_PROVIDER") == "codex";
         var plan = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_MODE") == "plan";
         var fixture = Path.Combine(_profileDirectory, "subagent-project");
         Directory.CreateDirectory(fixture);
@@ -73,15 +74,42 @@ internal sealed partial class ChatConversation
         RestoreProjectBehavior();
         ResetChat();
         _restoring = false;
-        await ConnectChatAsync();
-        if (!_chatReady || _cursorChat is null) throw new IOException("Cursor connection failed: " + _chatStatus.Text);
-        var modelId = (await _cursorChat.ModelsAsync(default)).FirstOrDefault(m => m.Id.StartsWith("grok-4.7[", StringComparison.Ordinal)
-            && m.Id.Contains("fast=true", StringComparison.Ordinal))?.Id ?? throw new IOException("Grok 4.7 unavailable.");
+        string modelId;
+        if (codex)
+        {
+            // Use an existing explicitly selected subscription profile in isolated QA,
+            // without copying its authentication or operating on its project files.
+            var subscriptionProfile = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBSCRIPTION_PROFILE") ?? _profileDirectory;
+            var epoch = ++_projectSessionEpoch;
+            _codexChat = new CodexChatClient(fixture, new CursorProjectOptions {
+                Mode = _saved.ProjectMode, Permissions = _saved.Permissions, EnableSubagents = true,
+                RequestPermission = RequestProjectPermissionAsync
+            }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } }, profile: subscriptionProfile);
+            using var connecting = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+            if (!await _codexChat.IsSubscriptionAsync(connecting.Token)) throw new IOException("Sign in to the ChatGPT connection before native subscription verification.");
+            var models = await _codexChat.ModelsAsync(connecting.Token);
+            if (!models.Contains("gpt-6.1-sol", StringComparer.Ordinal)) throw new IOException("GPT-6.1 Sol is not available in the connected subscription catalog.");
+            modelId = "gpt-6.1-sol";
+            BindChatModels(models.Select(m => (m, (string?)m)).ToArray(), false);
+            _chatReady = true;
+            UpdateProjectHeader();
+            SetChatBusy(false);
+        }
+        else
+        {
+            await ConnectChatAsync();
+            if (!_chatReady || _cursorChat is null) throw new IOException("Cursor connection failed: " + _chatStatus.Text);
+            modelId = (await _cursorChat.ModelsAsync(default)).FirstOrDefault(m => m.Id.StartsWith("grok-4.7[", StringComparison.Ordinal)
+                && m.Id.Contains("fast=true", StringComparison.Ordinal))?.Id ?? throw new IOException("Grok 4.7 unavailable.");
+        }
         if (!SelectChatModel(modelId)) throw new IOException("Cannot select the requested model.");
-        _chatInput.Text = "Verify native parallel delegation in this disposable project. Launch exactly three direct generalPurpose subagents concurrently before waiting for results. "
+        var helperType = codex ? "" : "generalPurpose ";
+        _chatInput.Text = "Verify native parallel delegation in this disposable project. Launch exactly three direct " + helperType + "subagents concurrently before waiting for results. "
             + "Name the tasks Backend, Interface and QA. Backend reads only backend.md and reports its marker. Interface reads only interface.md and reports its marker. QA reads only qa.md and reports its marker. "
+            + (codex ? "Each helper also produces a detailed twelve-step read-only validation checklist for its component, explaining what each check would verify and what evidence it needs. " : "")
             + "You must not read these files yourself. "
-            + "Do not edit files, run commands, use external accounts or launch nested helpers. "
+            + (codex ? "Helpers may use read-only file commands to inspect their assigned file. Do not edit files, run other commands, use external accounts or launch nested helpers. "
+                : "Do not edit files, run commands, use external accounts or launch nested helpers. ")
             + "If a helper fails, report the failure without retrying. "
             + "After all three finish, summarize their markers in your final answer and stop.";
         var sending = SendChatAsync();
@@ -224,10 +252,11 @@ internal sealed partial class ChatConversation
             checks.Add(message);
         }
         Check(_subagentRows.Count == 0, "Tiny native verification requires a fresh chat without previous helpers.");
+        var codex = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_PROVIDER") == "codex";
         var plan = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_MODE") == "plan";
         var fixture = Path.Combine(_profileDirectory, "subagent-project");
         Directory.CreateDirectory(fixture);
-        var marker = "GROK-TINY-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+        var marker = (codex ? "GPT" : "GROK") + "-TINY-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
         var content = "Delegated verification marker: " + marker + "\n";
         var markerPath = Path.Combine(fixture, "marker.txt");
         File.WriteAllText(markerPath, content);
@@ -239,15 +268,35 @@ internal sealed partial class ChatConversation
         };
         _projectFolder = fixture; _chatProvider.SelectedIndex = DeskChatConnections.Cursor;
         RestoreProjectBehavior(); ResetChat(); _restoring = false;
-        await ConnectChatAsync();
-        Check(_chatReady && _cursorChat is not null, "The Cursor connection is ready: " + _chatStatus.Text);
-        var modelId = (await _cursorChat!.ModelsAsync(default)).FirstOrDefault(m => m.Id.StartsWith("grok-4.7[", StringComparison.Ordinal)
-            && m.Id.Contains("fast=true", StringComparison.Ordinal))?.Id ?? throw new IOException("Grok 4.7 unavailable.");
+        string modelId;
+        if (codex)
+        {
+            var epoch = ++_projectSessionEpoch;
+            _codexChat = new CodexChatClient(fixture, new CursorProjectOptions {
+                Mode = _saved.ProjectMode, Permissions = _saved.Permissions, EnableSubagents = true,
+                RequestPermission = RequestProjectPermissionAsync
+            }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } }, profile: _profileDirectory);
+            using var connecting = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+            Check(await _codexChat.IsSubscriptionAsync(connecting.Token), "The isolated QA profile has an authenticated ChatGPT subscription.");
+            var models = await _codexChat.ModelsAsync(connecting.Token);
+            modelId = "gpt-6.1-sol";
+            Check(models.Contains(modelId, StringComparer.Ordinal), "The requested GPT model is advertised by the isolated QA connection.");
+            BindChatModels(models.Select(m => (m, (string?)m)).ToArray(), false);
+            _chatReady = true; UpdateProjectHeader(); SetChatBusy(false);
+        }
+        else
+        {
+            await ConnectChatAsync();
+            Check(_chatReady && _cursorChat is not null, "The Cursor connection is ready: " + _chatStatus.Text);
+            modelId = (await _cursorChat!.ModelsAsync(default)).FirstOrDefault(m => m.Id.StartsWith("grok-4.7[", StringComparison.Ordinal)
+                && m.Id.Contains("fast=true", StringComparison.Ordinal))?.Id ?? throw new IOException("Grok 4.7 unavailable.");
+        }
         Check(SelectChatModel(modelId), "The parent uses the selected advertised routing ID.");
-        _chatInput.Text = "This is one tiny native delegation check in a disposable project. Launch exactly ONE direct generalPurpose "
+        _chatInput.Text = "This is one tiny native delegation check in a disposable project. Launch exactly ONE direct " + (codex ? "" : "generalPurpose ")
             + "helper named Read marker. Its sole task is to read marker.txt once, report the marker it actually contains, and finish. "
-            + "You, the parent, must not read marker.txt yourself. Do not launch other or nested helpers, retry, edit files, resea" + "rch, or use external accounts. "
-            + "The helper may use the native read tool; no shell commands are needed. Return the read marker in the helper result. "
+            + "You, the parent, must not read marker.txt yourself. Do not launch other or nested helpers, retry, edit files, look up sources, or use external accounts. "
+            + (codex ? "The helper may use one read-only file command. It has explicit user authorization to report the result to its parent with send_message targeting /root, then finish with the same marker in its final answer. "
+                : "The helper may use the native read tool; no shell commands are needed. Return the read marker in the helper result. ")
             + "After this single helper reports and finishes, validate its returned marker and continue your own final answer with PARENT-CONTINUED-TINY-0347 followed by that marker. Stop after that short answer.";
         var sending = SendChatAsync();
         var deadline = DateTimeOffset.UtcNow.AddMinutes(3);
@@ -303,7 +352,7 @@ internal sealed partial class ChatConversation
         return new { mode = "tiny", chat_id = Id, process_id = Environment.ProcessId, profile = _profileDirectory, parent_model = modelId, provider_calls = true,
             permission_mode = plan ? "Plan" : "Always allow", child_count = 1, maximum_active = maximumActive, captured_running = capturedRunning,
             marker, fixture_unchanged = true, parent_continued = true, parent_relay_observed = parentRelayObserved,
-            relay_proof_scope = "Native helper result",
+            relay_proof_scope = codex ? (parentRelayObserved ? "Owned child interacted event addressed to parent" : "Not captured; final output is not relay proof") : "Native helper result",
             terminal_timer_frozen = true, checks, children = _subagentRows.Values,
             display = NativeSubagentDisplay(), reopen_reference = Path.Combine(output, "native-chat-reference.json") };
     }
@@ -316,7 +365,7 @@ internal sealed partial class ChatConversation
             if (!condition) { SaveNativeSubagentObservations(output, "reopen assertion failed", message); throw new IOException(message); }
             checks.Add(message);
         }
-        Check(Id == chatId && _cursorChat is null && _planChat is null && !_chatReady && _chatCancellation is null,
+        Check(Id == chatId && _codexChat is null && _cursorChat is null && _planChat is null && !_chatReady && _chatCancellation is null,
             "Fresh-process reopen restores the selected chat without creating a provider connection.");
         var referencePath = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_REOPEN_REFERENCE")
             ?? throw new IOException("A successful tiny-run saved-chat reference is required.");
@@ -337,7 +386,7 @@ internal sealed partial class ChatConversation
         await SettleExpandedNativeSubagentCaptureAsync(child, Check, output, "subagents-reopened-expanded");
         await capture("subagents-reopened-expanded");
         await Task.Delay(1200); RefreshSubagentElapsed();
-        Check(row.Elapsed.Text == frozenElapsed && _cursorChat is null && _planChat is null,
+        Check(row.Elapsed.Text == frozenElapsed && _codexChat is null && _cursorChat is null && _planChat is null,
             "Reopened terminal timer stays frozen and no provider client is created.");
         SaveNativeSubagentObservations(output, "provider-free reopen complete");
         return new { mode = Environment.GetEnvironmentVariable("SOVEREIGN_QA_SUBAGENTS_RECAPTURE") == "1" ? "provider-free-recapture" : "provider-free-reopen", chat_id = Id, process_id = Environment.ProcessId, provider_calls = false,

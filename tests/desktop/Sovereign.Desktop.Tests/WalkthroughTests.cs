@@ -23,6 +23,6 @@ public sealed class WalkthroughTests
             Fixtures);
         var receipt = await ClosureWalkthrough.RunAsync(vm, Fixtures);
         Assert.True(receipt.Passed, string.Join(Environment.NewLine, receipt.Steps.Select(s => $"{s.Id}: {s.Passed} {s.Detail}")));
-        Assert.Equal(4, receipt.Steps.Count);
+        Assert.Equal(5, receipt.Steps.Count);
     }
 }

@@ -571,11 +571,12 @@ public sealed partial class MainWindow
             window.DispatcherQueue.TryEnqueue(window.RefreshGrokbot);
         }
 
-        public string ReadSwarmBoard(string? swarmId) => SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId);
+        public string ReadSwarmBoard(string? swarmId, string? runId = null) =>
+            SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, null, string.IsNullOrWhiteSpace(runId) ? null : runId);
 
-        public string SubmitSwarmResult(string taskId, string result, string proof)
+        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null)
         {
-            var board = SwarmBoard.RequireTask(taskId, null, out _);
+            var board = SwarmBoard.RequireTask(taskId, null, out _, string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, string.IsNullOrWhiteSpace(runId) ? null : runId);
             var task = board.Submit(taskId, result, proof);
             return task.Id + "\t" + task.Status;
         }

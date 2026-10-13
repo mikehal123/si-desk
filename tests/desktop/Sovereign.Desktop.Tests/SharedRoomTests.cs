@@ -11,7 +11,7 @@ public sealed class SharedRoomTests
     public async Task Two_participants_share_ordered_messages_and_retries_do_not_duplicate()
     {
         var profile = Path.Combine(Path.GetTempPath(), "sovereign-room-test-" + Guid.NewGuid().ToString("N"));
-        await using var host = new SharedRoomHost(profile, "user"); await host.StartAsync();
+        await using var host = new SharedRoomHost(profile, "Micha"); await host.StartAsync();
         using var owner = new RoomConnection(host.Address, host.Owner);
         var invitation = host.NewInvitation(host.Address);
         using var peer = await RoomConnection.JoinAsync(invitation, "Caesar", CancellationToken.None);
@@ -20,7 +20,7 @@ public sealed class SharedRoomTests
         var first = await owner.SendAsync(post, CancellationToken.None);
         Assert.Equal(first, await owner.SendAsync(post, CancellationToken.None));
         await Assert.ThrowsAsync<IOException>(() => owner.SendAsync(post with { Text = "Different payload" }, CancellationToken.None));
-        await peer.SendAsync(new RoomPost(Guid.NewGuid(), "human", "", "Hello user"), CancellationToken.None);
+        await peer.SendAsync(new RoomPost(Guid.NewGuid(), "human", "", "Hello Micha"), CancellationToken.None);
         await peer.SendAsync(new RoomPost(Guid.NewGuid(), "ai", "Test model", "This is a test reply, not a live model generation."), CancellationToken.None);
         var snapshot = await owner.ReadAsync(0, CancellationToken.None);
         Assert.Equal(2, snapshot.Members.Length); Assert.Equal(3, snapshot.Messages.Length);
@@ -47,7 +47,7 @@ public sealed class SharedRoomTests
         http.DefaultRequestHeaders.Add("Origin", "https://attacker.invalid");
         Assert.Equal(HttpStatusCode.Forbidden,(await http.GetAsync("/")).StatusCode);
         Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new Uri("http://192.168.1.20/")));
-        Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new UriBuilder("https://example.com/") { UserName = "user", Password = "pass" }.Uri));
+        Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new Uri("https://user:pass@example.com/")));
         await Assert.ThrowsAsync<IOException>(() => peer.SendAsync(new RoomPost(Guid.NewGuid(),"system","","fake authority"),CancellationToken.None));
     }
 }

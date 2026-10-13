@@ -10,16 +10,24 @@ internal sealed partial class ChatConversation
 {
     private ChatSteeringQueue _steeringQueue = new();
     private bool _cursorSendLoop;
+    private bool _codexSendLoop;
     private bool _acceptingCursorInstruction;
     private bool _cursorStopRequested;
     private Task<CursorTurnOutcome>? _cursorPromptTask;
     private Task? _cursorSteeringTask;
+    private Task? _codexCorrectionTask;
     private Exception? _cursorSteeringFailure;
+    private CodexComposerSteering? _codexComposer;
+    private readonly HashSet<string> _acceptedIntoActiveTurn = [];
+    private readonly Dictionary<string, string> _instructionStatus = [];
+    private readonly Dictionary<string, string> _instructionFailures = [];
+    private readonly List<string> _pendingSteerErrors = [];
     private readonly Dictionary<string, (StackPanel Root, TextBlock Preview, TextBlock Status, StackPanel Actions)> _pendingInstructionViews = [];
     private readonly Dictionary<string, string> _removedInstructionLabels = [];
     private readonly HashSet<string> _deliveredInstructionIds = [];
     private const string InterruptedDelivery = "Your message · Interrupted · may already have been sent. Press Resume main agent to send it again. It is not resent automatically.";
-    private bool CursorComposerAvailable => !_chatBusy || ((CursorChat || GrokBuildChat) && _cursorSendLoop && _chatReady);
+    private CodexComposerSteering CodexComposer => _codexComposer ??= new(_steeringQueue);
+    private bool CursorComposerAvailable => !_chatBusy || ((CursorChat || GrokBuildChat) && _cursorSendLoop && _chatReady) || (CodexChat && _codexSendLoop && _chatReady);
     private CancellationTokenSource CreateTurnCancellation() => _projectFolder is not null
         ? new CancellationTokenSource()
         : new CancellationTokenSource(TimeSpan.FromMinutes(10));
@@ -82,12 +90,23 @@ internal sealed partial class ChatConversation
 
     private void StopChatResponse()
     {
-        if (CursorChat || GrokBuildChat)
+        if (CursorChat || GrokBuildChat || CodexChat)
         {
             _cursorStopRequested = true;
-            _steeringQueue.Pause();
+            if (CodexChat)
+            {
+                CodexComposer.Stop();
+                foreach (var id in _acceptedIntoActiveTurn)
+                {
+                    _steeringQueue.MarkMayHaveBeenSent(id);
+                    _instructionStatus[id] = InterruptedDelivery;
+                }
+            }
+            else _steeringQueue.Pause();
             RefreshPendingInstructions(); Save();
-            _chatStatus.Text = "Main agent · stop requested. This also stops its helpers. Pending messages stay here until you press Resume main agent.";
+            _chatStatus.Text = CodexChat
+                ? "Main agent · stop requested. This also stops its helpers. Unsent messages stay here until you press Resume main agent."
+                : "Main agent · stop requested. This also stops its helpers. Pending messages stay here until you press Resume main agent.";
         }
         _chatCancellation?.Cancel();
     }
@@ -282,6 +301,248 @@ internal sealed partial class ChatConversation
             ? (_grokBuild ?? throw new IOException("Connect Grok Build before sending.")).RequestSteeringAsync(ct)
             : (_cursorChat ?? throw new IOException("Connect Cursor before sending.")).RequestSteeringAsync(ct);
 
+    private async Task SendCodexChatAsync()
+    {
+        if (_disposed || _deleted || _acceptingCursorInstruction || _attachmentBusy || !CursorComposerAvailable) return;
+        var rawText = _chatInput.Text;
+        var text = rawText.Trim();
+        var files = _draftFiles.ToArray();
+        var model = SelectedChatModel ?? _saved.Model;
+        if (text.Length == 0 && files.Length == 0) return;
+        if (text.Length == 0) text = "Please examine the attached files.";
+        _lastPrompt = text;
+        var run = false;
+        _acceptingCursorInstruction = true;
+        SetAttachmentBusy(_attachmentBusy);
+        try
+        {
+            if (!_codexSendLoop && _reconnectOnSend)
+            {
+                var requestedModel = model ?? _saved.Model;
+                _saved = _saved with { Model = requestedModel };
+                await ConnectChatAsync();
+                if (_disposed || !_chatReady || PhoneSendCancelled) return;
+                model = SelectedChatModel;
+                if (model != requestedModel)
+                {
+                    _chatStatus.Text = "Your previous model is unavailable. Choose a model before sending again.";
+                    return;
+                }
+            }
+            if (PhoneSendCancelled) return;
+            if (!_chatReady || string.IsNullOrWhiteSpace(model) || !HasChatModel(model))
+            {
+                _chatStatus.Text = "Connect and choose an available model before sending.";
+                return;
+            }
+            if (_codexSendLoop)
+            {
+                var correction = AcceptCodexCorrectionAsync(rawText, text, model, files);
+                _codexCorrectionTask = correction;
+                try { await correction; }
+                finally { if (ReferenceEquals(_codexCorrectionTask, correction)) _codexCorrectionTask = null; }
+                return;
+            }
+            var instruction = _steeringQueue.Accept(text, model, files, false);
+            if (_saved.Turns.Length == 0 && _steeringQueue.Count == 1) _saved = _saved with { Title = ChatArchive.TitleFor(text) };
+            // Clear only the captured draft. A draft edited during reconnect belongs to the user.
+            if (_chatInput.Text == rawText) _chatInput.Text = "";
+            _draftFiles.RemoveAll(f => files.Any(sent => sent.Id == f.Id));
+            RenderDraftFiles();
+            _chatFollowLatest = true;
+            ShowPendingInstruction(instruction);
+            Save(); FollowChatIfNeeded();
+            _cursorStopRequested = false;
+            CodexComposer.Resume();
+            run = true;
+        }
+        finally { _acceptingCursorInstruction = false; SetAttachmentBusy(_attachmentBusy); }
+        if (run) await RunCodexInstructionsAsync();
+    }
+
+    private async Task AcceptCodexCorrectionAsync(string rawText, string text, string model, ChatAttachment[] files)
+    {
+        var token = _chatCancellation?.Token ?? CancellationToken.None;
+        var submission = await CodexComposer.SubmitDuringRunAsync(text, model, files, (instruction, ct) =>
+            _codexChat is null
+                ? Task.FromException<bool>(new IOException("OpenAI is not connected in this chat."))
+                : _codexChat.RequestSteeringAsync(instruction, ct), token);
+        if (submission.IgnoredDuplicate || _disposed) return;
+        if (_chatInput.Text == rawText) _chatInput.Text = "";
+        _draftFiles.RemoveAll(f => files.Any(sent => sent.Id == f.Id));
+        RenderDraftFiles();
+        _chatFollowLatest = true;
+        if (submission.Instruction is not { } instruction) return;
+        if (submission.Result == CodexComposerSteerResult.Accepted)
+        {
+            _acceptedIntoActiveTurn.Add(instruction.Id);
+            _instructionStatus[instruction.Id] = "Accepted into this response";
+            if (TryAppendInstructionToActiveTurn(instruction))
+            {
+                _steeringQueue.DeliverToActiveTurn(instruction.Id);
+                _acceptedIntoActiveTurn.Remove(instruction.Id);
+                _instructionStatus.Remove(instruction.Id);
+                _removedInstructionLabels[instruction.Id] = "Accepted into this response";
+            }
+        }
+        else if (submission.Failure is not null)
+        {
+            _instructionFailures[instruction.Id] = submission.Failure;
+            RecordSteerFailure(submission.Failure);
+        }
+        ShowPendingInstruction(instruction);
+        _chatStatus.Text = submission.Result switch
+        {
+            CodexComposerSteerResult.Accepted => "Correction accepted in this chat. The active response continues.",
+            CodexComposerSteerResult.QueuedForNextTurn => "The current response had already finished. This instruction is queued once for the next response in this chat.",
+            _ => submission.Failure is null
+                ? "Stop requested. Your new instruction is saved and remains unsent."
+                : "Correction could not be sent: " + submission.Failure + ". It is kept in this chat for explicit review and send."
+        };
+        RefreshPendingInstructions(); Save(); FollowChatIfNeeded();
+    }
+
+    private void RecordSteerFailure(string message)
+    {
+        if (_savedTurnIndex < 0) { _pendingSteerErrors.Add(message); return; }
+        _partialActivity.Enqueue(new CursorActivityEvent("notice", "Correction failed: " + message));
+        DrainSavedTurn();
+    }
+
+    private void FlushSteerFailures()
+    {
+        if (_pendingSteerErrors.Count == 0 || _savedTurnIndex < 0) return;
+        foreach (var message in _pendingSteerErrors)
+            _partialActivity.Enqueue(new CursorActivityEvent("notice", "Correction failed: " + message));
+        _pendingSteerErrors.Clear();
+        DrainSavedTurn();
+    }
+
+    private bool TryAppendInstructionToActiveTurn(SavedChatInstruction instruction)
+    {
+        if (_savedTurnIndex < 0 || _savedTurnIndex >= _saved.Turns.Length) return false;
+        var turn = _saved.Turns[_savedTurnIndex];
+        var existing = turn.Instructions ?? [];
+        if (existing.Any(i => i.Id == instruction.Id)) return true;
+        _saved.Turns[_savedTurnIndex] = turn with { Instructions = [.. existing, instruction] };
+        return true;
+    }
+
+    private void RememberAcceptedCorrections(bool delivered)
+    {
+        foreach (var id in _acceptedIntoActiveTurn.ToArray())
+        {
+            var instruction = _steeringQueue.Snapshot.FirstOrDefault(i => i.Id == id);
+            if (instruction is not null) TryAppendInstructionToActiveTurn(instruction);
+            if (!delivered)
+            {
+                _steeringQueue.MarkMayHaveBeenSent(id);
+                _instructionStatus[id] = InterruptedDelivery;
+                _acceptedIntoActiveTurn.Remove(id);
+                continue;
+            }
+            if (instruction is null || _savedTurnIndex < 0) { if (instruction is null) _acceptedIntoActiveTurn.Remove(id); continue; }
+            _steeringQueue.DeliverToActiveTurn(id);
+            _acceptedIntoActiveTurn.Remove(id);
+            _instructionStatus.Remove(id);
+            _removedInstructionLabels[id] = "Accepted into this response";
+        }
+    }
+
+    private async Task RunCodexInstructionsAsync()
+    {
+        if (_codexSendLoop || _disposed || _deleted || !_chatReady) return;
+        _codexSendLoop = true;
+        SetChatBusy(true);
+        try
+        {
+            while (!_disposed && !_deleted && !_cursorStopRequested && _steeringQueue.HasAutomaticPending)
+            {
+                var batch = _steeringQueue.BeginBatch();
+                if (batch.Length == 0) break;
+                var model = batch[0].Model;
+                var prompt = string.Join("\n\n", batch.Select(i => i.Text));
+                var images = new List<ChatImage>();
+                var prepared = new List<string>();
+                var content = new System.Text.StringBuilder();
+                ChatActivityView? turn = null;
+                var outcome = "failed";
+                string? failureReason = null;
+                // Project work may take hours. Stop still cancels; wall time must not.
+                _chatCancellation = CreateTurnCancellation();
+                SetChatBusy(true); RefreshPendingInstructions();
+                try
+                {
+                    if (!HasChatModel(model)) throw new IOException("The captured model is unavailable. Edit the pending instruction to choose another model.");
+                    SelectChatModel(model);
+                    _chatStatus.Text = "Preparing captured instructions. Stop keeps them available for explicit send.";
+                    foreach (var instruction in batch)
+                    {
+                        var attachmentCopy = instruction.Attachments.ToArray();
+                        var preparedResult = await PrepareAttachmentsAsync(instruction.Text, attachmentCopy, _chatCancellation.Token);
+                        prepared.Add(preparedResult.Text); images.AddRange(preparedResult.Images);
+                    }
+                    _chatCancellation.Token.ThrowIfCancellationRequested();
+                    var sentText = prepared.Count == 1 ? prepared[0]
+                        : "Apply these user instructions together, in submission order:\n\n" + string.Join("\n\n", prepared.Select((s, i) => $"Instruction {i + 1}:\n{s}"));
+                    var restoredPrompt = WithReportedHelpers(WithTeamContext(_needsContext ? ChatArchive.RestoreContext(_saved, sentText) : sentText));
+                    var label = ReadPicker(_chatModel.Items.Cast<object>().FirstOrDefault(i => ReadPicker(i).Id == model)).Label ?? model;
+                    turn = new ChatActivityView(label, UpdateChangesPanel, FollowChatIfNeeded, SetComposerStatus, PauseFollow, Path.Combine(_profileDirectory, "chat-activity"), _classicChat);
+                    _activeChatTurn = turn; TrackChatTurn(turn); _chatMessages.Children.Add(turn.Root);
+                    batch = _steeringQueue.MarkDispatched(batch);
+                    BeginSavedTurn(prompt, model, batch.SelectMany(i => i.Attachments).ToArray(), sentText, batch);
+                    FlushSteerFailures();
+                    RememberAcceptedCorrections(delivered: true);
+                    FollowChatIfNeeded();
+                    _chatStatus.Text = "Main agent · working. Enter queues a correction for the main agent. Stop stops the main agent and its helpers. A message is not resent on its own.";
+                    void Delta(string text) { content.Append(text); turn.Append(text); _partialReply.Enqueue(text); }
+                    ApplySkillGuidance(restoredPrompt);
+                    await _codexChat!.SendAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images);
+                    outcome = "completed";
+                    _needsContext = false;
+                    _chatStatus.Text = _projectFolder is not null ? "Response complete. Review Changed files in this turn." : "Response complete.";
+                }
+                catch (OperationCanceledException)
+                {
+                    outcome = "stopped";
+                    _steeringQueue.Pause();
+                    _chatStatus.Text = "Response stopped. Partial text and file edits are kept. Unsent instructions stay in this chat until you explicitly send them.";
+                    DisconnectCodexAfterFailure();
+                }
+                catch (Exception ex)
+                {
+                    failureReason = ProjectAgentException.Describe(ex); turn?.ShowFailure(failureReason);
+                    _steeringQueue.Pause();
+                    _chatStatus.Text = "Response failed: " + ex.Message + ". Pending instructions are kept for review; reconnect and explicitly send them when ready.";
+                    DisconnectCodexAfterFailure();
+                }
+                finally
+                {
+                    var correction = _codexCorrectionTask;
+                    if (correction is not null) await correction;
+                    RememberAcceptedCorrections(outcome is "completed");
+                    if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
+                    _steeringQueue.CompleteBatch(batch, outcome is "completed");
+                    FinishSubagents(outcome); _activeChatTurn = null;
+                    _chatCancellation.Dispose(); _chatCancellation = null;
+                    RefreshPendingInstructions(); Save();
+                }
+                if (outcome is not "completed") break;
+            }
+        }
+        finally
+        {
+            _codexSendLoop = false;
+            SetChatBusy(false); RefreshPendingInstructions(); Save();
+        }
+    }
+
+    private void DisconnectCodexAfterFailure()
+    {
+        _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++;
+        _chatReady = false; _codexChat?.Dispose(); _codexChat = null;
+    }
+
     internal void OfferMainAgentCorrection(string helperName, string note)
     {
         var name = string.IsNullOrWhiteSpace(helperName) ? "the helper" : helperName.Trim();
@@ -350,7 +611,10 @@ internal sealed partial class ChatConversation
         {
             var remains = pending.TryGetValue(id, out var instruction);
             var detail = !remains ? _removedInstructionLabels.GetValueOrDefault(id, "Your message · sent")
+                : _instructionStatus.TryGetValue(id, out var forced) ? forced
                 : _steeringQueue.IsInFlight(id) ? "Your message · Waiting for the main agent to accept it."
+                : _instructionFailures.TryGetValue(id, out var failure) ? "Your message · Failed · explicit send required. " + failure
+                : _codexSendLoop && !_cursorStopRequested && _steeringQueue.IsAutomatic(id) ? "Your message · Queued for the next response from the main agent."
                 : _cursorSendLoop && !_cursorStopRequested && _steeringQueue.HasAutomaticPending ? "Your message · Accepted · queued for the main agent in submission order."
                 : instruction?.MayHaveBeenSent == true ? InterruptedDelivery
                 : "Your message · Not sent · press Resume main agent. Nothing is sent automatically.";
@@ -358,15 +622,18 @@ internal sealed partial class ChatConversation
                 RevealDeliveredInstruction(instruction);
             view.Status.Text = !remains ?
                 _removedInstructionLabels.TryGetValue(id, out var removed) ? removed : "Delivered"
+                : _instructionFailures.TryGetValue(id, out var error) ? "Failed · " + error
+                : _instructionStatus.TryGetValue(id, out var forcedStatus) ?
+                    forcedStatus == InterruptedDelivery ? "Interrupted · check before resending" : forcedStatus
                 : instruction?.MayHaveBeenSent == true && !_steeringQueue.IsInFlight(id) ? "Interrupted · check before resending"
                 : _steeringQueue.IsInFlight(id) ? "Waiting for acceptance"
-                : _cursorStopRequested || !_cursorSendLoop ? "Not sent"
+                : _cursorStopRequested || (!_cursorSendLoop && !_codexSendLoop) ? "Not sent"
                 : "Queued";
             ToolTipService.SetToolTip(view.Status, detail);
             var discarded = _removedInstructionLabels.GetValueOrDefault(id) is "Moved to composer · unsent" or "Removed from pending instructions";
             view.Root.Visibility = !discarded && (remains || view.Root.Tag is string) ? Visibility.Visible : Visibility.Collapsed;
             view.Actions.Visibility = remains && !IsWorking && !_steeringQueue.IsInFlight(id) ? Visibility.Visible : Visibility.Collapsed;
-            foreach (var button in view.Actions.Children.OfType<Button>()) button.IsEnabled = !_cursorSendLoop && !_acceptingCursorInstruction && !_attachmentBusy;
+            foreach (var button in view.Actions.Children.OfType<Button>()) button.IsEnabled = !_cursorSendLoop && !_codexSendLoop && !_acceptingCursorInstruction && !_attachmentBusy;
         }
         var seen = new Dictionary<string, (string Id, int Count)>(StringComparer.Ordinal);
         foreach (var (id, view) in _pendingInstructionViews)
@@ -390,12 +657,14 @@ internal sealed partial class ChatConversation
 
     private async Task SendPendingCursorInstructionsAsync()
     {
-        if (!(CursorChat || GrokBuildChat) || IsWorking || _disposed || _deleted || _steeringQueue.Count == 0) return;
+        if (!(CursorChat || GrokBuildChat || CodexChat) || IsWorking || _disposed || _deleted || _steeringQueue.Count == 0) return;
         // A saved instruction's model remains captured even when the current picker changes.
         if (!_chatReady) { await ConnectChatAsync(); if (_disposed || !_chatReady) return; }
         _cursorStopRequested = false;
+        if (CodexChat) CodexComposer.Resume();
         _steeringQueue.ResumeAll();
-        await RunCursorInstructionsAsync();
+        if (CodexChat) await RunCodexInstructionsAsync();
+        else await RunCursorInstructionsAsync();
     }
 
     private void EditPendingInstruction(string id)

@@ -86,7 +86,7 @@ internal sealed partial class ChatConversation
 
     private void UpdateSubagentOption()
     {
-        var show = (CursorChat || GrokBuildChat) && _projectFolder is not null ? Visibility.Visible : Visibility.Collapsed;
+        var show = (CodexChat || CursorChat || GrokBuildChat) && _projectFolder is not null ? Visibility.Visible : Visibility.Collapsed;
         _subagentOption.Visibility = show;
         _swarmOption.Visibility = show;
         _subagentOptionRow.Visibility = show;
@@ -572,7 +572,7 @@ internal sealed partial class ChatConversation
             AvatarFailed = false;
             Avatar.Visibility = Visibility.Collapsed;
             Initial.Visibility = Visibility.Collapsed;
-            Model.Text = SubagentCardText.IdentityLine(child);
+            Model.Text = SubagentCardText.CardLine(child);
             Provider.Visibility = Visibility.Collapsed;
             Requested.Visibility = Visibility.Collapsed;
             ToolTipService.SetToolTip(Model, SubagentCardText.IdentityDetail(child));

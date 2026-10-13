@@ -55,6 +55,8 @@ public partial class App : Application
         };
         if (Environment.GetEnvironmentVariable("SOVEREIGN_QA_UI_POLISH") is not null)
             UnhandledException += (_, e) => WriteLaunchDiag("UI_POLISH_UNHANDLED " + e.Exception);
+        if (Environment.GetCommandLineArgs().Contains("--codex-chat-verify"))
+            UnhandledException += (_, e) => WriteLaunchDiag("CODEX_QA_UNHANDLED " + e.Exception);
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -64,9 +66,6 @@ public partial class App : Application
         WriteLaunchDiag("BaseDirectory=" + AppContext.BaseDirectory);
         try
         {
-            var account = AccountConfiguration.Read(Path.Combine(AppContext.BaseDirectory, "account-service.json"));
-            if (account.IsConfigured)
-                account.Validate();
             var options = LaunchOptions.Parse(raw);
             var openedFiles = ShellOpenFiles.Parse(raw);
             WriteLaunchDiag(
@@ -104,7 +103,7 @@ public partial class App : Application
                           ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                               "xAIDesk");
             profile = Path.GetFullPath(profile);
-            if (options.OllamaChatVerification is not null || options.ChatLayoutVerification is not null || options.ChatSteeringVerification is not null) MainWindow.ValidateCodexQaProfile(profile);
+            if (options.CodexChatVerification is not null || options.OllamaChatVerification is not null || options.ChatLayoutVerification is not null || options.ChatSteeringVerification is not null) MainWindow.ValidateCodexQaProfile(profile);
             var installDir = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\') + "\\";
             if (profile.StartsWith(installDir, StringComparison.OrdinalIgnoreCase))
             {
@@ -115,12 +114,20 @@ public partial class App : Application
             Directory.CreateDirectory(profile);
             var fixtures = Path.Combine(AppContext.BaseDirectory, "fixtures");
             string? hostProfile = null;
+            if (options.Mode == ApplicationMode.NativeConnection)
+            {
+                hostProfile = ResolveHostProfile(options.HostProfileDirectory, profile);
+            }
 
-            WriteLaunchDiag("resolved profile=" + profile + " host=<null> fixtures=" + fixtures + " fixtures_exists=" + Directory.Exists(fixtures));
+            WriteLaunchDiag("resolved profile=" + profile + " host=" + (hostProfile ?? "<null>") + " fixtures=" + fixtures + " fixtures_exists=" + Directory.Exists(fixtures));
             IOperatorClient client = options.Mode switch
             {
                 ApplicationMode.EvidenceArchive when options.ArchiveDirectory is not null =>
                     CreateArchive(options.ArchiveDirectory, fixtures),
+                ApplicationMode.NativeConnection => new NativeOperatorClient(
+                    string.IsNullOrWhiteSpace(hostProfile)
+                        ? NativeClientOptions.Disconnected
+                        : new NativeClientOptions(hostProfile, "Sovereign.Desktop", ShellViewModel.AppVersion, profile)),
                 _ => new PreviewOperatorClient(ScenarioCatalog.Load(fixtures, options.ScenarioId ?? "admitted-blocked-execution"))
             };
             var vm = new ShellViewModel(client, new FileDraftStore(profile), profile, fixtures, hostProfile);
@@ -213,6 +220,12 @@ public partial class App : Application
             _ = _window.DispatcherQueue.TryEnqueue(async () => await _window.RunOllamaChatVerificationAsync(
                 Path.GetFullPath(options.OllamaChatVerification), options.OllamaVerificationModel!, Path.GetFullPath(options.OllamaVerificationPrompts!), options.OllamaVerificationThinking));
         }
+        else if (options.CodexChatVerification is not null)
+        {
+            var verificationDirectory = Path.GetFullPath(options.CodexChatVerification);
+            _ = _window.DispatcherQueue.TryEnqueue(async () =>
+                await _window.RunCodexChatVerificationAsync(verificationDirectory));
+        }
         else if (options.Walkthrough || options.NativeIntegration || options.KeyboardProbe || options.CaptureDirectory is not null)
         {
             var outDir = options.CaptureDirectory
@@ -292,6 +305,7 @@ public partial class App : Application
         options.ExitAfterSmoke || options.SmokeDump is not null || options.Walkthrough || options.KeyboardProbe
         || options.NativeIntegration || options.CaptureDirectory is not null || options.ExitAfterWalkthrough
         || options.ChatLayoutVerification is not null || options.ChatSteeringVerification is not null
+        || options.CodexChatVerification is not null
         || options.OllamaChatVerification is not null;
 
     private static void WriteLaunchDiag(string message)
@@ -307,6 +321,28 @@ public partial class App : Application
         catch
         {
         }
+    }
+
+    private static string? ResolveHostProfile(string? requested, string desktopProfile)
+    {
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            if (!Sovereign.Desktop.Client.Host.HostDiscovery.IsAuthorizedProfile(requested, out var why))
+            {
+                throw new InvalidOperationException(why + " Builder/Grok/QA staging profiles are refused.");
+            }
+
+            return Path.GetFullPath(requested);
+        }
+
+        var host = Path.GetFullPath(Path.Combine(desktopProfile, "host"));
+        if (!Sovereign.Desktop.Client.Host.HostDiscovery.IsAuthorizedProfile(host, out var reason))
+        {
+            throw new InvalidOperationException(reason);
+        }
+
+        Directory.CreateDirectory(host);
+        return host;
     }
 
     private static IOperatorClient CreateArchive(string directory, string fixtures)
@@ -340,6 +376,7 @@ public sealed class LaunchOptions
     public string? CaptureDirectory { get; init; }
     public string? ChatLayoutVerification { get; init; }
     public string? ChatSteeringVerification { get; init; }
+    public string? CodexChatVerification { get; init; }
     public string? OllamaChatVerification { get; init; }
     public string? OllamaVerificationModel { get; init; }
     public string? OllamaVerificationPrompts { get; init; }
@@ -351,7 +388,7 @@ public sealed class LaunchOptions
     public static LaunchOptions Parse(string[] args)
     {
         string? mode = null, profile = null, scenario = null, archive = null, smoke = null, walkOut = null, capture = null, hostProfile = null;
-        string? chatLayoutVerification = null, chatSteeringVerification = null;
+        string? codexChatVerification = null, chatLayoutVerification = null, chatSteeringVerification = null;
         string? ollamaChatVerification = null, ollamaVerificationModel = null, ollamaVerificationPrompts = null;
         var ollamaVerificationThinking = false;
         var exit = false;
@@ -380,6 +417,7 @@ public sealed class LaunchOptions
                 case "--capture-dir": capture = Next(); break;
                 case "--chat-layout-verify": chatLayoutVerification = Next() ?? throw new ArgumentException("Missing layout evidence directory."); break;
                 case "--chat-steering-verify": chatSteeringVerification = Next() ?? throw new ArgumentException("Missing chat steering evidence directory."); break;
+                case "--codex-chat-verify": codexChatVerification = Next() ?? throw new ArgumentException("--codex-chat-verify requires an evidence directory."); break;
                 case "--ollama-chat-verify": ollamaChatVerification = Next() ?? throw new ArgumentException("Missing evidence directory."); break;
                 case "--ollama-verify-model": ollamaVerificationModel = Next(); break;
                 case "--ollama-verify-prompts": ollamaVerificationPrompts = Next(); break;
@@ -393,6 +431,8 @@ public sealed class LaunchOptions
 
         if (ollamaChatVerification is not null && (string.IsNullOrWhiteSpace(ollamaVerificationModel) || string.IsNullOrWhiteSpace(ollamaVerificationPrompts)))
             throw new ArgumentException("Ollama verification requires an explicit model and exported prompts file.");
+        if (ollamaChatVerification is not null && codexChatVerification is not null)
+            throw new ArgumentException("Verify one provider at a time.");
         // Host profile is resolved in OnLaunched. Pin profile_root/stage_root are ignored.
 
         var parsedMode = mode switch
@@ -418,6 +458,7 @@ public sealed class LaunchOptions
             CaptureDirectory = capture,
             ChatLayoutVerification = chatLayoutVerification,
             ChatSteeringVerification = chatSteeringVerification,
+            CodexChatVerification = codexChatVerification,
             OllamaChatVerification = ollamaChatVerification,
             OllamaVerificationModel = ollamaVerificationModel,
             OllamaVerificationPrompts = ollamaVerificationPrompts,

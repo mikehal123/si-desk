@@ -29,7 +29,7 @@ internal sealed partial class ChatConversation
         RestoreProjectBehavior();
         AutomationName(_projectBehavior, "Agent mode and permissions");
         ToolTipService.SetToolTip(_projectBehavior,
-            "Always ask: approve each tool request. Always allow — tools within this project's permissions. Plan: read and search only. The selected folder stays the writable root. GLM/Kimi terminal commands run as your Windows user and are not sandboxed. Cursor and Grok Build retain their runtime policies.");
+            "Always ask: approve each tool request. Always allow — tools within this project's permissions. Plan: read and search only. The selected folder stays the writable root. GLM/Kimi terminal commands run as your Windows user and are not sandboxed. Codex and Cursor retain their runtime policies.");
         _projectBehavior.SelectionChanged += async (_, _) => await ProjectPreferencesChangedAsync();
         StyleComposerPicker(_projectBehavior);
         return _projectBehavior;
@@ -54,7 +54,7 @@ internal sealed partial class ChatConversation
     private async Task ProjectPreferencesChangedAsync()
     {
         if (_restoring || _chatBusy) return;
-        var reconnect = _chatReady || _reconnectOnSend || ((CursorChat || GrokBuildChat) && !string.IsNullOrWhiteSpace(_saved.Model));
+        var reconnect = _chatReady || _reconnectOnSend || ((CodexChat || CursorChat || GrokBuildChat) && !string.IsNullOrWhiteSpace(_saved.Model));
         Save(); // Capture model/draft before the new transport session clears the picker.
         _saved = _saved with { ProjectMode = _projectBehavior.SelectedIndex == 2 ? CursorProjectMode.Plan : CursorProjectMode.Agent,
             Permissions = _projectBehavior.SelectedIndex == 1 ? CursorPermissionPolicy.AlwaysAllow : CursorPermissionPolicy.AlwaysAsk };
@@ -70,7 +70,7 @@ internal sealed partial class ChatConversation
             ? "Chat only · Open Folder to enable project tools."
             : _projectFolder + (CursorChat || GrokBuildChat ? "" : " · This provider is chat only.");
         if (!_classicChat) RefreshTuiFooter();
-        _projectBehavior.Visibility = (CursorChat || GrokBuildChat || PlanChat) && _projectFolder is not null ? Visibility.Visible : Visibility.Collapsed;
+        _projectBehavior.Visibility = (CodexChat || CursorChat || GrokBuildChat || PlanChat) && _projectFolder is not null ? Visibility.Visible : Visibility.Collapsed;
         _projectBehavior.IsEnabled = !_chatBusy;
         UpdateSubagentOption();
         UpdateSubagentPanelsOption();
@@ -106,6 +106,7 @@ internal sealed partial class ChatConversation
     private Task<string?> RequestProjectPermissionAsync(CursorPermissionRequest permission, CancellationToken ct)
     {
         var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var id = _owner.PhoneGate.Track(permission, completion, ct, _saved.Title);
         if (!_owner.DispatcherQueue.TryEnqueue(async () =>
         {
             ContentDialog? dialog = null;
@@ -115,6 +116,7 @@ internal sealed partial class ChatConversation
                 if (ct.IsCancellationRequested) { completion.TrySetCanceled(ct); return; }
                 var allow = permission.Options.FirstOrDefault(o => o.Kind == "allow_once");
                 var reject = permission.Options.FirstOrDefault(o => o.Kind == "reject_once");
+                _owner.PhoneGate.BindDesktopHide(id, () => { if (dialog is not null) _owner.DispatcherQueue.TryEnqueue(() => dialog.Hide()); });
                 if (completion.Task.IsCompleted) return;
                 await _dialogs.WaitAsync(ct);
                 held = true;
@@ -133,10 +135,11 @@ internal sealed partial class ChatConversation
                 if (!completion.Task.IsCompleted) completion.TrySetResult(result == ContentDialogResult.Primary ? allow?.Id : reject?.Id);
             }
             catch (Exception) { if (!completion.Task.IsCompleted) completion.TrySetResult(null); }
-            finally { if (held) _dialogs.Release(); }
+            finally { if (held) _dialogs.Release(); _owner.PhoneGate.Release(id); }
         }))
         {
             completion.TrySetResult(null);
+            _owner.PhoneGate.Release(id);
         }
         return completion.Task;
     }

@@ -71,7 +71,7 @@ public sealed class CapabilityConnectionTests
     [Fact]
     public async Task Findings_preserve_collection_dates_and_operator_verdict_without_loading_embeddings()
     {
-        using var handler = new Handler(_ => Json("""{"findings":[{"id":"abc","title":"Saved finding","summary":"Evidence","url":"https://example.com/paper","published_at":"2026-09-12","retrieved_at":"2026-09-13","verdict":{"action":"keep"},"embedding":[0.1,0.2]}]}"""));
+        using var handler = new Handler(_ => Json("""{"findings":[{"id":"abc","title":"Saved lookup","summary":"Evidence","url":"https://example.com/paper","published_at":"2026-09-12","retrieved_at":"2026-09-13","verdict":{"action":"keep"},"embedding":[0.1,0.2]}]}"""));
         using var client = new CapabilityConnections(handler);
         var result = await client.ReadFindingsAsync();
         var finding = Assert.Single(result.Findings);

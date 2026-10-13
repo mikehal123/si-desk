@@ -18,27 +18,9 @@ public sealed record MandateDraft(
     long? CashFloorMinorUnits,
     int? TurnoverBps,
     IReadOnlyList<string>? AllowedSources,
-    long? InquiryBudgetMinorUnits,
     string Currency)
 {
     public const string CurrentSchema = "desktop-draft/mandate/v1";
-}
-
-public sealed record InquiryDraft(
-    string SchemaVersion,
-    string Id,
-    int Revision,
-    string Name,
-    DateTimeOffset SavedAt,
-    ActivationStatus Activation,
-    string? Question,
-    IReadOnlyList<string>? Sources,
-    IReadOnlyList<string>? Skills,
-    string? Horizon,
-    long? BudgetMinorUnits,
-    string Currency)
-{
-    public const string CurrentSchema = "desktop-draft/resea" + "rch/v1";
 }
 
 public sealed record SessionDraft(
@@ -101,11 +83,6 @@ public static class DraftValidator
             errors.Add(new FieldError("CashFloorMinorUnits", "Cash floor must be a non-negative integer number of minor units, or unset."));
         }
 
-        if (draft.InquiryBudgetMinorUnits is < 0)
-        {
-            errors.Add(new FieldError("InquiryBudgetMinorUnits", "Resea" + "rch budget must be a non-negative integer number of minor units, or unset."));
-        }
-
         if (draft.AllowedSources is { Count: 0 })
         {
             errors.Add(new FieldError("AllowedSources", "Allowed sources was provided empty. Leave unset or name at least one source."));
@@ -114,42 +91,6 @@ public static class DraftValidator
         if (string.IsNullOrWhiteSpace(draft.Currency) || draft.Currency.Length != 3)
         {
             errors.Add(new FieldError("Currency", "Currency must be a 3-letter code."));
-        }
-
-        if (draft.Activation != ActivationStatus.DraftNotActivated)
-        {
-            errors.Add(new FieldError("Activation", "Desktop persistence cannot mark a draft activated."));
-        }
-
-        return errors;
-    }
-
-    public static IReadOnlyList<FieldError> ValidateInquiry(InquiryDraft draft)
-    {
-        var errors = new List<FieldError>();
-        if (string.IsNullOrWhiteSpace(draft.Name))
-        {
-            errors.Add(new FieldError("Name", "Name is required."));
-        }
-
-        if (draft.Question is { Length: > 4000 })
-        {
-            errors.Add(new FieldError("Question", "Question exceeds 4000 characters."));
-        }
-
-        if (draft.Horizon is not null && draft.Horizon is not ("0-3m" or "3-12m" or "12-24m" or "24-60m"))
-        {
-            errors.Add(new FieldError("Horizon", "Horizon must be one of 0-3m, 3-12m, 12-24m, 24-60m, or left unset."));
-        }
-
-        if (draft.BudgetMinorUnits is < 0)
-        {
-            errors.Add(new FieldError("BudgetMinorUnits", "Budget must be a non-negative integer number of minor units, or unset."));
-        }
-
-        if (draft.Sources is { Count: 0 })
-        {
-            errors.Add(new FieldError("Sources", "Sources was provided empty. Leave unset or name at least one source."));
         }
 
         if (draft.Activation != ActivationStatus.DraftNotActivated)

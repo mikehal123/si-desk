@@ -205,7 +205,15 @@ public sealed class ConnectorHost : IAsyncDisposable
         if (name == "app_screenshot") return Screenshot(arguments);
         try
         {
-            var text = name switch
+            string text;
+            object[]? inboxContent = null;
+            if (name == "grokbot_inbox_list")
+            {
+                var rows = _desk.ListGrokbotInbox(string.IsNullOrWhiteSpace(Arg("since")) ? null : Arg("since"));
+                text = InboxText(rows);
+                inboxContent = InboxContent(text, rows);
+            }
+            else text = name switch
             {
                 "read_chat" => Text(_desk.ReadChat(string.IsNullOrWhiteSpace(Arg("conversation")) ? null : Arg("conversation"), Limit())),
                 "list_chats" => Text(_desk.ListChats().Select(item => item.Id + "\t" + item.Title)),
@@ -215,15 +223,14 @@ public sealed class ConnectorHost : IAsyncDisposable
                 "list_subagents" => Text(_desk.ListSubagents(Arg("conversation")).Select(item => item.Id + "\t" + item.Name + "\t" + item.State)),
                 "read_subagent" => ReadSubagent(Arg("id")),
                 "status" => Status(),
-                "grokbot_inbox_list" => InboxText(string.IsNullOrWhiteSpace(Arg("since")) ? null : Arg("since")),
                 "grokbot_inbox_reply" => InboxReply(Arg("message_id"), Arg("text")),
                 "app_ui_tree" => _desk.GrokbotUiTree(),
                 "app_click" => _desk.GrokbotClick(Blank(Arg("control_id")), ArgInt("x"), ArgInt("y")),
                 "app_type" => _desk.GrokbotType(Arg("control_id"), Arg("text")),
                 "app_key" => _desk.GrokbotKey(Arg("keys")),
                 "app_navigate" => _desk.GrokbotNavigate(Arg("page")),
-                "read_swarm_board" => _desk.ReadSwarmBoard(string.IsNullOrWhiteSpace(Arg("swarm_id")) ? null : Arg("swarm_id")),
-                "swarm_submit_result" => SubmitSwarm(Arg("task_id"), Arg("result"), Arg("proof")),
+                "read_swarm_board" => _desk.ReadSwarmBoard(BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
+                "swarm_submit_result" => SubmitSwarm(Arg("task_id"), Arg("result"), Arg("proof"), BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
                 _ => ""
             };
             if (!KnownTool(name))
@@ -235,6 +242,8 @@ public sealed class ConnectorHost : IAsyncDisposable
             var auditTarget = name is "read_chat" or "send_to_chat" or "list_subagents" ? Arg("conversation") : name == "read_subagent" ? Arg("id") : name == "grokbot_inbox_reply" ? Arg("message_id") : name == "swarm_submit_result" ? Arg("task_id") : name == "read_swarm_board" ? Arg("swarm_id") : null;
             _audit.Write(name, Redact(auditTarget));
             TryRecord(name, ArgSummary(arguments), text);
+            if (inboxContent is not null)
+                return new { content = inboxContent, isError = false };
             return new { content = new[] { new { type = "text", text } }, isError = false };
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or KeyNotFoundException)
@@ -265,10 +274,19 @@ public sealed class ConnectorHost : IAsyncDisposable
         }
     }
 
-    private string InboxText(string? since)
+    private static string InboxText(IReadOnlyList<GrokbotMail> rows) =>
+        string.Join("\n", rows.Select(mail => mail.Id + "\t" + mail.Status + "\t" + (mail.AskToAct ? "act" : "reply") + "\t" + mail.Text.Replace('\n', ' ')));
+
+    private static object[] InboxContent(string text, IReadOnlyList<GrokbotMail> rows)
     {
-        var rows = _desk.ListGrokbotInbox(since);
-        return string.Join("\n", rows.Select(mail => mail.Id + "\t" + mail.Status + "\t" + (mail.AskToAct ? "act" : "reply") + "\t" + mail.Text.Replace('\n', ' ')));
+        var content = new List<object> { new { type = "text", text } };
+        foreach (var mail in rows)
+        {
+            if (mail.Image is not { Length: > 0 } png) continue;
+            content.Add(new { type = "text", text = mail.Id });
+            content.Add(new { type = "image", mimeType = "image/png", data = Convert.ToBase64String(png) });
+        }
+        return content.ToArray();
     }
 
     private string InboxReply(string id, string text)
@@ -337,11 +355,13 @@ public sealed class ConnectorHost : IAsyncDisposable
         return "Posted to Shared room as Grok Bot.";
     }
 
-    private string SubmitSwarm(string taskId, string result, string proof)
+    private static string? BlankArg(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private string SubmitSwarm(string taskId, string result, string proof, string? swarmId, string? runId)
     {
         if (string.IsNullOrWhiteSpace(taskId)) throw new ArgumentException("Task id is required.");
         if (string.IsNullOrWhiteSpace(proof)) throw new ArgumentException("Nothing is done without proof.");
-        return _desk.SubmitSwarmResult(taskId, result, proof);
+        return _desk.SubmitSwarmResult(taskId, result, proof, swarmId, runId);
     }
 
     private string ReadSubagent(string id)
@@ -383,8 +403,8 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("app_type", "Type into a control in the xAI Desk window. Secret fields are blocked.", "control_id", true, false),
         Tool("app_key", "Send keys to the focused control in the xAI Desk window.", "keys", true, false),
         Tool("app_navigate", "Open Chat, Shared room, Settings, or Grokbot.", "page", true, false),
-        Tool("read_swarm_board", "Read a swarm board. Omit swarm_id to list boards.", "swarm_id", false, false),
-        Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof. Moves the task to review. Cannot mark it done.", "task_id", true, false)
+        Tool("read_swarm_board", "Read a swarm board. Pass run_id to read that run even when it is not current. Omit swarm_id to list boards.", "swarm_id", false, false),
+        Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof for swarm_id and task_id. Pass run_id to write that run. Moves the task to review. Cannot mark it done.", "task_id", true, false)
     ];
 
     private static object Tool(string name, string description, string? argument, bool required, bool limit)
@@ -401,8 +421,12 @@ public sealed class ConnectorHost : IAsyncDisposable
             properties["text"] = new { type = "string" };
             requiredNames.Add("text");
         }
+        if (name == "read_swarm_board")
+            properties["run_id"] = new { type = "string" };
         if (name == "swarm_submit_result")
         {
+            properties["swarm_id"] = new { type = "string" };
+            properties["run_id"] = new { type = "string" };
             properties["result"] = new { type = "string" };
             properties["proof"] = new { type = "string" };
             requiredNames.Add("result");

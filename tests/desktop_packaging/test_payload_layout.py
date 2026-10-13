@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import ast
 import json
 import sys
 import tempfile
@@ -10,6 +11,8 @@ from desktop_package_layout import assemble_payload, relative, verify_inventory
 
 
 class PayloadLayoutTests(unittest.TestCase):
+    def test_packaging_entry_point_parses(self):
+        ast.parse((Path(__file__).resolve().parents[2] / 'scripts/Package-DesktopRelease.py').read_text())
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)

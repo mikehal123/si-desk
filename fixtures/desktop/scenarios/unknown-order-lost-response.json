@@ -1,0 +1,245 @@
+{
+  "scenario_id": "unknown-order-lost-response",
+  "title": "Unknown order after lost response",
+  "ui_interpretation": "Current state unknown. UI must not invent broker acknowledgement.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Degraded",
+      "label": "Engine: degraded",
+      "reason": "lost response"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Unknown",
+      "label": "Broker: unknown",
+      "reason": "lost response"
+    },
+    "reconciliation": {
+      "value": "Unknown",
+      "label": "Reconciliation: unknown",
+      "reason": "lost response"
+    },
+    "authorization": {
+      "value": "Granted",
+      "label": "Authorization: granted (preview label only)",
+      "reason": "scenario; not actual authority"
+    },
+    "next_cycle": {
+      "presence": "unknown",
+      "reason": "clock wait after timeout"
+    },
+    "unresolved_issues": [
+      {
+        "id": "ord-unknown",
+        "severity": "error",
+        "summary": "Order ORD-9 is unknown after timeout.",
+        "related_order_id": "ord-9"
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 70000
+    },
+    "holdings": [],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 9100
+    },
+    "open_order_ids": [
+      "ord-9"
+    ],
+    "incomplete_valuation_reasons": [],
+    "source_label": "journal-derived"
+  },
+  "decisions": [
+    {
+      "id": "dec-fff-1",
+      "action": "Buy",
+      "instrument": "FFF",
+      "quantity": {
+        "presence": "known",
+        "decimal": "10"
+      },
+      "price": {
+        "presence": "known",
+        "currency": "USD",
+        "minor_units": 910
+      },
+      "evidence_ids": [
+        "ev-aaa-admission"
+      ],
+      "account_revision": "rev-9",
+      "reasons": [
+        "Submitted in scenario; response lost."
+      ],
+      "admission": {
+        "verdict": "Pass",
+        "reason": "Admitted."
+      },
+      "risk": {
+        "verdict": "Pass",
+        "reason": "Sized."
+      },
+      "execution": {
+        "verdict": "Pass",
+        "reason": "Send attempted."
+      },
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": "ord-9"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ord-9",
+      "proposal_id": "prop-9",
+      "decision_id": "dec-fff-1",
+      "instrument": "FFF",
+      "requested_state": "SendAttempted",
+      "acknowledged_state": {
+        "presence": "unknown",
+        "reason": "broker response lost"
+      },
+      "current_state": {
+        "presence": "unknown",
+        "reason": "timed out after send; not canceled"
+      },
+      "fills": [],
+      "remaining_quantity": {
+        "presence": "known",
+        "decimal": "10"
+      },
+      "requested_at": "2026-09-15T12:00:00Z",
+      "ambiguity_reasons": [
+        "TIMEOUT_AFTER_SEND",
+        "UNKNOWN_UNTIL_RECOVERY"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-send",
+      "cursor": "0001",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "order",
+      "summary": "Send attempted",
+      "order_id": "ord-9",
+      "gap_before": false
+    },
+    {
+      "id": "evt-timeout",
+      "cursor": "0003",
+      "at": "2026-09-15T12:00:00Z",
+      "kind": "order",
+      "summary": "Timeout; state unknown",
+      "order_id": "ord-9",
+      "gap_before": true
+    }
+  ],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-lookup-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-aaa-admission",
+      "title": "AAA admission note",
+      "media_type": "text/plain",
+      "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
+      "allowed_uri_schemes": [
+        "https",
+        "http"
+      ],
+      "source_uris": [
+        "https://example.invalid/lookup/aaa",
+        "javascript:alert(1)",
+        "file:///C:/Windows/win.ini"
+      ]
+    }
+  ],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {
+    "cancel-order": {
+      "operation": "cancel-order",
+      "idempotency_key": "preset",
+      "status": "TimedOut",
+      "host_request_id": "req-lost",
+      "detail": "Timed out after send. Status remains UNKNOWN. Local cancel does not manufacture acknowledgement.",
+      "simulated_preview_acknowledgement": true
+    }
+  }
+}

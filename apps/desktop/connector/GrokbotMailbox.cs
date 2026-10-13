@@ -15,7 +15,8 @@ public sealed record GrokbotMail(
     DateTimeOffset? AnsweredAt,
     string? WakeNote = null,
     DateTimeOffset? PickedUpAt = null,
-    bool Liked = false);
+    bool Liked = false,
+    byte[]? Image = null);
 
 public enum GrokbotLinkState { Off, Waiting, Connected }
 
@@ -86,12 +87,15 @@ public sealed class GrokbotMailbox
         }
     }
 
-    public GrokbotMail Queue(string text, bool askToAct)
+    public GrokbotMail Queue(string text, bool askToAct) => Queue(text, askToAct, null);
+
+    public GrokbotMail Queue(string text, bool askToAct, byte[]? image)
     {
         var clean = CleanText(text);
+        var png = image is { Length: > 0 } bytes ? bytes.ToArray() : null;
         lock (_gate)
         {
-            var mail = new GrokbotMail(Guid.NewGuid().ToString("N"), clean, askToAct, GrokbotMailStatus.Queued, DateTimeOffset.UtcNow, null, null);
+            var mail = new GrokbotMail(Guid.NewGuid().ToString("N"), clean, askToAct, GrokbotMailStatus.Queued, DateTimeOffset.UtcNow, null, null, Image: png);
             _messages.Add(mail);
             while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
             SaveMessages();
@@ -250,7 +254,8 @@ public sealed class GrokbotMailbox
         {
             var saved = JsonSerializer.Deserialize<MailFile>(line, Json);
             if (saved is null || string.IsNullOrWhiteSpace(saved.Id)) return;
-            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked));
+            var image = saved.Image is { Length: > 0 } png ? png : null;
+            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked, image));
         });
         while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         LoadLines(Path.Combine(_directory, "audit.jsonl"), line =>
@@ -378,5 +383,6 @@ public sealed class GrokbotMailbox
         public string? WakeNote { get; set; }
         public DateTimeOffset? PickedUpAt { get; set; }
         public bool Liked { get; set; }
+        public byte[]? Image { get; set; }
     }
 }

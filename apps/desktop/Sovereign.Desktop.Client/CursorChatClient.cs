@@ -18,11 +18,18 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     public const string CliVersion = "2026.09.23-86fc751";
     public static string RuntimeDirectory => ResolveRuntimeDirectory(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
 
-    /// <summary>Cursor connector copied for xAI Desk. That folder is the runtime, not the chat profile or saved keys.</summary>
+    /// <summary>
+    /// Prefer a runtime copied for xAI Desk. Otherwise use the Cursor CLI already installed for xAI Desk.
+    /// That folder is the connector, not the chat profile or saved keys.
+    /// </summary>
     public static string ResolveRuntimeDirectory(string localAppData)
     {
         var versioned = Path.Combine("CursorAgent", CliVersion, "dist-package");
-        return Path.Combine(localAppData, "xAIDesk", "Tools", versioned);
+        var own = Path.Combine(localAppData, "xAIDesk", "Tools", versioned);
+        if (IsRuntime(own)) return own;
+        var installed = Path.Combine(localAppData, "SovereignAI.Tools", versioned);
+        if (IsRuntime(installed)) return installed;
+        return own;
     }
 
     public static bool IsRuntime(string directory) =>

@@ -11,16 +11,20 @@ namespace Sovereign.Desktop;
 public sealed partial class MainWindow
 {
     private readonly Grid _settingsPage = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(DeskTheme.Space24), Background = DeskTheme.Background };
+    private readonly StackPanel _settingsUpdates = new() { Spacing = DeskTheme.Space12 };
     private readonly TextBlock _statusCursor = Note("Not checked");
     private readonly TextBlock _statusGrokBuild = Note("Not checked");
     private readonly ProgressRing _grokBuildProgress = new() { Width = 16, Height = 16, IsActive = false, Visibility = Visibility.Collapsed };
     private bool _grokBuildBusy;
     private readonly TextBlock _statusXaiApi = Note("Not set");
     private readonly PasswordBox _xaiApiKey = new() { Header = "API key", PlaceholderText = "xAI API key", MaxWidth = 440, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, DeskTheme.Space4, 0, 0) };
-    private readonly TextBlock _settingsDataStatus = Note("Profile path is on this PC.");
+    private readonly TextBlock _settingsDataStatus = Note("");
     private readonly CheckBox _lineReviewOption = new() { Content = "Line review for plans and diffs" };
     private readonly CheckBox _classicChatOption = new() { Content = "Classic chat view" };
     private readonly TextBlock _settingsProfilePath = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, LineHeight = DeskTheme.Space24 };
+    private readonly StackPanel _githubWait = new() { Spacing = DeskTheme.Space8 };
+    private readonly Button _cancelSignInButton = new() { Visibility = Visibility.Collapsed, Content = "Cancel sign-in" };
+
     private void OpenSettings()
     {
         CloseRoomView(); CloseChatView(); CloseGrokbot();
@@ -60,7 +64,7 @@ public sealed partial class MainWindow
         var page = new StackPanel { Spacing = DeskTheme.Space16, MaxWidth = 920, Children = {
             heading,
             SettingsCard(ConnectionsSection()), SettingsCard(DataSection()), SettingsCard(SkillLibrarySection()),
-            SettingsCard(ConnectorSection()), SettingsCard(AboutSection()) } };
+            SettingsCard(PhoneSection()), SettingsCard(ConnectorSection()), SettingsCard(UpdatesSection()), SettingsCard(AboutSection()) } };
         _settingsPage.Children.Add(PageScroll(page, minimumWidth: 620, centered: true));
         RefreshConnectionStatuses();
     }
@@ -97,7 +101,9 @@ public sealed partial class MainWindow
             new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = {
                 Button("Copy path", CopyProfilePath),
                 Button("Open app data folder", async () => { await Windows.System.Launcher.LaunchFolderPathAsync(_vm.ProfileDirectory); }),
-                Button("Export support report", ShowExportDialog) } } } };
+                Button("Export support report", ShowExportDialog) } },
+            SettingsDivider(),
+            _settingsDataStatus } };
     }
     private static StackPanel UpdatesSection() => new() { Spacing = DeskTheme.Space12, Children = { Head("Updates"), Note("Updates are off.") } };
 
@@ -156,6 +162,14 @@ public sealed partial class MainWindow
         action.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(action, 2); grid.Children.Add(action);
         parent.Children.Add(grid);
+    }
+    private void SyncSignInCancel()
+    {
+        _cancelSignInButton.Visibility = _signInCancel is not null ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void SyncGitHubCancel()
+    {
+        if (_cancelGitHubButton is not null) _cancelGitHubButton.Visibility = _githubUpdateSignIn is not null ? Visibility.Visible : Visibility.Collapsed;
     }
     private void RefreshConnectionStatuses()
     {

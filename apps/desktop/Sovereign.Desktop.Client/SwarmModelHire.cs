@@ -2,7 +2,7 @@ namespace Sovereign.Desktop.Client;
 
 /// <summary>
 /// Picks one advertised model id per swarm role. Display names are matched, never sent.
-/// The grokbot wake roles are not in this catalog.
+/// grokbot-research and grokbot-ops are wake roles and are not in this catalog.
 /// </summary>
 public static class SwarmModelHire
 {
@@ -22,11 +22,11 @@ public static class SwarmModelHire
             lines.Append("- ").Append(model.Id).Append(" | ").Append(model.Name).Append('\n');
         lines.Append("engineer modelId: ").Append(engineer).Append('\n');
         lines.Append("verifier modelId: ").Append(verifier).Append('\n');
-        lines.Append("resear" + "cher modelId: ").Append(lookup).Append('\n');
+        lines.Append("researcher modelId: ").Append(lookup).Append('\n');
         lines.Append("investigator modelId: ").Append(lookup).Append('\n');
-        lines.Append("Use those ids for engineer, " + "resear" + "cher, investigator, and verifier. ");
+        lines.Append("Use those ids for engineer, researcher, investigator, and verifier. ");
         lines.Append("The verifier modelId must differ from the engineer modelId. ");
-        lines.Append("grokbot-" + "resear" + "ch and grokbot-ops stay wake roles and take no modelId from this catalog. ");
+        lines.Append("grokbot-research and grokbot-ops stay wake roles and take no modelId from this catalog. ");
         lines.Append("If the helper tool rejects the model field, say so and use the parent modelId when it is allowed for that role.\n");
         return lines.ToString();
     }

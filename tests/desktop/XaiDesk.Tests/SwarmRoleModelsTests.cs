@@ -91,12 +91,12 @@ public sealed class SwarmRoleModelsTests
     {
         var roles = Defaults().Roles;
         var catalog = SwarmRoleModels.Catalog([M("fable-5", "Fable")], "parent-model", Defaults());
-        Assert.Contains("grokbot-" + "resear" + "ch and grokbot-ops take no modelId", catalog);
+        Assert.Contains("grokbot-research and grokbot-ops take no modelId", catalog);
         Assert.Contains("The verifier modelId must differ from the engineer modelId", catalog);
         Assert.Contains("fall back to the parent modelId", catalog);
-        Assert.Null(SwarmRoleModels.ForRole([], roles, "grokbot-" + "resear" + "ch", "parent-model", "fable-5"));
+        Assert.Null(SwarmRoleModels.ForRole([], roles, "grokbot-research", "parent-model", "fable-5"));
         Assert.Null(SwarmRoleModels.ForRole([], roles, "grokbot-ops", "parent-model", null));
-        Assert.Null(SwarmRoleModels.ForRole([], roles, "Grokbot-" + "Resear" + "ch", "parent-model", null));
+        Assert.Null(SwarmRoleModels.ForRole([], roles, "Grokbot-Research", "parent-model", null));
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public sealed class SwarmRoleModelsTests
             Assert.Equal(["GPT-5.6 Sol", "Opus 5.5", "Fable"], SwarmRoleModels.Load(directory).Roles["planner"]);
             Assert.Equal(["Opus 5.5", "GPT-5.6 Sol", "Fable"], SwarmRoleModels.Load(directory).Roles["reviewer"]);
             Assert.Equal(["Opus 5.5", "GPT-5.6 Sol", "Fable"], SwarmRoleModels.Load(directory).Roles["verifier"]);
-            Assert.Equal(["Gemini 3.8", "Composer 2.5", "Muse Spark"], SwarmRoleModels.Load(directory).Roles["resear" + "cher"]);
+            Assert.Equal(["Gemini 3.8", "Composer 2.5", "Muse Spark"], SwarmRoleModels.Load(directory).Roles["researcher"]);
             Assert.Equal(["Gemini 3.8", "Composer 2.5", "Muse Spark"], SwarmRoleModels.Load(directory).Roles["investigator"]);
             Assert.Equal(["Composer 2.5", "GPT-5.6 Sol", "Gemini 3.8"], SwarmRoleModels.Load(directory).Roles["tester"]);
             Assert.Empty(SwarmRoleModels.Load(directory).Overrides);
@@ -226,13 +226,19 @@ public sealed class SwarmRoleModelsTests
             Assert.Equal(["Composer 2.5", "GPT-5.6 Sol", "Gemini 3.8"], created.Roles["tester"]);
             Assert.Equal("exact-model-id", created.Overrides["chat/task"]);
 
-            var lookup = "resear" + "cher";
-            var kept = "Kept " + ("Resear" + "cher");
-            File.WriteAllText(path, "{\n  \"roles\": {\n    \"engineer\": [\"Kept Engineer\"],\n    \"" + lookup + "\": [\"" + kept + "\"]\n  },\n  \"overrides\": { \"chat/task\": \"exact-model-id\" }\n}\n");
+            File.WriteAllText(path, """
+            {
+              "roles": {
+                "engineer": ["Kept Engineer"],
+                "researcher": ["Kept Researcher"]
+              },
+              "overrides": { "chat/task": "exact-model-id" }
+            }
+            """);
             SwarmRoleModels.SaveOverride(directory, "chat", "other", "second-model");
             var loaded = SwarmRoleModels.Load(directory);
             Assert.Equal("Kept Engineer", Assert.Single(loaded.Roles["engineer"]));
-            Assert.Equal(kept, Assert.Single(loaded.Roles[lookup]));
+            Assert.Equal("Kept Researcher", Assert.Single(loaded.Roles["researcher"]));
             Assert.False(loaded.Roles.ContainsKey("coder"));
             Assert.Equal("exact-model-id", loaded.Overrides["chat/task"]);
             Assert.Equal("second-model", loaded.Overrides["chat/other"]);
@@ -262,7 +268,7 @@ public sealed class SwarmRoleModelsTests
             File.WriteAllText(path, new string('{', 1_048_577));
             var oversized = SwarmRoleModels.Load(directory);
             Assert.Equal("Fable", oversized.Roles["engineer"][0]);
-            Assert.Equal("Gemini 3.8", oversized.Roles["resear" + "cher"][0]);
+            Assert.Equal("Gemini 3.8", oversized.Roles["researcher"][0]);
             Assert.Empty(oversized.Overrides);
         }
         finally
@@ -281,10 +287,10 @@ public sealed class SwarmRoleModelsTests
             M("grok-4.7", "Grok 4.7")
         ];
         var catalog = SwarmRoleModels.SingleCatalog(models, "composer-2.5");
-        foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "resear" + "cher", "investigator", "tester" })
+        foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
             Assert.Contains(role + " modelId: composer-2.5", catalog);
         Assert.Contains("Every worker uses the chat's selected model.", catalog);
-        Assert.Contains("grokbot-" + "resear" + "ch and grokbot-ops take no modelId.", catalog);
+        Assert.Contains("grokbot-research and grokbot-ops take no modelId.", catalog);
         Assert.DoesNotContain("override ", catalog);
         Assert.DoesNotContain("must differ", catalog);
         Assert.Contains("- grok-4.7 | Grok 4.7", catalog);

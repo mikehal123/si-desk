@@ -46,10 +46,16 @@ public static class SubagentCardText
         return string.Join("\n", lines);
     }
 
-    public static string RoleLine(CursorSubagent child) => "Role not reported";
+    public static string RoleLine(CursorSubagent child) =>
+        TeamPrompt.TryReadRole(child.Task, out var roleId, out _) && TeamRoles.TryGet(roleId, out var role)
+            ? role.Name : "Role not reported";
 
-    public static string TaskLine(CursorSubagent child) =>
-        string.IsNullOrWhiteSpace(child.Task) ? "Task details not supplied by provider" : child.Task;
+    public static string TaskLine(CursorSubagent child)
+    {
+        if (string.IsNullOrWhiteSpace(child.Task)) return "Task details not supplied by provider";
+        if (!TeamPrompt.TryReadRole(child.Task, out _, out var body)) return child.Task;
+        return string.IsNullOrWhiteSpace(body) ? "Task details not supplied by provider" : body;
+    }
 
     public static string LifecycleLine(CursorSubagent child)
     {

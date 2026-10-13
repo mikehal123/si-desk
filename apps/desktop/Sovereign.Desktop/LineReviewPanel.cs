@@ -318,7 +318,7 @@ internal sealed partial class ChatConversation
 
     private bool ReviewComposerReady()
     {
-        if (CursorChat || GrokBuildChat) return CursorComposerAvailable;
+        if (CursorChat || GrokBuildChat || CodexChat) return CursorComposerAvailable;
         return !_chatBusy && !_attachmentBusy;
     }
 }

@@ -1,0 +1,242 @@
+{
+  "scenario_id": "partial-fill-cancel-pending",
+  "title": "Partial fill, cancel pending",
+  "ui_interpretation": "Show remaining quantity, partial fills, and cancel pending without claiming canceled.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Connected",
+      "label": "Broker: connected (preview)",
+      "reason": "preview"
+    },
+    "reconciliation": {
+      "value": "Current",
+      "label": "Reconciliation: current (preview)",
+      "reason": "preview"
+    },
+    "authorization": {
+      "value": "Paused",
+      "label": "Authorization: paused",
+      "reason": "cancel pending"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "cancel-pending",
+        "severity": "warning",
+        "summary": "Cancel pending on ORD-2.",
+        "related_order_id": "ord-2"
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived plus broker-observed fills (labeled)",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 60000
+    },
+    "holdings": [
+      {
+        "instrument": "GGG",
+        "quantity": {
+          "presence": "known",
+          "decimal": "4"
+        },
+        "mark": {
+          "presence": "known",
+          "currency": "USD",
+          "minor_units": 800
+        },
+        "quantity_source": "broker-observed fill"
+      }
+    ],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 4800
+    },
+    "open_order_ids": [
+      "ord-2"
+    ],
+    "incomplete_valuation_reasons": [],
+    "source_label": "mixed journal/broker-observed"
+  },
+  "decisions": [
+    {
+      "id": "dec-ggg-1",
+      "action": "Buy",
+      "instrument": "GGG",
+      "quantity": {
+        "presence": "known",
+        "decimal": "10"
+      },
+      "price": {
+        "presence": "known",
+        "currency": "USD",
+        "minor_units": 800
+      },
+      "evidence_ids": [
+        "ev-aaa-admission"
+      ],
+      "account_revision": "rev-2",
+      "reasons": [
+        "Working order."
+      ],
+      "admission": {
+        "verdict": "Pass",
+        "reason": "Admitted."
+      },
+      "risk": {
+        "verdict": "Pass",
+        "reason": "Sized."
+      },
+      "execution": {
+        "verdict": "Pass",
+        "reason": "Acknowledged."
+      },
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": "ord-2"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ord-2",
+      "proposal_id": "prop-2",
+      "decision_id": "dec-ggg-1",
+      "instrument": "GGG",
+      "requested_state": "CancelPending",
+      "acknowledged_state": {
+        "presence": "known",
+        "text": "PartialFill"
+      },
+      "current_state": {
+        "presence": "known",
+        "text": "CancelPending"
+      },
+      "fills": [
+        {
+          "id": "fill-1",
+          "quantity": {
+            "presence": "known",
+            "decimal": "4"
+          },
+          "price": {
+            "presence": "known",
+            "currency": "USD",
+            "minor_units": 800
+          },
+          "at": "2026-09-15T12:00:00Z"
+        }
+      ],
+      "remaining_quantity": {
+        "presence": "known",
+        "decimal": "6"
+      },
+      "requested_at": "2026-09-15T12:00:00Z",
+      "ambiguity_reasons": []
+    }
+  ],
+  "events": [],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-lookup-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-aaa-admission",
+      "title": "AAA admission note",
+      "media_type": "text/plain",
+      "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
+      "allowed_uri_schemes": [
+        "https",
+        "http"
+      ],
+      "source_uris": [
+        "https://example.invalid/lookup/aaa",
+        "javascript:alert(1)",
+        "file:///C:/Windows/win.ini"
+      ]
+    }
+  ],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

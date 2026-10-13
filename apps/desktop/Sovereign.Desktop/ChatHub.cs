@@ -2,7 +2,6 @@ using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Sovereign.Desktop.Client;
-using Sovereign.Desktop.Core;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace Sovereign.Desktop;
@@ -10,7 +9,7 @@ namespace Sovereign.Desktop;
 public sealed partial class MainWindow
 {
     private readonly Grid _chatPage = new() { Visibility = Visibility.Collapsed };
-    private Grid? _workspaceContent = null;
+    private Grid? _workspaceContent;
     private MenuFlyoutItem? _openProjectMenu;
     private MenuFlyoutItem? _closeProjectMenu;
     private readonly StackPanel _chatRecents = new() { Spacing = DeskTheme.Space4 };
@@ -445,6 +444,7 @@ public sealed partial class MainWindow
     private OllamaChatClient _ollamaChat => _currentChat._ollamaChat;
     private OllamaChatOptions? _ollamaQaOptions { get => _currentChat._ollamaQaOptions; set => _currentChat._ollamaQaOptions = value; }
     private OllamaChatReceipt? _lastOllamaReceipt => _currentChat._lastOllamaReceipt;
+    private CodexChatClient? _codexChat { get => _currentChat._codexChat; set => _currentChat._codexChat = value; }
     private CodingPlanChatClient? _planChat => _currentChat._planChat;
     private CancellationTokenSource? _chatCancellation => _currentChat._chatCancellation;
     private bool _chatReady => _currentChat._chatReady;
@@ -465,15 +465,4 @@ public sealed partial class MainWindow
     private Task SendChatAsync() => _currentChat.SendChatAsync();
     private Task<bool> StartChatSignInAsync() => _currentChat.StartChatSignInAsync();
     private void SetChatBusy(bool busy) => _currentChat.SetChatBusy(busy);
-
-    public static void ValidateCodexQaProfile(string profile)
-    {
-        var directory = new DirectoryInfo(Path.GetFullPath(profile));
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), XaiDeskIdentity.DataFolderName);
-        if (!directory.Name.Equals("profile", StringComparison.OrdinalIgnoreCase)
-            || directory.Parent is not { } instance
-            || !instance.Name.StartsWith("qa-", StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(instance.Parent?.FullName, root, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Codex chat verification requires an explicit xAI Desk qa-* instance profile. Main and default profiles are refused.");
-    }
 }

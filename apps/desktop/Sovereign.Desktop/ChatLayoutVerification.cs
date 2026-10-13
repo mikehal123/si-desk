@@ -42,6 +42,7 @@ public sealed partial class MainWindow
             OpenChat();
             var checks = await _currentChat.VerifyLayoutAsync(async name => { await Task.Delay(250); await CapturePng(Path.Combine(output, name + ".png")); },
                 width => AppWindow.Resize(new Windows.Graphics.SizeInt32(width, 850)), output);
+            if (Environment.GetEnvironmentVariable("SOVEREIGN_QA_PHONE") == "1") await VerifyPhoneDesktopAsync(checks, output);
             File.WriteAllText(Path.Combine(output, "receipt.json"), JsonSerializer.Serialize(new { passed = true, checks,
                 mode = displayOnly ? "subagent-display-only" : "chat-layout", provider_calls_allowed = !displayOnly && Environment.GetEnvironmentVariable("SOVEREIGN_QA_PROJECT_LIVE") == "1",
                 clipboard_actions_allowed = !displayOnly,
@@ -219,9 +220,8 @@ internal sealed partial class ChatConversation
         Check(_subagentRows["qa-helper"].State == "completed", "stopping the parent preserves already completed helpers");
         Check(_subagentSummary.Text == "Active · 0   Completed · 1   Stop requested · 3" && !_subagentSummary.Text.Contains("Finished"),
             "requested helper stops are separated from the one confirmed completion");
-        const string inquiryKind = "resea" + "rch";
         foreach (var fixture in new[] { ("table", "Fix the report columns", "table.svg"), ("pdf", "Fix PDF table columns", "pdf.svg"),
-            ("cleanup", "Strip report run metadata", "cleanup.svg"), (inquiryKind, "Resea" + "rch issuer documentation", inquiryKind + ".svg"), ("code", "Fix a compiler bug", "code.svg") })
+            ("cleanup", "Strip report run metadata", "cleanup.svg"), ("inquiry", "Investigate issuer documentation", "inquiry.svg"), ("code", "Fix a compiler bug", "code.svg") })
         {
             var entry = helper with { SessionId = "qa-avatar-" + fixture.Item1, Name = fixture.Item1 + " helper", Task = fixture.Item2,
                 State = "completed", CurrentWork = "Fixture complete", CompletedAt = started.AddMinutes(2), UpdatedAt = started.AddMinutes(2) };
@@ -251,7 +251,7 @@ internal sealed partial class ChatConversation
         Check(configuredView.Failure.Text == configured.Failure && configuredView.Result.Text == "No result was reported.",
             "recorded helper failure is separate from an absent result");
         await Task.Delay(500);
-        foreach (var kind in new[] { "table", "pdf", "cleanup", inquiryKind, "code", "unknown" })
+        foreach (var kind in new[] { "table", "pdf", "cleanup", "inquiry", "code", "unknown" })
             Check(_subagentViews["qa-avatar-" + kind].AvatarLoaded && !_subagentViews["qa-avatar-" + kind].AvatarFailed, kind + " blob avatar is drawn");
         if (displayOnly)
             foreach (var pair in _subagentViews) pair.Value.Root.Visibility = pair.Key.StartsWith("qa-avatar-", StringComparison.Ordinal)

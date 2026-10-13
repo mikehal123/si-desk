@@ -23,7 +23,7 @@ public sealed partial class MainWindow
             await Task.Delay(400);
             Check(chat.SubagentPanelVisibleCount == 2 && chat.SubagentPanelTabCount == 3, "fresh process restores two helper panels and three tabs");
             Check(new[] { "qa-panel-reopen-a", "qa-panel-reopen-b", "qa-panel-reopen-c" }.All(chat.SubagentPanelReadOnly), "fresh process restores all helper panels as read-only");
-            Check(chat._cursorChat is null && !chat.IsWorking, "reopening helper panels does not reconnect or send work");
+            Check(chat._cursorChat is null && chat._codexChat is null && !chat.IsWorking, "reopening helper panels does not reconnect or send work");
             chat.VerifyRestoredHelperPanelData(Check);
             await CapturePng(Path.Combine(output, "helper-row-reopened.png"));
             File.WriteAllText(Path.Combine(output, "receipt.json"), JsonSerializer.Serialize(new { passed = true, checks, provider_calls = 0, main_accessed = false }));

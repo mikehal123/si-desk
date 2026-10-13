@@ -1,6 +1,6 @@
 namespace Sovereign.Desktop.Core;
 
-/// <summary>Identity for the xAI Desk clone. Kept separate from the original desk's data, keys, and single-instance names.</summary>
+/// <summary>Identity for the xAI Desk clone. Kept separate from the previous product's data, keys, and single-instance names.</summary>
 public static class XaiDeskIdentity
 {
     public const string AppName = "xAI Desk";
@@ -26,7 +26,7 @@ public static class XaiDeskIdentity
     public static bool IsGrokModel(string? id) =>
         !string.IsNullOrWhiteSpace(id) && id.Contains("grok", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Cursor, Grok Build, and the xAI API may only offer Grok or xAI models.</summary>
+    /// <summary>Grok Build and the xAI API may only offer Grok or xAI models.</summary>
     public static bool IsDeskModel(string? id, string? name = null)
     {
         if (OtherVendor(id) || OtherVendor(name)) return false;

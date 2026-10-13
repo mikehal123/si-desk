@@ -50,9 +50,6 @@ public sealed partial class MainWindow : Window
     private readonly TextBox _cash = new() { Header = "Cash floor minor units" };
     private readonly TextBox _turnover = new() { Header = "Turnover bps" };
     private readonly TextBox _sources = new() { Header = "Allowed sources" };
-    private const string InquiryNav = "resea" + "rch";
-    private const string BudgetHeader = "Resea" + "rch budget minor units";
-    private readonly TextBox _budget = new() { Header = BudgetHeader };
     private Grid? _scaleRoot;
     private ContentDialog? _exportDialog;
     private int _tab;
@@ -78,7 +75,6 @@ public sealed partial class MainWindow : Window
         AutomationName(_cash, "Cash floor minor units");
         AutomationName(_turnover, "Turnover bps");
         AutomationName(_sources, "Allowed sources");
-        AutomationName(_budget, BudgetHeader);
         AutomationId(_title, "app-title");
         AutomationId(_banner, "mode-banner");
         AutomationId(_account, "account-heading");
@@ -113,8 +109,53 @@ public sealed partial class MainWindow : Window
         _scenarios.SelectionChanged += ScenarioChanged;
         _modes.SelectionChanged += ModeChanged;
 
+        var filter = DeskButton("Apply filter");
+        AutomationName(filter, "Apply filter");
+        filter.Click += async (_, _) =>
+        {
+            _vm.Query = _search.Text ?? "";
+            await _vm.FilterDecisionsAsync();
+            BindList();
+            BindHeader();
+        };
+        var save = Button("Validate and save draft", async () =>
+        {
+            _vm.SetMandateFields(_name.Text ?? "", Empty(_universe.Text), Empty(_horizon.Text), Empty(_schedule.Text), Empty(_timezone.Text),
+                Int(_conc.Text), Int(_sector.Text), Long(_cash.Text), Int(_turnover.Text), Empty(_sources.Text));
+            await _vm.SaveMandateAsync();
+            BindHeader();
+            BindList();
+            BindDraft();
+        });
+        save.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = VirtualKey.S, Modifiers = VirtualKeyModifiers.Control });
+        var dup = Button("Duplicate draft", () => { _vm.DuplicateMandate(); BindDraft(); BindHeader(); });
+        var pause = Button("Request pause (capability-gated)", async () =>
+        {
+            var result = await _vm.RequestHostOperationAsync("PAUSE_NEW_RISK");
+            _host.Text = ShellViewModel.FormatHostOperation(result);
+        });
+        var activate = Button("Activate session", () => _host.Text = _vm.DisabledReasonFor("activate-session"));
+        var openUri = Button("Open allowed source URI", OpenUri);
+        var export = Button("Export redacted support zip", ShowExportDialog);
+        var offline = Button("Start offline engine run", async () =>
+        {
+            if (_runButton is not null) _runButton.IsEnabled = false;
+            _host.Text = "Running the offline demonstration… Waiting for the engine result.";
+            try
+            {
+                var result = await _vm.StartOfflineEngineRunAsync();
+                _host.Text = ShellViewModel.FormatHostOperation(result);
+                BindHeader();
+                BindList();
+            }
+            catch (Exception ex) { _host.Text = "Could not confirm the run result. Refresh to reconcile before retrying. " + ex.Message; }
+            finally { if (_runButton is not null) _runButton.IsEnabled = true; }
+        });
+        offline.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
+        offline.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = VirtualKey.R, Modifiers = VirtualKeyModifiers.Control });
+
         App.CrashLog("before BuildShell");
-        var root = BuildShell();
+        var root = BuildShell(filter, save, dup, pause, activate, openUri, export, offline);
         App.CrashLog("after BuildShell");
         _scaleRoot = root;
         Content = root;
@@ -124,15 +165,19 @@ public sealed partial class MainWindow : Window
         AssignTabOrder();
         ApplyWindowChrome(testDpiPercent);
         _vm.PropertyChanged += OnViewModelChanged;
+        BindHeader();
+        BindList();
+        BindDraft();
         App.CrashLog("before Navigate chat");
         Navigate("chat");
         App.CrashLog("after Navigate chat");
-        root.Loaded += async (_,_) => { if (Environment.GetCommandLineArgs().Contains("--chat-layout-verify") || Environment.GetCommandLineArgs().Contains("--chat-steering-verify")) return; await StartConnectorIfEnabledAsync(); };
+        root.Loaded += async (_,_) => { if ((Environment.GetCommandLineArgs().Contains("--chat-layout-verify") || Environment.GetCommandLineArgs().Contains("--chat-steering-verify") || Environment.GetCommandLineArgs().Contains("--desk-store-verify") || Environment.GetCommandLineArgs().Contains("--quant-desk-verify"))) return; await InitializeUpdatesAsync(); if (!_updateStartupFailed) await InitializeAccountAsync(); await StartPhoneIfEnabledAsync(); await StartConnectorIfEnabledAsync(); };
+        Closed += (_,_) => _signInCancel?.Cancel();
     }
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedEvidence" or "Mandate" or "Inquiry") return;
+        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedOrder" or "SelectedEvidence" or "Mandate") return;
         if (_bindQueued)
         {
             return;
@@ -157,7 +202,7 @@ public sealed partial class MainWindow : Window
         _broker.Text = _vm.BrokerLabel;
         _recon.Text = _vm.ReconciliationLabel;
         _auth.Text = _vm.AuthorizationLabel;
-        _status.Text = _vm.StatusLine;
+        _status.Text = _vm.StatusLine + " | cash " + _vm.CashLabel + " | equity " + _vm.EquityLabel;
         _draftStatus.Text = _vm.DraftStatus;
         _draftError.Text = _vm.DraftErrors;
         _hint.Text = _vm.WorkspaceGuidance;
@@ -173,10 +218,11 @@ public sealed partial class MainWindow : Window
         IEnumerable<string> rows = nav switch
         {
             "decisions" => _vm.Decisions.Select(DescribeDecision),
-            InquiryNav => _vm.Jobs.Select(j => $"{j.Id} [{j.Status}] {j.Title} {(j.UnavailableReason ?? "")}"),
+            "portfolio" => DescribePortfolio(),
+            "orders" => _vm.Orders.Select(DescribeOrder).Concat(_vm.Events.Select(e => $"EVENT {e.Cursor} {e.Kind}: {e.Summary}")),
             "tools" => _vm.Capabilities.Select(c => $"{c.Id} {c.Version} status={c.CatalogStatus} avail={c.AvailabilityReason}"),
             "evaluation" => new[] { DescribeEval() },
-            "overview" => new[] { "Workspace overview", "Open Chat, Shared room, Grokbot, or Settings." },
+            "overview" => new[] { "Offline demonstration", "The installed engine produces a synthetic three-cycle book. These balances and orders are not from a broker or from chat agents.", "Use the sections above to inspect the run, edit local drafts, or review the engine connection." },
             "connection" => new[]
             {
                 $"Version {_vm.AppTitle}",
@@ -202,12 +248,31 @@ public sealed partial class MainWindow : Window
 
     private IEnumerable<string> DescribeHome()
     {
-        yield return "Your xAI Desk workspace\nOne place for conversations, Shared room, Grokbot, and Settings.";
+        yield return "Your xAI Desk workspace\nOne place for conversations and the tools on this PC.";
         yield return $"Conversations\n{_conversations.Count} saved chats on this PC. Open Chat or choose a recent conversation to continue.";
+        yield return "Later · offline demo\nThe synthetic portfolio, orders and engine controls are grouped separately. They are not your live account.";
+    }
+
+    private IEnumerable<string> DescribePortfolio()
+    {
+        if (!_vm.Account.IsKnown)
+        {
+            yield return "Account: " + _vm.Account.Describe();
+            yield break;
+        }
+
+        var account = _vm.Account.Value!;
+        yield return "Cash: " + account.Cash.Describe(money => money.Format());
+        yield return "Ending equity: " + account.EndingEquity.Describe(money => money.Format());
+        foreach (var holding in account.Holdings)
+            yield return $"{holding.Instrument} qty={holding.Quantity.Describe()}";
     }
 
     private static string DescribeDecision(DecisionRecord d) =>
         $"{d.Id}  ·  {d.Action}  ·  {d.Instrument}\nQuantity: {d.Quantity.Describe()}\nAdmission: {d.Admission.Verdict}  ·  Risk: {d.Risk.Verdict}  ·  Execution: {d.Execution.Verdict}";
+
+    private static string DescribeOrder(OrderRecord o) =>
+        $"{o.Id}\nRequested: {o.RequestedState}  ·  Acknowledged: {o.AcknowledgedState.Describe()}\nCurrent: {o.CurrentState.Describe()}  ·  Remaining: {o.RemainingQuantity.Describe()} {string.Join(";", o.AmbiguityReasons)}";
 
     private string DescribeEval()
     {
@@ -229,7 +294,6 @@ public sealed partial class MainWindow : Window
         _cash.Text = _vm.Mandate.CashFloorMinorUnits?.ToString() ?? "";
         _turnover.Text = _vm.Mandate.TurnoverBps?.ToString() ?? "";
         _sources.Text = _vm.Mandate.AllowedSources is null ? "" : string.Join(",", _vm.Mandate.AllowedSources);
-        _budget.Text = _vm.Mandate.InquiryBudgetMinorUnits?.ToString() ?? "";
     }
 
     private async void ScenarioChanged(object sender, SelectionChangedEventArgs e)
@@ -291,7 +355,7 @@ public sealed partial class MainWindow : Window
             {
                 $"Decision {decision.Id}",
                 $"Action {decision.Action} {decision.Instrument}",
-                $"Qty {decision.Quantity.Describe()}",
+                $"Qty {decision.Quantity.Describe()} Price {decision.Price.Describe(m => m.Format())}",
                 $"Revision {decision.AccountRevision}",
                 $"Admission {decision.Admission.Verdict}: {decision.Admission.Reason}",
                 $"Risk {decision.Risk.Verdict}: {decision.Risk.Reason}",
@@ -302,6 +366,13 @@ public sealed partial class MainWindow : Window
             _evidence.Text = _vm.SelectedEvidence is null
                 ? "No evidence document."
                 : _vm.SelectedEvidence.Title + Environment.NewLine + _vm.SelectedEvidence.Text;
+            return;
+        }
+
+        var order = _vm.Orders.FirstOrDefault(o => row.StartsWith(o.Id, StringComparison.Ordinal));
+        if (order is not null)
+        {
+            _detail.Text = DescribeOrder(order) + Environment.NewLine + string.Join(Environment.NewLine, order.AmbiguityReasons);
         }
     }
 
@@ -374,7 +445,7 @@ public sealed partial class MainWindow : Window
         foreach (var el in new FrameworkElement[]
                  {
                      _nav, _search, _scenarios, _modes, _main, _name, _universe, _horizon, _schedule, _timezone,
-                     _conc, _sector, _cash, _turnover, _sources, _budget
+                     _conc, _sector, _cash, _turnover, _sources
                  })
         {
             el.TabIndex = ++_tab;

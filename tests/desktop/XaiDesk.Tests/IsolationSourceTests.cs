@@ -4,13 +4,11 @@ namespace XaiDesk.Tests;
 
 public sealed class IsolationSourceTests
 {
-    private const string OriginalDesk = "Sovereign" + "AI";
-
     private static readonly string[] Forbidden =
     [
-        OriginalDesk + ".DesktopPreview",
-        OriginalDesk + ".CodingPlan",
-        OriginalDesk + ".MarketData",
+        "SovereignAI.DesktopPreview",
+        "SovereignAI.CodingPlan",
+        "SovereignAI.MarketData",
         "8788"
     ];
 
@@ -19,8 +17,9 @@ public sealed class IsolationSourceTests
         Path.Combine("apps", "desktop", "Sovereign.Desktop", "App.xaml.cs"),
         Path.Combine("apps", "desktop", "Sovereign.Desktop", "SettingsPage.cs"),
         Path.Combine("apps", "desktop", "Sovereign.Desktop", "ChatRoom.cs"),
+        Path.Combine("apps", "desktop", "phone", "PhoneBindAddress.cs"),
         Path.Combine("apps", "desktop", "Sovereign.Desktop.Client", "ShellOpenFiles.cs"),
-        Path.Combine("apps", "desktop", "Sovereign.Desktop", "SettingsPage.cs")
+        Path.Combine("apps", "desktop", "Sovereign.Desktop.Updates", "UpdateTrust.cs")
     ];
 
     [Fact]

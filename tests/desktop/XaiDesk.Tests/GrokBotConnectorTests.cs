@@ -134,13 +134,13 @@ public sealed class GrokBotConnectorTests
     [Fact]
     public void Tailscale_address_comes_from_the_command_not_another_100_address()
     {
-        var carrierGrade = new IPAddress([100, 64, 0, 1]);
-        Assert.Null(ConnectorBind.Select(ConnectorBindMode.Tailscale, [IPAddress.Parse("192.0.2.1"), carrierGrade]));
-        Assert.Equal(carrierGrade, ConnectorBind.ParseTailscaleIp(carrierGrade + "\r\n"));
-        Assert.Null(ConnectorBind.ParseTailscaleIp("192.0.2.1\r\n"));
+        var first = Cg(64, 1, 2);
+        var second = Cg(65, 3, 4);
+        Assert.Null(ConnectorBind.Select(ConnectorBindMode.Tailscale, [first, second]));
+        Assert.Equal(second, ConnectorBind.ParseTailscaleIp(second.ToString() + "\r\n"));
         Assert.Null(ConnectorBind.ParseTailscaleIp(""));
         Assert.Null(ConnectorBind.ParseTailscaleIp("8.8.8.8\n192.168.1.20"));
-        Assert.Equal(IPAddress.Loopback, ConnectorBind.Select(ConnectorBindMode.Loopback, [IPAddress.Parse("192.0.2.1")]));
+        Assert.Equal(IPAddress.Loopback, ConnectorBind.Select(ConnectorBindMode.Loopback, [first]));
     }
 
     [Fact]
@@ -178,10 +178,15 @@ public sealed class GrokBotConnectorTests
         var (address, lookupError) = await ConnectorBind.QueryTailscaleIpv4Async();
         Assert.Null(lookupError);
         Assert.NotNull(address);
-        Assert.True(ConnectorBind.IsTailscale(address));
+        Assert.StartsWith("100.", address!.ToString(), StringComparison.Ordinal);
         await Prove(address!, ConnectorBindMode.Tailscale, address);
         Assert.Equal("http://127.0.0.1:8790/mcp", loopback);
     }
+
+    private static IPAddress Cg(int second, int third, int fourth) =>
+        IPAddress.Parse("100." + second.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "." + third.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "." + fourth.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     private static async Task<string> Prove(IPAddress address, ConnectorBindMode mode, IPAddress? expected)
     {
@@ -244,6 +249,46 @@ public sealed class GrokBotConnectorTests
         Assert.Equal(GrokbotMailStatus.Answered, desk.Mail.Messages.Single().Status);
         var again = await Call(http, host.Url!, "grokbot_inbox_list");
         Assert.DoesNotContain(queued.Id, again, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Inbox_list_keeps_the_text_row_and_appends_image_blocks_in_row_order()
+    {
+        var firstPng = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 1 };
+        var secondPng = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 2, 3 };
+        var desk = new MemoryDesk();
+        var first = desk.Mail.Queue("one", false, firstPng);
+        var plain = desk.Mail.Queue("two", false, []);
+        var second = desk.Mail.Queue("three", true, secondPng);
+        Assert.Null(plain.Image);
+        await using var host = await Start(desk);
+        using var http = Client();
+        var response = await http.PostAsync(host.Url, Body("grokbot_inbox_list"));
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(body);
+        var result = json.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        var content = result.GetProperty("content");
+        Assert.Equal(5, content.GetArrayLength());
+        var text = content[0].GetProperty("text").GetString() ?? "";
+        var lines = text.Split('\n');
+        Assert.Equal(3, lines.Length);
+        Assert.Equal(first.Id + "\tPickedUp\treply\tone", lines[0]);
+        Assert.Equal(plain.Id + "\tPickedUp\treply\ttwo", lines[1]);
+        Assert.Equal(second.Id + "\tPickedUp\tact\tthree", lines[2]);
+        foreach (var line in lines) Assert.Equal(4, line.Split('\t').Length);
+        Assert.DoesNotContain(Convert.ToBase64String(firstPng), text, StringComparison.Ordinal);
+        Assert.Equal("text", content[1].GetProperty("type").GetString());
+        Assert.Equal(first.Id, content[1].GetProperty("text").GetString());
+        Assert.Equal("image", content[2].GetProperty("type").GetString());
+        Assert.Equal("image/png", content[2].GetProperty("mimeType").GetString());
+        Assert.Equal(Convert.ToBase64String(firstPng), content[2].GetProperty("data").GetString());
+        Assert.Equal("text", content[3].GetProperty("type").GetString());
+        Assert.Equal(second.Id, content[3].GetProperty("text").GetString());
+        Assert.Equal("image", content[4].GetProperty("type").GetString());
+        Assert.Equal("image/png", content[4].GetProperty("mimeType").GetString());
+        Assert.Equal(Convert.ToBase64String(secondPng), content[4].GetProperty("data").GetString());
     }
 
     [Fact]
@@ -516,10 +561,10 @@ public sealed class GrokBotConnectorTests
         }
         public void RecordGrokbotTool(string tool, string args, string result) => Mail.Record(tool, args, result);
         public string? SwarmRoot { get; set; }
-        public string ReadSwarmBoard(string? swarmId) => SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, SwarmRoot);
-        public string SubmitSwarmResult(string taskId, string result, string proof)
+        public string ReadSwarmBoard(string? swarmId, string? runId = null) => SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, SwarmRoot, string.IsNullOrWhiteSpace(runId) ? null : runId);
+        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null)
         {
-            var board = SwarmBoard.RequireTask(taskId, SwarmRoot, out _);
+            var board = SwarmBoard.RequireTask(taskId, SwarmRoot, out _, string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, string.IsNullOrWhiteSpace(runId) ? null : runId);
             var task = board.Submit(taskId, result, proof);
             return task.Id + "\t" + task.Status;
         }

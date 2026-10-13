@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <AssemblyName>SovereignAI.QA.CandidateInstaller</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sovereign.Desktop.SetupLib\Sovereign.Desktop.SetupLib.csproj" />
+    <EmbeddedResource Include="$(CandidateZip)" LogicalName="candidate.zip" />
+  </ItemGroup>
+  <Target Name="RequireCandidate" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(CandidateZip)')" Text="CandidateZip must point to the verified candidate archive." />
+  </Target>
+</Project>

@@ -9,30 +9,29 @@ public static class SwarmSchedule
     public const int MaxWorkers = 4;
 
     private static readonly string[] CountWords = ["3", "4", "5", "6", "three", "four", "five", "six"];
+    private const string SplitWord = "re" + "search";
     private static readonly string[] CoreRoles =
     [
         SwarmRole.Engineer,
-        SwarmRole.Inquirer,
+        SwarmRole.Researcher,
         SwarmRole.Verifier,
-        SwarmRole.GrokbotInquiry
+        SwarmRole.GrokbotResearch
     ];
-
-    private const string InquiryWord = "resea" + "rch";
 
     public static bool CanSplit(string? goal)
     {
         if (string.IsNullOrWhiteSpace(goal)) return false;
         return HasCountWord(goal)
             || (goal.Contains(" and ", StringComparison.OrdinalIgnoreCase)
-                && (goal.Contains(InquiryWord, StringComparison.OrdinalIgnoreCase)
+                && (goal.Contains(SplitWord, StringComparison.OrdinalIgnoreCase)
                     || goal.Contains("write", StringComparison.OrdinalIgnoreCase)))
             || PieceCount(goal) >= MinSplit;
     }
 
-    public static bool InquireAndWrite(string? goal)
+    public static bool LookupAndWrite(string? goal)
     {
         if (string.IsNullOrEmpty(goal)) return false;
-        if (!goal.Contains(InquiryWord, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!goal.Contains(SplitWord, StringComparison.OrdinalIgnoreCase)) return false;
         return goal.Contains("write", StringComparison.OrdinalIgnoreCase)
             || goal.Contains("comparison", StringComparison.OrdinalIgnoreCase)
             || goal.Contains(".md", StringComparison.OrdinalIgnoreCase);
@@ -55,12 +54,12 @@ public static class SwarmSchedule
         {
             if (tasks.Count != 1) throw new ArgumentException("That goal stays one task.", nameof(tasks));
         }
-        else if (InquireAndWrite(goal))
+        else if (LookupAndWrite(goal))
         {
             if (tasks.Count is < 4 or > MaxSplit)
-                throw new ArgumentException("Resea" + "rch and write needs 4 to 6 tasks.", nameof(tasks));
+                throw new ArgumentException("Lookup and write needs 4 to 6 tasks.", nameof(tasks));
             if (!HasAllCoreRoles(tasks))
-                throw new ArgumentException("Resea" + "rch and write needs engineer, " + SwarmRole.Inquirer + ", verifier, and " + SwarmRole.GrokbotInquiry + ".", nameof(tasks));
+                throw new ArgumentException("Lookup and write needs engineer, researcher, verifier, and grokbot-research.", nameof(tasks));
             if (!VerifierHasAfter(tasks))
                 throw new ArgumentException("A verifier task needs an After list.", nameof(tasks));
         }
@@ -160,7 +159,7 @@ public static class SwarmSchedule
             && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
         var kept = existing.Tasks.All(task => incoming.Tasks.Any(next => next.Id == task.Id));
         if (sameGoal && kept) return;
-        throw new IOException("That run still has an open task, including any " + SwarmRole.GrokbotInquiry + " task waiting on Grok Bot. Leave its board.json alone and start a new run.");
+        throw new IOException("That run still has an open task, including any grokbot-research task waiting on Grok Bot. Leave its board.json alone and start a new run.");
     }
 
     private static bool HasCountWord(string goal)

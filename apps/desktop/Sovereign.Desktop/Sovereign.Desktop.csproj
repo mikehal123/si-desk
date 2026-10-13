@@ -22,6 +22,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="$(PrivateDesktopCompileRemove)" Condition="'$(PrivateDesktopCompileRemove)' != ''" />
+    <Content Include="..\phone\www\**\*" Link="phone\www\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\..\.cursor\skills\**\*" Link=".cursor\skills\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\xAIDesk.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="account-service.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -29,11 +31,14 @@
     <Content Include="skill-chroma\embed384.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\SubagentAvatars\*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\..\scripts\Install-CursorConnection.ps1" Link="setup\Install-CursorConnection.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\room-tunnel\*" Link="room-tunnel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\phone\Sovereign.Desktop.Phone.csproj" />
     <ProjectReference Include="..\connector\Sovereign.Desktop.Connector.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.Updates\Sovereign.Desktop.Updates.csproj" />
     <ProjectReference Include="..\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
     <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
     <ProjectReference Include="..\Sovereign.Desktop.Presentation\Sovereign.Desktop.Presentation.csproj" />
@@ -105,6 +110,7 @@
   </Target>
   <ItemGroup>
     <Content Include="..\..\..\fixtures\desktop\**\*" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\..\contracts\observed\engine-bundle-pin.json" Link="engine-bundle-pin.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\..\contracts\observed\engine-bundle-pin.json')" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
   <ItemGroup Condition="'$(DeskRuntimeInventory)' != ''">

@@ -16,13 +16,13 @@ public static class SwarmRole
 {
     public const string Engineer = "engineer";
     public const string Investigator = "investigator";
-    public const string Inquirer = "resea" + "rcher";
+    public const string Researcher = "researcher";
     public const string Verifier = "verifier";
-    public const string GrokbotInquiry = "grokbot-resea" + "rch";
+    public const string GrokbotResearch = "grokbot-research";
     public const string GrokbotOps = "grokbot-ops";
 
     public static bool IsGrokbot(string? role) =>
-        string.Equals(role, GrokbotInquiry, StringComparison.Ordinal)
+        string.Equals(role, GrokbotResearch, StringComparison.Ordinal)
         || string.Equals(role, GrokbotOps, StringComparison.Ordinal);
 }
 
@@ -134,9 +134,15 @@ public sealed class SwarmBoard
             .ToArray();
     }
 
-    public static string ReadText(string? swarmId, string? root = null)
+    public static string ReadText(string? swarmId, string? root = null, string? runId = null)
     {
         var folder = string.IsNullOrWhiteSpace(root) ? DefaultRoot() : root;
+        if (!string.IsNullOrWhiteSpace(swarmId) && !string.IsNullOrWhiteSpace(runId))
+        {
+            var path = RunBoardPath(swarmId, runId, folder);
+            if (!File.Exists(path)) throw new KeyNotFoundException("That swarm board is not on disk.");
+            return File.ReadAllText(path);
+        }
         if (string.IsNullOrWhiteSpace(swarmId))
         {
             var lines = ListIds(folder).Select(id =>
@@ -150,18 +156,71 @@ public sealed class SwarmBoard
         return File.ReadAllText(Load(swarmId.Trim(), folder).BoardPath);
     }
 
-    public static SwarmBoard RequireTask(string taskId, string? root, out SwarmTask task)
+    public static SwarmBoard RequireTask(string taskId, string? root, out SwarmTask task, string? swarmId = null, string? runId = null)
     {
         if (string.IsNullOrWhiteSpace(taskId)) throw new ArgumentException("Task id is required.", nameof(taskId));
+        var wanted = taskId.Trim();
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            if (string.IsNullOrWhiteSpace(swarmId)) throw new ArgumentException("Swarm id is required.", nameof(swarmId));
+            var pinned = RunBoardPath(swarmId, runId, root);
+            if (!File.Exists(pinned)) throw new KeyNotFoundException("That swarm task is not on a board.");
+            return Take(Read(pinned), wanted, out task);
+        }
+        if (!string.IsNullOrWhiteSpace(swarmId))
+        {
+            foreach (var path in RunBoardFiles(swarmId, root))
+            {
+                var board = Read(path);
+                var found = board.Tasks.FirstOrDefault(item => item.Id == wanted);
+                if (found is null) continue;
+                task = found;
+                return board;
+            }
+            throw new KeyNotFoundException("That swarm task is not on a board.");
+        }
         foreach (var id in ListIds(root))
         {
             var board = Load(id, root);
-            var found = board.Tasks.FirstOrDefault(item => item.Id == taskId);
+            var found = board.Tasks.FirstOrDefault(item => item.Id == wanted);
             if (found is null) continue;
             task = found;
             return board;
         }
         throw new KeyNotFoundException("That swarm task is not on a board.");
+    }
+
+    public static string RunBoardPath(string swarmId, string runId, string? root = null)
+    {
+        if (!IsBoardId(swarmId)) throw new ArgumentException("Swarm id is required.", nameof(swarmId));
+        if (!IsBoardId(runId)) throw new ArgumentException("Run id is required.", nameof(runId));
+        var folder = string.IsNullOrWhiteSpace(root) ? DefaultRoot() : root;
+        return Path.Combine(folder, swarmId.Trim(), "runs", runId.Trim(), "board.json");
+    }
+
+    public static IReadOnlyList<string> RunBoardFiles(string swarmId, string? root = null)
+    {
+        if (!IsBoardId(swarmId)) return [];
+        var folder = string.IsNullOrWhiteSpace(root) ? DefaultRoot() : root;
+        var runs = Path.Combine(folder, swarmId.Trim(), "runs");
+        if (!Directory.Exists(runs)) return [];
+        return Directory.GetDirectories(runs)
+            .Select(dir => Path.Combine(dir, "board.json"))
+            .Where(File.Exists)
+            .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
+            .ThenBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static bool IsBoardId(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && Guid.TryParseExact(value.Trim(), "N", out _);
+
+    private static SwarmBoard Take(SwarmBoard board, string taskId, out SwarmTask task)
+    {
+        var found = board.Tasks.FirstOrDefault(item => item.Id == taskId);
+        if (found is null) throw new KeyNotFoundException("That swarm task is not on a board.");
+        task = found;
+        return board;
     }
 
     public SwarmTask TaskById(string taskId) =>
@@ -243,8 +302,8 @@ public sealed class SwarmBoard
     }
 
     /// <summary>
-    /// Button path. The first use interrupts a doing task into one narrower retry.
-    /// Using it again on that task fails only that task.
+    /// Button path. The first use restarts a doing, todo, or review task into one narrower retry.
+    /// Using it again on that task fails only that task. Done and failed stay as they are.
     /// </summary>
     public SwarmTask Respawn(string taskId, string? reason)
     {
@@ -254,6 +313,19 @@ public sealed class SwarmBoard
         {
             task.Status = SwarmStatus.Failed;
             task.Result = ClipReason(reason);
+            Save();
+            return task;
+        }
+        if (task.Status is SwarmStatus.Todo or SwarmStatus.Review && task.InterruptRetries == 0)
+        {
+            var why = ClipReason(reason);
+            task.InterruptRetries = 1;
+            task.Status = SwarmStatus.Todo;
+            task.Assignee = "";
+            task.Result = "Interrupted once. " + why;
+            var title = string.IsNullOrWhiteSpace(task.Title) ? task.Id : task.Title.Trim();
+            var line = "Narrowed after an interrupt: do only \"" + title + "\". Drop side work. Reason: " + why;
+            task.Details = string.IsNullOrWhiteSpace(task.Details) ? line : task.Details.Trim() + "\n" + line;
             Save();
             return task;
         }

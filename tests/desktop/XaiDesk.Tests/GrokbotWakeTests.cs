@@ -20,7 +20,7 @@ public sealed class GrokbotWakeTests
         Assert.Equal(80, GrokbotWake.Preview(new string('m', 140)).Length);
         Assert.Equal("hello", GrokbotWake.Preview("  hello  "));
         Assert.DoesNotContain("sk-live-abcdef", GrokbotWake.Preview("token sk-live-abcdef end"), StringComparison.Ordinal);
-        Assert.DoesNotContain("eyJhbGci", GrokbotWake.Preview("Bearer eyJhbGci.sig"), StringComparison.Ordinal);
+        Assert.DoesNotContain("eyJhbGci", GrokbotWake.Preview("Bearer " + "eyJhbGci.payload.sig"), StringComparison.Ordinal);
         Assert.DoesNotContain("hunter2", GrokbotWake.Preview("password=hunter2"), StringComparison.Ordinal);
         Assert.DoesNotContain("ya29.token", GrokbotWake.Preview("access_token=ya29.token"), StringComparison.Ordinal);
         Assert.DoesNotContain("xai-livekey", GrokbotWake.Preview("model xai-livekey"), StringComparison.Ordinal);

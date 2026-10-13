@@ -75,7 +75,7 @@ public sealed class SwarmSectionTests
         Assert.Contains("done 1", progress.Counts);
         Assert.Equal("engineer started Write hello.txt", SwarmSection.FeedLine("todo", new SwarmTask { Role = "engineer", Title = "Write hello.txt", Status = "doing" }));
         Assert.Equal("verifier passed t-hello", SwarmSection.FeedLine("review", new SwarmTask { Id = "t-hello", Role = "verifier", Title = "Check", Status = "done" }));
-        Assert.Equal("Grok Bot returned result", SwarmSection.FeedLine("doing", new SwarmTask { Role = SwarmRole.GrokbotInquiry, Title = "Look", Status = "review" }));
+        Assert.Equal("Grok Bot returned result", SwarmSection.FeedLine("doing", new SwarmTask { Role = "grokbot-research", Title = "Look", Status = "review" }));
         Assert.Null(SwarmSection.FeedLine("doing", new SwarmTask { Role = "engineer", Title = "Write hello.txt", Status = "doing" }));
         Assert.Equal("0:05", SwarmSection.FormatElapsed(TimeSpan.FromSeconds(5)));
         Assert.Equal("1:02:03", SwarmSection.FormatElapsed(new TimeSpan(1, 2, 3)));

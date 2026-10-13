@@ -65,13 +65,17 @@ public sealed class DeskChatConnectionTests
     }
 
     [Fact]
-    public void Cursor_runtime_uses_the_xai_desk_connector()
+    public void Cursor_runtime_uses_the_installed_connector_when_xai_desk_has_none()
     {
         var root = Path.Combine(Path.GetTempPath(), "xai-desk-runtime-" + Guid.NewGuid().ToString("N"));
-        var own = Path.Combine(root, "xAIDesk", "Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
+        var installed = Path.Combine(root, "SovereignAI.Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
+        Directory.CreateDirectory(installed);
+        File.WriteAllText(Path.Combine(installed, "node.exe"), "runtime");
+        File.WriteAllText(Path.Combine(installed, "index.js"), "runtime");
         try
         {
-            Assert.Equal(own, CursorChatClient.ResolveRuntimeDirectory(root));
+            Assert.Equal(installed, CursorChatClient.ResolveRuntimeDirectory(root));
+            var own = Path.Combine(root, "xAIDesk", "Tools", "CursorAgent", CursorChatClient.CliVersion, "dist-package");
             Directory.CreateDirectory(own);
             File.WriteAllText(Path.Combine(own, "node.exe"), "own");
             File.WriteAllText(Path.Combine(own, "index.js"), "own");

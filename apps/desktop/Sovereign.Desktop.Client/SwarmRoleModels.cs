@@ -19,10 +19,10 @@ public static class SwarmRoleModels
     private static readonly string[] EngineerDefault = ["Fable", "Opus 5.5", "GPT-5.6 Sol", "Codex 5.3"];
     private static readonly string[] PlannerDefault = ["GPT-5.6 Sol", "Opus 5.5", "Fable"];
     private static readonly string[] VerifierDefault = ["Opus 5.5", "GPT-5.6 Sol", "Fable"];
-    private static readonly string[] LookupDefault = ["Gemini 3.8", "Composer 2.5", "Muse Spark"];
+    private static readonly string[] InquiryDefault = ["Gemini 3.8", "Composer 2.5", "Muse Spark"];
     private static readonly string[] TesterDefault = ["Composer 2.5", "GPT-5.6 Sol", "Gemini 3.8"];
     private static readonly string[] CatalogRoles =
-        ["engineer", "coder", "planner", "reviewer", "verifier", "resear" + "cher", "investigator", "tester"];
+        ["engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester"];
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly JsonDocumentOptions ReadJson = new()
@@ -153,8 +153,8 @@ public static class SwarmRoleModels
             if (AdvertisedId(advertised, pair.Value) is not { } id) continue;
             lines.Append("override ").Append(pair.Key).Append(" modelId: ").Append(id).Append('\n');
         }
-        lines.Append("Use those ids for engineer, coder, planner, reviewer, verifier, " + "resear" + "cher, investigator, and tester. ");
-        lines.Append("grokbot-" + "resear" + "ch and grokbot-ops take no modelId. ");
+        lines.Append("Use those ids for engineer, coder, planner, reviewer, verifier, researcher, investigator, and tester. ");
+        lines.Append("grokbot-research and grokbot-ops take no modelId. ");
         lines.Append("The verifier modelId must differ from the engineer modelId. ");
         lines.Append("If the helper tool rejects the model field, fall back to the parent modelId.\n");
         return lines.ToString();
@@ -175,13 +175,13 @@ public static class SwarmRoleModels
         foreach (var role in CatalogRoles)
             lines.Append(role).Append(" modelId: ").Append(id).Append('\n');
         lines.Append("Every worker uses the chat's selected model. ");
-        lines.Append("grokbot-" + "resear" + "ch and grokbot-ops take no modelId. ");
+        lines.Append("grokbot-research and grokbot-ops take no modelId. ");
         lines.Append("If the helper tool rejects the model field, fall back to the parent modelId.\n");
         return lines.ToString();
     }
 
     private static bool IsWakeRole(string? role) =>
-        string.Equals(role, "grokbot-" + "resear" + "ch", StringComparison.OrdinalIgnoreCase)
+        string.Equals(role, "grokbot-research", StringComparison.OrdinalIgnoreCase)
         || string.Equals(role, "grokbot-ops", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsVerifierFamily(string? role) =>
@@ -253,8 +253,8 @@ public static class SwarmRoleModels
         ["planner"] = PlannerDefault.ToArray(),
         ["reviewer"] = VerifierDefault.ToArray(),
         ["verifier"] = VerifierDefault.ToArray(),
-        ["resear" + "cher"] = LookupDefault.ToArray(),
-        ["investigator"] = LookupDefault.ToArray(),
+        ["researcher"] = InquiryDefault.ToArray(),
+        ["investigator"] = InquiryDefault.ToArray(),
         ["tester"] = TesterDefault.ToArray()
     };
 

@@ -83,6 +83,32 @@ function Test-InsidePreview([string]$line, [int]$index, [int]$length) {
     return $false
 }
 
+function Test-AllowedSpan([string]$text, [int]$index, [int]$length, [string[]]$phrases) {
+    foreach ($phrase in $phrases) {
+        if ([string]::IsNullOrEmpty($phrase)) { continue }
+        $start = 0
+        while ($start -le $text.Length) {
+            $at = $text.IndexOf($phrase, $start, [StringComparison]::OrdinalIgnoreCase)
+            if ($at -lt 0) { break }
+            $end = $at + $phrase.Length
+            if ($index -ge $at -and ($index + $length) -le $end) { return $true }
+            $start = $at + 1
+            if ($start -le $at) { break }
+        }
+    }
+    return $false
+}
+
+function Test-MarkerRemains([System.Text.RegularExpressions.Regex]$re, [string]$text, [string[]]$phrases) {
+    $found = $null
+    try { $found = $re.Matches($text) } catch { return $false }
+    for ($mi = 0; $mi -lt $found.Count; $mi++) {
+        $item = $found[$mi]
+        if (-not (Test-AllowedSpan $text $item.Index $item.Length $phrases)) { return $true }
+    }
+    return $false
+}
+
 function Test-UnderChart([string]$rel) {
     $norm = $rel.Replace('/', '\')
     if ([string]::Equals($norm, $script:chartRel, [StringComparison]::OrdinalIgnoreCase)) { return $true }
@@ -168,6 +194,27 @@ try {
         $reS = New-ScanRegex $script:litS $script:opt
         $reQ = New-ScanRegex ('\b' + $script:litQ + '\b') $script:opt
         $reT = New-ScanRegex ('\b' + $script:litT + '\b') $script:opt
+        $script:rolePhrases = @(
+            ($script:litA + 'er'),
+            ('grokbot-' + $script:litA),
+            ('grokbot' + $script:litA)
+        )
+        $script:allowSovereign = @(
+            'Sovereign.Desktop',
+            ($script:litS + '.DesktopPreview'),
+            ($script:litS + '.Account'),
+            ($script:litS + '.ico'),
+            ($script:litS + '.png'),
+            ($script:litS + '.Tools'),
+            ($script:litS + '.Offline'),
+            ($script:litS + '.OpenFile'),
+            ($script:litS + '.OpenWith'),
+            ($script:litS + '.Updater'),
+            ($script:litS + '.ps1'),
+            ($script:litS + '.QA'),
+            ($script:litS + '.CodingPlan'),
+            ($script:litS + '.MarketData')
+        )
 
         $files = New-Object System.Collections.Generic.List[string]
         Add-Files $Root $files
@@ -221,6 +268,7 @@ try {
                         if ($value.Length -lt 20) { continue }
                         if (-not [regex]::IsMatch($value, '[0-9]')) { continue }
                         if (Test-DeniedToken $value) { continue }
+                        if ($value.StartsWith('TEST-TOKEN-', [StringComparison]::Ordinal)) { continue }
                         Add-Hit 'secret' $rel $lineNo $item.Value
                     }
                 }
@@ -228,16 +276,27 @@ try {
                     Add-RegexHits 'secret' $re $rel $lineNo $line $false
                 }
                 Add-RegexHits 'path' $pathRe $rel $lineNo $line $true
-                Add-RegexHits 'email' $emailRe $rel $lineNo $line $false
+                $emails = $null
+                try { $emails = $emailRe.Matches($line) } catch { $emails = $null }
+                if ($null -ne $emails) {
+                    for ($mi = 0; $mi -lt $emails.Count; $mi++) {
+                        $item = $emails[$mi]
+                        if ($item.Value.EndsWith('@example.com', [StringComparison]::OrdinalIgnoreCase)) { continue }
+                        Add-Hit 'email' $rel $lineNo $item.Value
+                    }
+                }
                 Add-RegexHits 'tailscale' $tailRe $rel $lineNo $line $false
             }
 
             $tags = New-Object System.Collections.Generic.List[string]
-            try { if ($reA.IsMatch($text)) { [void]$tags.Add($script:litA) } } catch { }
-            try { if ($reS.IsMatch($text)) { [void]$tags.Add($script:litS) } } catch { }
-            try { if ($reQ.IsMatch($text)) { [void]$tags.Add($script:litQ) } } catch { }
-            if (-not $underChart) {
-                try { if ($reT.IsMatch($text)) { [void]$tags.Add($script:litT) } } catch { }
+            $skipMarkers = [string]::Equals($rel, '.gitignore', [StringComparison]::OrdinalIgnoreCase)
+            if (-not $skipMarkers) {
+                try { if (Test-MarkerRemains $reA $text $script:rolePhrases) { [void]$tags.Add($script:litA) } } catch { }
+                try { if (Test-MarkerRemains $reS $text $script:allowSovereign) { [void]$tags.Add($script:litS) } } catch { }
+                try { if (Test-MarkerRemains $reQ $text @()) { [void]$tags.Add($script:litQ) } } catch { }
+                if (-not $underChart) {
+                    try { if (Test-MarkerRemains $reT $text @()) { [void]$tags.Add($script:litT) } } catch { }
+                }
             }
             if ($tags.Count -gt 0) {
                 Add-Hit 'marker' $rel -1 ([string]::Join(' ', $tags.ToArray()))

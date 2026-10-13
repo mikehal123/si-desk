@@ -10,7 +10,7 @@ public sealed class SwarmMemoryTests
     public void Investigator_uses_the_team_investigator_instructions_and_builder_maps_to_engineer()
     {
         var investigator = SwarmRoles.For(SwarmRole.Investigator);
-        Assert.Contains("Trace the problem and return file-level evidence", investigator);
+        Assert.Contains(TeamRoles.Investigator.Instructions, investigator);
         Assert.Contains("Do not implement the change", investigator);
         var manager = SwarmRoles.Manager(Path.Combine(Path.GetTempPath(), "board"), "Project memory\n- Finding (unverified): old note");
         Assert.Contains("Builder means engineer", manager);

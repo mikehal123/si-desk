@@ -24,10 +24,9 @@ public sealed class ShellViewModel : ObservableObject
     private string _selectedNav = "home";
     private string _query = "";
     private DecisionRecord? _selectedDecision;
+    private OrderRecord? _selectedOrder;
     private EvidenceDocument? _selectedEvidence;
     private MandateDraft _mandate;
-    private InquiryDraft _inquiry;
-    private const string InquiryWord = "resea" + "rch";
     private string _draftErrors = "";
     private string _draftStatus = "DRAFT — NOT ACTIVATED";
     private string _theme = "Dark";
@@ -42,7 +41,6 @@ public sealed class ShellViewModel : ObservableObject
         _fixturesRoot = fixturesRoot;
         _hostProfileDirectory = hostProfileDirectory;
         _mandate = NewMandate();
-        _inquiry = NewInquiry();
     }
 
     public IOperatorClient Client => _client;
@@ -59,17 +57,17 @@ public sealed class ShellViewModel : ObservableObject
     public string DraftErrors { get => _draftErrors; private set => SetField(ref _draftErrors, value); }
     public string DraftStatus { get => _draftStatus; private set => SetField(ref _draftStatus, value); }
     public MandateDraft Mandate { get => _mandate; private set => SetField(ref _mandate, value); }
-    public InquiryDraft Inquiry { get => _inquiry; private set => SetField(ref _inquiry, value); }
 
     public RuntimeIdentity? Runtime { get; private set; }
     public SystemHealth? Health { get; private set; }
     public Presence<AccountView> Account { get; private set; } = Presence<AccountView>.Unknown("not loaded");
     public IReadOnlyList<DecisionRecord> Decisions { get; private set; } = [];
+    public IReadOnlyList<OrderRecord> Orders { get; private set; } = [];
     public IReadOnlyList<ClientEvent> Events { get; private set; } = [];
-    public IReadOnlyList<InquiryJob> Jobs { get; private set; } = [];
     public IReadOnlyList<CapabilityItem> Capabilities { get; private set; } = [];
     public EvaluationSummary? Evaluation { get; private set; }
     public DecisionRecord? SelectedDecision { get => _selectedDecision; private set => SetField(ref _selectedDecision, value); }
+    public OrderRecord? SelectedOrder { get => _selectedOrder; private set => SetField(ref _selectedOrder, value); }
     public EvidenceDocument? SelectedEvidence { get => _selectedEvidence; private set => SetField(ref _selectedEvidence, value); }
     public EvidenceDocument? ApiNegativeEvidence { get; private set; }
     public IReadOnlyList<MandateDraft> SavedMandates { get; private set; } = [];
@@ -83,24 +81,28 @@ public sealed class ShellViewModel : ObservableObject
         ? $"Account {Account.Value!.AccountId} ({Account.Value.Environment}) — {ModeLabels.Short(Mode)}"
         : $"Account unknown — {ModeLabels.Short(Mode)} — {Account.Describe()}";
 
-    public bool IsNativeAuthenticated => false;
+    public string CashLabel => Account.IsKnown ? Account.Value!.Cash.Describe(m => m.Format()) : Account.Describe();
+    public string EquityLabel => Account.IsKnown ? Account.Value!.EndingEquity.Describe(m => m.Format()) : Account.Describe();
+    public string TradingAuthorityLabel => Account.IsKnown ? Account.Value!.TradingAuthority : "unknown";
+
+    public bool IsNativeAuthenticated => _client is NativeOperatorClient native && native.IsConnected;
 
     public string WorkspaceGuidance => Mode switch
     {
         ApplicationMode.NativeConnection when IsNativeAuthenticated =>
-            "Authenticated native connection. Offline synthetic execution only. Not live trad" + "ing. Not preview fixtures.",
+            "Authenticated native connection. Offline synthetic execution only. Not a live market. Not preview fixtures.",
         ApplicationMode.NativeConnection =>
             "Native mode is not authenticated. Local drafts only. Account panel is not filled with preview balances.",
         ApplicationMode.EvidenceArchive =>
             "Historical packet. Observation window is in the banner. No execution authority.",
-        _ => "Preview scenario. Values are deterministic fixtures, not live " + InquiryWord + " or accounting."
+        _ => "Preview scenario. Values are deterministic fixtures, not a live account or accounting."
     };
 
     public static string FormatHostOperation(OperationResult result)
     {
         var authority = result.SimulatedPreviewAcknowledgement
-            ? "Preview simulated acknowledgement — not host authority and not live trad" + "ing."
-            : "Offline synthetic host execution — not live trad" + "ing.";
+            ? "Preview simulated acknowledgement — not host authority and not a live market."
+            : "Offline synthetic host execution — not a live market.";
         return result.Status + ": " + result.Detail + ". " + authority;
     }
 
@@ -110,8 +112,18 @@ public sealed class ShellViewModel : ObservableObject
         Health = await _client.GetHealthAsync(cancellationToken).ConfigureAwait(false);
         Account = await _client.GetAccountAsync(cancellationToken).ConfigureAwait(false);
         Decisions = await _client.ListDecisionsAsync(Query, null, cancellationToken).ConfigureAwait(false);
+        Orders = await _client.ListOrdersAsync(cancellationToken).ConfigureAwait(false);
         Events = await _client.ListEventsAsync(cancellationToken).ConfigureAwait(false);
-        Jobs = await _client.ListJobsAsync(cancellationToken).ConfigureAwait(false);
+        if (_client is NativeOperatorClient native && native.ConsumeResyncRequired())
+        {
+            await native.ResyncAuthoritativeStateAsync(cancellationToken).ConfigureAwait(false);
+            Account = await _client.GetAccountAsync(cancellationToken).ConfigureAwait(false);
+            Decisions = await _client.ListDecisionsAsync(Query, null, cancellationToken).ConfigureAwait(false);
+            Orders = await _client.ListOrdersAsync(cancellationToken).ConfigureAwait(false);
+            Evaluation = await _client.GetEvaluationAsync(cancellationToken).ConfigureAwait(false);
+            Events = await _client.ListEventsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         Capabilities = await _client.ListCapabilitiesAsync(cancellationToken).ConfigureAwait(false);
         Evaluation = await _client.GetEvaluationAsync(cancellationToken).ConfigureAwait(false);
         SavedMandates = await _drafts.ListMandatesAsync(cancellationToken).ConfigureAwait(false);
@@ -120,8 +132,8 @@ public sealed class ShellViewModel : ObservableObject
         Raise(nameof(Health));
         Raise(nameof(Account));
         Raise(nameof(Decisions));
+        Raise(nameof(Orders));
         Raise(nameof(Events));
-        Raise(nameof(Jobs));
         Raise(nameof(Capabilities));
         Raise(nameof(Evaluation));
         Raise(nameof(SavedMandates));
@@ -131,6 +143,9 @@ public sealed class ShellViewModel : ObservableObject
         Raise(nameof(ReconciliationLabel));
         Raise(nameof(AuthorizationLabel));
         Raise(nameof(AccountHeading));
+        Raise(nameof(CashLabel));
+        Raise(nameof(EquityLabel));
+        Raise(nameof(TradingAuthorityLabel));
         Raise(nameof(ModeBanner));
         Raise(nameof(IsNativeAuthenticated));
         Raise(nameof(WorkspaceGuidance));
@@ -144,11 +159,9 @@ public sealed class ShellViewModel : ObservableObject
             ApplicationMode.DesktopPreview => new PreviewOperatorClient(
                 ScenarioCatalog.Load(_fixturesRoot, scenarioId ?? "admitted-blocked-execution")),
             ApplicationMode.EvidenceArchive when archiveDirectory is not null => CreateArchiveClient(archiveDirectory),
-            ApplicationMode.NativeConnection => new PreviewOperatorClient(
-                ScenarioCatalog.Load(_fixturesRoot, "disconnected-drafts"), ApplicationMode.NativeConnection),
+            ApplicationMode.NativeConnection => new NativeOperatorClient(NativeOptions()),
             ApplicationMode.EvidenceArchive => throw new InvalidOperationException("Archive mode requires a packet directory."),
-            _ => new PreviewOperatorClient(
-                ScenarioCatalog.Load(_fixturesRoot, "admitted-blocked-execution"))
+            _ => new NativeOperatorClient(NativeOptions())
         };
         Raise(nameof(Client));
         Raise(nameof(Mode));
@@ -183,6 +196,7 @@ public sealed class ShellViewModel : ObservableObject
     public void ClearSelection(string reason)
     {
         SelectedDecision = null;
+        SelectedOrder = null;
         SelectedEvidence = null;
         StatusLine = "Selections cleared (" + reason + ")";
     }
@@ -190,6 +204,11 @@ public sealed class ShellViewModel : ObservableObject
     public async Task SelectDecisionAsync(string id, CancellationToken cancellationToken = default)
     {
         SelectedDecision = await _client.GetDecisionAsync(id, cancellationToken);
+        if (SelectedDecision?.RelatedOrderId is string orderId)
+        {
+            SelectedOrder = await _client.GetOrderAsync(orderId, cancellationToken);
+        }
+
         if (SelectedDecision?.EvidenceIds.FirstOrDefault() is string evidenceId)
         {
             SelectedEvidence = await _client.GetEvidenceAsync(evidenceId, cancellationToken);
@@ -256,22 +275,6 @@ public sealed class ShellViewModel : ObservableObject
         DraftStatus = "DRAFT — NOT ACTIVATED (duplicate, unsaved)";
     }
 
-    public IReadOnlyList<FieldError> ValidateInquiry() => DraftValidator.ValidateInquiry(Inquiry);
-
-    public async Task SaveInquiryAsync(CancellationToken cancellationToken = default)
-    {
-        var errors = ValidateInquiry();
-        if (errors.Count > 0)
-        {
-            DraftErrors = string.Join(Environment.NewLine, errors.Select(e => e.Field + ": " + e.Message));
-            return;
-        }
-
-        Inquiry = await _drafts.SaveInquiryAsync(Inquiry, Inquiry.Revision == 0 ? 0 : Inquiry.Revision, cancellationToken);
-        DraftStatus = $"{InquiryWord.ToUpperInvariant()} DRAFT — NOT ACTIVATED · revision {Inquiry.Revision}";
-        DraftErrors = "";
-    }
-
     public async Task ReopenNativeSessionAsync(CancellationToken cancellationToken = default)
     {
         if (_client is IAsyncDisposable disposable)
@@ -279,8 +282,7 @@ public sealed class ShellViewModel : ObservableObject
             await disposable.DisposeAsync().ConfigureAwait(false);
         }
 
-        _client = new PreviewOperatorClient(
-            ScenarioCatalog.Load(_fixturesRoot, "disconnected-drafts"), ApplicationMode.NativeConnection);
+        _client = new NativeOperatorClient(NativeOptions());
         Raise(nameof(Client));
         Raise(nameof(Mode));
         Raise(nameof(ModeBanner));
@@ -307,18 +309,40 @@ public sealed class ShellViewModel : ObservableObject
         return result;
     }
 
-    public Task<OperationResult> StartOfflineEngineRunAsync(CancellationToken cancellationToken = default)
+    public async Task<OperationResult> StartOfflineEngineRunAsync(CancellationToken cancellationToken = default)
     {
-        _ = cancellationToken;
-        var refused = new OperationResult(
-            "offline_demo.start",
-            "offline-demo",
-            OperationStatus.Unavailable,
-            null,
-            "The offline engine is not part of this build.",
-            false);
-        DisabledReason = refused.Detail;
-        return Task.FromResult(refused);
+        var advertised = Capabilities.Any(c =>
+            c.Id.Equals("offline_demo.start", StringComparison.OrdinalIgnoreCase)
+            || c.Id.Contains("offline_demo", StringComparison.OrdinalIgnoreCase));
+        if (Mode == ApplicationMode.NativeConnection && _client is NativeOperatorClient native && native.IsConnected && !advertised)
+        {
+            var refused = new OperationResult(
+                "offline_demo.start",
+                NativeOperatorClient.OfflineDemoIdempotencyKey,
+                OperationStatus.Unavailable,
+                null,
+                "Host has not advertised offline_demo.start. The desktop will not start a run from envelope reachability alone.",
+                false);
+            DisabledReason = refused.Detail;
+            return refused;
+        }
+
+        var result = await RequestHostOperationAsync("offline_demo.start", NativeOperatorClient.OfflineDemoIdempotencyKey, cancellationToken).ConfigureAwait(false);
+        await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        return result;
+    }
+
+    private NativeClientOptions NativeOptions()
+    {
+        var host = _hostProfileDirectory;
+        if (string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(_profileDirectory))
+        {
+            host = Path.Combine(_profileDirectory, "host");
+        }
+
+        return string.IsNullOrWhiteSpace(host)
+            ? NativeClientOptions.Disconnected
+            : new NativeClientOptions(host, "Sovereign.Desktop", AppVersion, _profileDirectory);
     }
 
     public SupportExportResult ExportSupport(string destinationZip, bool includePrivateDrafts = false)
@@ -326,7 +350,7 @@ public sealed class ShellViewModel : ObservableObject
         File.WriteAllText(Path.Combine(_profileDirectory, "app-version.json"),
             $$"""{"app":"{{AppDisplayName}}","version":"{{AppVersion}}","mode":"{{Mode}}"}""");
         File.WriteAllText(Path.Combine(_profileDirectory, "connection-state.json"),
-            $$"""{"mode":"{{Mode}}","backend":"{{Runtime?.BackendType}}","connected":false}""");
+            $$"""{"mode":"{{Mode}}","backend":"{{Runtime?.BackendType}}","connected":{{(_client is NativeOperatorClient n && n.IsConnected ? "true" : "false")}}}""");
         File.WriteAllText(Path.Combine(_profileDirectory, "last-client-errors.json"),
             $$"""{"last_error":{{System.Text.Json.JsonSerializer.Serialize(LastError)}}}""");
         File.WriteAllText(Path.Combine(_profileDirectory, "preferences.json"),
@@ -338,10 +362,8 @@ public sealed class ShellViewModel : ObservableObject
     {
         "activate-session" => "Activation is host-gated. No authenticated session grant is present.",
         "pause-session" => "Pause requires host capability PAUSE_NEW_RISK and an authenticated session.",
+        "submit-order" => "The desktop does not submit orders. Paper transport is a host responsibility.",
         "store-secret" => "Credential storage is a future host-backed function. Preview will not accept secrets.",
-        "start-" + InquiryWord + "-job" => Mode == ApplicationMode.DesktopPreview
-            ? "Preview can only show canned job states. It will not answer the typed question with fabricated " + InquiryWord + "."
-            : "Real model/provider execution is unavailable until a verified host job API exists.",
         _ => "Unsupported action: " + operation
     };
 
@@ -355,8 +377,7 @@ public sealed class ShellViewModel : ObservableObject
         int? sector,
         long? cashFloor,
         int? turnover,
-        string? sourcesCsv,
-        long? budget)
+        string? sourcesCsv)
     {
         Mandate = Mandate with
         {
@@ -369,21 +390,7 @@ public sealed class ShellViewModel : ObservableObject
             SectorCapBps = sector,
             CashFloorMinorUnits = cashFloor,
             TurnoverBps = turnover,
-            AllowedSources = Split(sourcesCsv),
-            InquiryBudgetMinorUnits = budget
-        };
-    }
-
-    public void SetInquiryFields(string name, string? question, string? sourcesCsv, string? skillsCsv, string? horizon, long? budget)
-    {
-        Inquiry = Inquiry with
-        {
-            Name = name,
-            Question = EmptyToNull(question),
-            Sources = Split(sourcesCsv),
-            Skills = Split(skillsCsv),
-            Horizon = EmptyToNull(horizon),
-            BudgetMinorUnits = budget
+            AllowedSources = Split(sourcesCsv)
         };
     }
 
@@ -414,21 +421,6 @@ public sealed class ShellViewModel : ObservableObject
         null,
         null,
         null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        "USD");
-
-    private static InquiryDraft NewInquiry() => new(
-        InquiryDraft.CurrentSchema,
-        InquiryWord + "-default",
-        0,
-        "Untitled " + InquiryWord,
-        DateTimeOffset.UnixEpoch,
-        ActivationStatus.DraftNotActivated,
         null,
         null,
         null,

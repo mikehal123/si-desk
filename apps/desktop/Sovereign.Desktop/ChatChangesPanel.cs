@@ -28,6 +28,7 @@ internal sealed partial class ChatConversation
 
     private void BuildChangesPanel()
     {
+        EnsureTeamBook();
         ConfigureTeamOption();
         _rightWidth = DeskLayoutStore.Load(_profileDirectory).RightPanel;
         _chatPage.ColumnDefinitions.Add(new ColumnDefinition());

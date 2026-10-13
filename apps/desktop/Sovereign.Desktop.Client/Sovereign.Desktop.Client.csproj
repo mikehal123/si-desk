@@ -6,6 +6,7 @@
     <Description>Operator client adapters, draft store, host framing. Views depend on IOperatorClient, not files or brokers.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="$(PrivateClientCompileRemove)" Condition="'$(PrivateClientCompileRemove)' != ''" />
     <InternalsVisibleTo Include="Sovereign.Desktop.Phone.Tests" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="PdfPig" />

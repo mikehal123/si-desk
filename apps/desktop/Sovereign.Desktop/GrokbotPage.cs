@@ -4,7 +4,13 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics.Imaging;
+using Windows.Storage;
+using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -54,6 +60,8 @@ public sealed partial class MainWindow
     private readonly List<Storyboard> _grokbotDotMotion = [];
     private readonly HashSet<string> _grokbotAnnouncedReplies = new(StringComparer.Ordinal);
     private readonly GrokbotAppToaster _grokbotToaster = new();
+    private readonly Image _grokbotPendingView = new() { MaxWidth = 160, MaxHeight = 96, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
+    private byte[]? _grokbotImage;
 
     internal GrokbotMailbox GrokbotMail => _grokbotMail;
 
@@ -142,15 +150,34 @@ public sealed partial class MainWindow
         send.VerticalAlignment = VerticalAlignment.Center;
         send.HorizontalAlignment = HorizontalAlignment.Right;
         _grokbotInput.PreviewKeyDown += GrokbotInputKeyDown;
+        _grokbotInput.Paste += async (_, e) =>
+        {
+            e.Handled = true;
+            await PasteGrokbotAsync();
+        };
         _grokbotInput.BorderThickness = new Thickness(0);
         _grokbotInput.BorderBrush = DeskTheme.Transparent;
         _grokbotInput.Background = DeskTheme.Transparent;
         _grokbotInput.VerticalAlignment = VerticalAlignment.Center;
+        var attach = DeskButton("Image");
+        attach.MinHeight = 28;
+        attach.Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space4, DeskTheme.Space12, DeskTheme.Space4);
+        attach.VerticalAlignment = VerticalAlignment.Center;
+        AutomationName(attach, "Attach image");
+        attach.Click += async (_, _) =>
+        {
+            attach.IsEnabled = false;
+            try { await PickGrokbotImageAsync(); }
+            finally { attach.IsEnabled = true; }
+        };
         var inputGrid = new Grid { ColumnSpacing = DeskTheme.Space8 };
         inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         inputGrid.Children.Add(_grokbotInput);
-        Grid.SetColumn(send, 1);
+        Grid.SetColumn(attach, 1);
+        inputGrid.Children.Add(attach);
+        Grid.SetColumn(send, 2);
         inputGrid.Children.Add(send);
         var rounded = new Border
         {
@@ -171,9 +198,14 @@ public sealed partial class MainWindow
         composerRow.Children.Add(rounded);
         Grid.SetColumn(_grokbotAsk, 1);
         composerRow.Children.Add(_grokbotAsk);
-        var composer = new StackPanel { Spacing = DeskTheme.Space8, Children = { _grokbotHint, composerRow, _grokbotStop } };
+        AutomationName(_grokbotPendingView, "Grokbot attached image");
+        var composer = new StackPanel { Spacing = DeskTheme.Space8, Children = { _grokbotHint, _grokbotPendingView, composerRow, _grokbotStop } };
         Grid.SetRow(composer, 3);
         _grokbotPage.Children.Add(composer);
+        EnableGrokbotDrop(_grokbotPage);
+        EnableGrokbotDrop(_grokbotMessages);
+        EnableGrokbotDrop(_grokbotInput);
+        EnableGrokbotDrop(rounded);
         _grokbotTimer.Tick += (_, _) => TickGrokbot();
         _grokbotTimer.Start();
         Activated += (_, args) =>
@@ -290,8 +322,13 @@ public sealed partial class MainWindow
     {
         try
         {
-            var mail = _grokbotMail.Queue(_grokbotInput.Text ?? "", _grokbotAsk.IsOn);
+            var pending = _grokbotImage;
+            var mail = pending is null
+                ? _grokbotMail.Queue(_grokbotInput.Text ?? "", _grokbotAsk.IsOn)
+                : _grokbotMail.Queue(_grokbotInput.Text ?? "", _grokbotAsk.IsOn, pending);
             _grokbotInput.Text = "";
+            _grokbotImage = null;
+            ShowGrokbotPending();
             _grokbotHint.Text = "";
             PaintGrokbot();
             ScheduleGrokbotWake(mail);
@@ -329,7 +366,7 @@ public sealed partial class MainWindow
             };
             var bar = GrokTuiPresentation.UserBar(mail.Text, mail.Created.ToLocalTime());
             var footer = bar.Time + " · " + status + (mail.AskToAct ? " · Act on" : "");
-            _grokbotMessages.Children.Add(GrokbotMine(bar.Text, footer, mail.WakeNote));
+            _grokbotMessages.Children.Add(GrokbotMine(bar.Text, footer, mail.WakeNote, mail.Image));
             if (!string.IsNullOrWhiteSpace(mail.Reply))
             {
                 var when = mail.AnsweredAt?.ToLocalTime() ?? mail.Created.ToLocalTime();
@@ -366,9 +403,9 @@ public sealed partial class MainWindow
 
     private const double GrokbotBubbleMaxWidth = 520;
 
-    private static UIElement GrokbotMine(string text, string footer, string? note)
+    private static UIElement GrokbotMine(string text, string footer, string? note, byte[]? image)
     {
-        var column = GrokbotBubbleColumn(text, footer, true);
+        var column = GrokbotBubbleColumn(text, footer, true, image);
         if (!string.IsNullOrWhiteSpace(note))
         {
             column.Children.Add(new TextBlock
@@ -500,7 +537,7 @@ public sealed partial class MainWindow
         var id = mail.Id;
         copy.Click += (_, _) => CopyGrokbotReply(reply, id);
         AutomationName(copy, "Copy Grokbot reply");
-        var like = GrokbotActionButton("Like", mail.Liked);
+        var like = GrokbotActionButton(mail.Liked ? "Liked" : "Like", mail.Liked);
         var liked = mail.Liked;
         like.Click += (_, _) =>
         {
@@ -570,7 +607,7 @@ public sealed partial class MainWindow
         });
     }
 
-    private static StackPanel GrokbotBubbleColumn(string text, string footer, bool mine)
+    private static StackPanel GrokbotBubbleColumn(string text, string footer, bool mine, byte[]? image = null)
     {
         var align = mine ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         var body = new TextBlock
@@ -583,6 +620,13 @@ public sealed partial class MainWindow
             Foreground = DeskTheme.Text,
             MaxWidth = GrokbotBubbleMaxWidth
         };
+        UIElement bubbleChild = body;
+        if (mine && image is { Length: > 0 })
+        {
+            var thumb = GrokbotThumbnail(image);
+            if (thumb is not null)
+                bubbleChild = new StackPanel { Spacing = DeskTheme.Space8, Children = { thumb, body } };
+        }
         var bubble = new Border
         {
             Background = mine ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 36, 36, 42)) : DeskTheme.Surface,
@@ -592,7 +636,7 @@ public sealed partial class MainWindow
             CornerRadius = new CornerRadius(DeskTheme.Radius10),
             HorizontalAlignment = align,
             MaxWidth = GrokbotBubbleMaxWidth,
-            Child = body
+            Child = bubbleChild
         };
         var meta = new TextBlock
         {
@@ -673,7 +717,7 @@ public sealed partial class MainWindow
         try
         {
             using var handler = new HttpClientHandler { AllowAutoRedirect = false };
-            note = (await GrokbotWake.DeliverAsync(handler, url, key, call.MessageId, call.Act, preview, ct, swarmId: call.SwarmId, taskId: call.TaskId, title: call.Title, details: call.Details).ConfigureAwait(false)).Note;
+            note = (await GrokbotWake.DeliverAsync(handler, url, key, call.MessageId, call.Act, preview, ct, swarmId: call.SwarmId, taskId: call.TaskId, title: call.Title, details: call.Details, runId: call.RunId).ConfigureAwait(false)).Note;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -685,5 +729,251 @@ public sealed partial class MainWindow
         catch (Exception) { }
         try { DispatcherQueue.TryEnqueue(RefreshGrokbot); }
         catch (Exception) { }
+    }
+
+    private void EnableGrokbotDrop(UIElement element)
+    {
+        element.AllowDrop = true;
+        element.DragOver += GrokbotDragOver;
+        element.Drop += GrokbotDrop;
+    }
+
+    private static void GrokbotDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        e.Handled = true;
+    }
+
+    private async void GrokbotDrop(object sender, DragEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        try
+        {
+            e.Handled = true;
+            if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+            var items = await e.DataView.GetStorageItemsAsync();
+            var files = items.OfType<StorageFile>().ToList();
+            if (files.Count == 0)
+            {
+                _grokbotHint.Text = "wrong type";
+                return;
+            }
+            foreach (var file in files) await AcceptGrokbotFileAsync(file);
+        }
+        catch { _grokbotHint.Text = "wrong type"; }
+        finally { deferral.Complete(); }
+    }
+
+    private async Task PickGrokbotImageAsync()
+    {
+        try
+        {
+            var picker = new FileOpenPicker();
+            picker.FileTypeFilter.Add(".png");
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".webp");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSingleFileAsync();
+            if (file is null) return;
+            await AcceptGrokbotFileAsync(file);
+        }
+        catch { _grokbotHint.Text = "wrong type"; }
+    }
+
+    private async Task PasteGrokbotAsync()
+    {
+        var original = _grokbotInput.Text;
+        var start = _grokbotInput.SelectionStart;
+        var length = _grokbotInput.SelectionLength;
+        bool Unchanged() => _grokbotInput.Text == original && _grokbotInput.SelectionStart == start && _grokbotInput.SelectionLength == length;
+        try
+        {
+            var data = await ChatClipboard.ReadAsync(_grokbotInput.DispatcherQueue);
+            if (!Unchanged()) return;
+            if (data.Contains(StandardDataFormats.StorageItems))
+            {
+                var items = await data.GetStorageItemsAsync();
+                var files = items.OfType<StorageFile>().ToList();
+                if (!Unchanged()) return;
+                if (files.Count > 0)
+                {
+                    foreach (var file in files) await AcceptGrokbotFileAsync(file);
+                    return;
+                }
+            }
+            if (data.Contains(StandardDataFormats.Bitmap))
+            {
+                if (!Unchanged()) return;
+                using var stream = await (await data.GetBitmapAsync()).OpenReadAsync();
+                var png = await PrepareGrokbotPngAsync(stream, ".png", clipboard: true, (long)stream.Size);
+                if (png is null) return;
+                KeepGrokbotImage(png);
+                return;
+            }
+            if (!data.Contains(StandardDataFormats.Text)) return;
+            var text = await data.GetTextAsync();
+            if (!Unchanged()) return;
+            _grokbotInput.SelectedText = text;
+            var inserted = _grokbotInput.Text.Length - (original.Length - length);
+            _grokbotInput.Select(start + inserted, 0);
+        }
+        catch
+        {
+            if (_grokbotHint.Text.Length == 0) _grokbotHint.Text = "Clipboard is busy. Try pasting again.";
+        }
+    }
+
+    private async Task AcceptGrokbotFileAsync(StorageFile file)
+    {
+        var type = file.FileType;
+        var typed = GrokbotImage.Reject(type, false, false, 0, 0, 0, 0);
+        if (typed is not null)
+        {
+            _grokbotHint.Text = typed;
+            return;
+        }
+        var props = await file.GetBasicPropertiesAsync();
+        var sourceBytes = (long)props.Size;
+        var sized = GrokbotImage.Reject(type, false, false, sourceBytes, 0, 0, 0);
+        if (sized is not null)
+        {
+            _grokbotHint.Text = sized;
+            return;
+        }
+        using var stream = await file.OpenAsync(FileAccessMode.Read);
+        var png = await PrepareGrokbotPngAsync(stream, type, clipboard: false, sourceBytes);
+        if (png is null) return;
+        KeepGrokbotImage(png);
+    }
+
+    private async Task<byte[]?> PrepareGrokbotPngAsync(IRandomAccessStream stream, string? type, bool clipboard, long sourceBytes)
+    {
+        if (clipboard)
+        {
+            var sized = GrokbotImage.Reject(".png", true, true, sourceBytes, 0, 0, 0);
+            if (sized is not null)
+            {
+                _grokbotHint.Text = sized;
+                return null;
+            }
+        }
+        BitmapDecoder decoder;
+        try
+        {
+            stream.Seek(0);
+            decoder = await BitmapDecoder.CreateAsync(stream);
+        }
+        catch
+        {
+            _grokbotHint.Text = GrokbotImage.Reject(type, clipboard, false, sourceBytes, 0, 0, 0) ?? "wrong type";
+            return null;
+        }
+        var width = (int)decoder.PixelWidth;
+        var height = (int)decoder.PixelHeight;
+        if (width < 1 || height < 1)
+        {
+            _grokbotHint.Text = "wrong type";
+            return null;
+        }
+        var beforeScale = clipboard
+            ? GrokbotImage.Reject(".png", true, true, sourceBytes, width, height, 0)
+            : GrokbotImage.Reject(type, false, false, sourceBytes, width, height, 0);
+        if (beforeScale is not null)
+        {
+            _grokbotHint.Text = beforeScale;
+            return null;
+        }
+        byte[] png;
+        try { png = await EncodeGrokbotPngAsync(decoder, width, height); }
+        catch
+        {
+            _grokbotHint.Text = "wrong type";
+            return null;
+        }
+        var encodedAsPng = GrokbotImage.IsPng(png);
+        var after = GrokbotImage.Reject(clipboard ? ".png" : type, clipboard, encodedAsPng, sourceBytes, width, height, png.Length);
+        if (after is not null)
+        {
+            _grokbotHint.Text = after;
+            return null;
+        }
+        return png;
+    }
+
+    private static async Task<byte[]> EncodeGrokbotPngAsync(BitmapDecoder decoder, int width, int height)
+    {
+        var scale = GrokbotImage.Scale(width, height);
+        var scaledWidth = Math.Max(1u, (uint)(width * scale));
+        var scaledHeight = Math.Max(1u, (uint)(height * scale));
+        var pixels = await decoder.GetPixelDataAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, new BitmapTransform { ScaledWidth = scaledWidth, ScaledHeight = scaledHeight }, ExifOrientationMode.IgnoreExifOrientation, ColorManagementMode.ColorManageToSRgb);
+        using var output = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
+        encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, scaledWidth, scaledHeight, 96, 96, pixels.DetachPixelData());
+        await encoder.FlushAsync();
+        output.Seek(0);
+        using var result = new MemoryStream();
+        await output.AsStreamForRead().CopyToAsync(result);
+        return result.ToArray();
+    }
+
+    private void KeepGrokbotImage(byte[] png)
+    {
+        _grokbotImage = png;
+        _grokbotHint.Text = "";
+        ShowGrokbotPending();
+    }
+
+    private void ShowGrokbotPending()
+    {
+        if (_grokbotImage is not { Length: > 0 } png)
+        {
+            _grokbotPendingView.Source = null;
+            _grokbotPendingView.Visibility = Visibility.Collapsed;
+            return;
+        }
+        try
+        {
+            _grokbotPendingView.Source = GrokbotPngSource(png);
+            _grokbotPendingView.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            _grokbotPendingView.Source = null;
+            _grokbotPendingView.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private static Image? GrokbotThumbnail(byte[] png)
+    {
+        try
+        {
+            var image = new Image
+            {
+                Source = GrokbotPngSource(png),
+                MaxWidth = GrokbotBubbleMaxWidth,
+                MaxHeight = 160,
+                Stretch = Stretch.Uniform
+            };
+            AutomationName(image, "Grokbot image");
+            return image;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static BitmapImage GrokbotPngSource(byte[] png)
+    {
+        var stream = new InMemoryRandomAccessStream();
+        var write = stream.AsStreamForWrite();
+        write.Write(png, 0, png.Length);
+        write.Flush();
+        stream.Seek(0);
+        var bitmap = new BitmapImage();
+        bitmap.SetSource(stream);
+        return bitmap;
     }
 }

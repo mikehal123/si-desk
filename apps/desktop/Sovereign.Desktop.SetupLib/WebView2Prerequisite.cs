@@ -35,7 +35,7 @@ public static class WebView2Prerequisite
                 return null;
             }
             Report("Microsoft Edge WebView2 Runtime is required. Setup will download Microsoft's signed Evergreen bootstrapper and install the runtime. Internet access is required; Windows may apply your organization's installation policy.");
-            temporary = Path.Combine(Path.GetTempPath(), "xAIDesk-WebView2-" + Guid.NewGuid().ToString("N"));
+            temporary = Path.Combine(Path.GetTempPath(), "xAI Desk-WebView2-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(temporary);
             var installer = Path.Combine(temporary, "MicrosoftEdgeWebview2Setup.exe");
             platform.DownloadBootstrapper(installer);

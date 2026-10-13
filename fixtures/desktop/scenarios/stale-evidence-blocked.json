@@ -58,7 +58,21 @@
     "presence": "known",
     "account_id": "preview-paper-a",
     "environment": "offline-preview",
+    "balance_basis": "journal-derived",
     "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 50000
+    },
+    "holdings": [],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 0
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [],
     "source_label": "journal-derived"
   },
   "decisions": [
@@ -69,6 +83,11 @@
       "quantity": {
         "presence": "known",
         "decimal": "10"
+      },
+      "price": {
+        "presence": "known",
+        "currency": "USD",
+        "minor_units": 1200
       },
       "evidence_ids": [
         "ev-aaa-admission"
@@ -89,9 +108,11 @@
         "verdict": "Blocked",
         "reason": "Admission failed."
       },
-      "observed_at": "2026-09-15T12:00:00Z"
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": null
     }
   ],
+  "orders": [],
   "events": [],
   "jobs": [],
   "capabilities": [
@@ -99,7 +120,7 @@
       "id": "rig.search_desk_knowledge",
       "version": "planned",
       "status": "planned",
-      "provider": "host-inquiry-worker",
+      "provider": "host-lookup-worker",
       "permission_scope": "read-approved-library",
       "required_capabilities": [
         "library-read"
@@ -108,6 +129,21 @@
       "cost_status": "unknown",
       "last_outcome": null,
       "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
     }
   ],
   "evidence": [
@@ -121,7 +157,7 @@
         "http"
       ],
       "source_uris": [
-        "https://example.invalid/inquiry/aaa",
+        "https://example.invalid/lookup/aaa",
         "javascript:alert(1)",
         "file:///C:/Windows/win.ini"
       ]

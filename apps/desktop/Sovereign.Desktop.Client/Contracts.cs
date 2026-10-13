@@ -15,8 +15,9 @@ public interface IOperatorClient
     Task<IReadOnlyList<DecisionRecord>> ListDecisionsAsync(string? query = null, DecisionAction? action = null, CancellationToken cancellationToken = default);
     Task<DecisionRecord?> GetDecisionAsync(string id, CancellationToken cancellationToken = default);
     Task<EvidenceDocument?> GetEvidenceAsync(string id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default);
+    Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<InquiryJob>> ListJobsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default);
     Task<EvaluationSummary> GetEvaluationAsync(CancellationToken cancellationToken = default);
     IAsyncEnumerable<ClientEvent> SubscribeAsync(string? resumeCursor, CancellationToken cancellationToken = default);
@@ -28,9 +29,6 @@ public interface IDraftStore
     Task<MandateDraft> SaveMandateAsync(MandateDraft draft, int? expectedRevision, CancellationToken cancellationToken = default);
     Task<MandateDraft?> LoadMandateAsync(string id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MandateDraft>> ListMandatesAsync(CancellationToken cancellationToken = default);
-    Task<InquiryDraft> SaveInquiryAsync(InquiryDraft draft, int? expectedRevision, CancellationToken cancellationToken = default);
-    Task<InquiryDraft?> LoadInquiryAsync(string id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<InquiryDraft>> ListInquiryAsync(CancellationToken cancellationToken = default);
     Task<SessionDraft> SaveSessionAsync(SessionDraft draft, int? expectedRevision, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SessionDraft>> ListSessionsAsync(CancellationToken cancellationToken = default);
 }

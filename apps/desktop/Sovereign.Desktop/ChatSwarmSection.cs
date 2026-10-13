@@ -493,7 +493,7 @@ internal sealed partial class ChatConversation
     }
 
     private static bool IsCursorWakeRole(string? role) =>
-        string.Equals(role, "grokbot-" + "resear" + "ch", StringComparison.OrdinalIgnoreCase)
+        string.Equals(role, "grokbot-research", StringComparison.OrdinalIgnoreCase)
         || string.Equals(role, "grokbot-ops", StringComparison.OrdinalIgnoreCase);
 
     private static string? AdvertisedName(IReadOnlyList<CursorChatModel> advertised, string id)

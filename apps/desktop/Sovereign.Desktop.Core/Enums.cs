@@ -80,6 +80,18 @@ public enum DecisionAction
     Abstain
 }
 
+public enum OrderLifecycle
+{
+    Unknown,
+    RequestAcceptedLocally,
+    SendAttempted,
+    BrokerAcknowledged,
+    PartialFill,
+    CancelPending,
+    Canceled,
+    Rejected
+}
+
 public enum CycleTiming
 {
     Unknown,
@@ -131,9 +143,9 @@ public static class ModeLabels
 {
     public static string Banner(ApplicationMode mode) => mode switch
     {
-        ApplicationMode.DesktopPreview => "PREVIEW MODE - scenario data. Not a live account, not resea" + "rch, not a submission.",
+        ApplicationMode.DesktopPreview => "PREVIEW MODE - scenario data. Not a live account and not a submission.",
         ApplicationMode.EvidenceArchive => "ARCHIVE MODE - historical packet. Immutable. Not current authorization or current account.",
-        ApplicationMode.NativeConnection => "NATIVE CONNECTION — host is authoritative. Offline synthetic execution only. Not live trad" + "ing. Absence of host data is not preview data.",
+        ApplicationMode.NativeConnection => "NATIVE CONNECTION — host is authoritative. Offline synthetic execution only. Not a live market. Absence of host data is not preview data.",
         _ => "MODE UNKNOWN"
     };
 
@@ -147,9 +159,9 @@ public static class ModeLabels
 
     public static string OfflineDemoBanner(ApplicationMode mode) => mode switch
     {
-        ApplicationMode.DesktopPreview => "OFFLINE DEMO · DEMO FIXTURE · No live trad" + "ing",
+        ApplicationMode.DesktopPreview => "OFFLINE DEMO · DEMO FIXTURE · No live market",
         ApplicationMode.EvidenceArchive => "OFFLINE DEMO · EVIDENCE ARCHIVE · Read only",
-        ApplicationMode.NativeConnection => "OFFLINE DEMO · NATIVE SYNTHETIC · No live trad" + "ing",
+        ApplicationMode.NativeConnection => "OFFLINE DEMO · NATIVE SYNTHETIC · No live market",
         _ => "OFFLINE DEMO · MODE UNKNOWN"
     };
 }

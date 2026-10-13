@@ -24,10 +24,10 @@ public sealed class SwarmModelHireTests
         var catalog = SwarmModelHire.Catalog(models, "grok-4.7");
         Assert.Contains("engineer modelId: fable-5.1", catalog);
         Assert.Contains("verifier modelId: opus-5.5", catalog);
-        Assert.Contains("resear" + "cher modelId: gemini-3.8-flash", catalog);
+        Assert.Contains("researcher modelId: gemini-3.8-flash", catalog);
         Assert.Contains("investigator modelId: gemini-3.8-flash", catalog);
         Assert.Contains("- fable-5.1 | Claude Fable 5.1", catalog);
-        Assert.Contains("grokbot-" + "resear" + "ch and grokbot-ops stay wake roles", catalog);
+        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", catalog);
         Assert.DoesNotContain("Claude Fable 5.1 modelId", catalog);
     }
 
@@ -38,7 +38,7 @@ public sealed class SwarmModelHireTests
         var catalog = SwarmModelHire.Catalog(models, "fable-5.1");
         Assert.Contains("engineer modelId: fable-5.1", catalog);
         Assert.Contains("verifier modelId: (none)", catalog);
-        Assert.Contains("resear" + "cher modelId: fable-5.1", catalog);
+        Assert.Contains("researcher modelId: fable-5.1", catalog);
     }
 
     [Fact]

@@ -8,10 +8,10 @@ public sealed class PreviewOperatorClient : IOperatorClient
     private readonly EventInbox _inbox;
     private readonly OperationGuard _guard = new();
 
-    public PreviewOperatorClient(Scenarios.ScenarioDocument scenario, ApplicationMode mode = ApplicationMode.DesktopPreview)
+    public PreviewOperatorClient(Scenarios.ScenarioDocument scenario)
     {
         _scenario = scenario;
-        Mode = mode;
+        Mode = ApplicationMode.DesktopPreview;
         ScenarioId = scenario.ScenarioId;
         _inbox = EventInbox.From(_scenario.Events);
     }
@@ -54,11 +54,14 @@ public sealed class PreviewOperatorClient : IOperatorClient
     public Task<EvidenceDocument?> GetEvidenceAsync(string id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Evidence.FirstOrDefault(e => e.Id == id));
 
+    public Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenario.Orders);
+
+    public Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenario.Orders.FirstOrDefault(o => o.Id == id));
+
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_inbox.Snapshot());
-
-    public Task<IReadOnlyList<InquiryJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Jobs);
 
     public Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Capabilities);
@@ -179,11 +182,14 @@ public sealed class ArchiveOperatorClient : IOperatorClient
         return Task.FromResult<EvidenceDocument?>(null);
     }
 
+    public Task<IReadOnlyList<OrderRecord>> ListOrdersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenario.Orders);
+
+    public Task<OrderRecord?> GetOrderAsync(string id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenario.Orders.FirstOrDefault(o => o.Id == id));
+
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Events);
-
-    public Task<IReadOnlyList<InquiryJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(_scenario.Jobs);
 
     public Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Capabilities);

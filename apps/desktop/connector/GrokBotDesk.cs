@@ -297,6 +297,6 @@ public interface IGrokBotDesk
     string GrokbotKey(string keys);
     string GrokbotNavigate(string page);
     void RecordGrokbotTool(string tool, string args, string result);
-    string ReadSwarmBoard(string? swarmId);
-    string SubmitSwarmResult(string taskId, string result, string proof);
+    string ReadSwarmBoard(string? swarmId, string? runId = null);
+    string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null);
 }

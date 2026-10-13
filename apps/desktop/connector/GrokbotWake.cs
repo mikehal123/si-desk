@@ -29,7 +29,7 @@ public static class GrokbotWake
     public static async Task<string> PostAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null) =>
         (await DeliverAsync(handler, url, bearer, messageId, act, preview, ct, delay).ConfigureAwait(false)).Note;
 
-    public static async Task<GrokbotWakeReceipt> DeliverAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null, string? swarmId = null, string? taskId = null, string? title = null, string? details = null)
+    public static async Task<GrokbotWakeReceipt> DeliverAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null, string? swarmId = null, string? taskId = null, string? title = null, string? details = null, string? runId = null)
     {
         ArgumentNullException.ThrowIfNull(handler);
         if (string.IsNullOrWhiteSpace(url)) return new GrokbotWakeReceipt("Wake webhook URL is not set.", null);
@@ -43,7 +43,8 @@ public static class GrokbotWake
             swarmId is null ? null : swarmId,
             swarmId is null ? null : taskId,
             swarmId is null ? null : title,
-            swarmId is null ? null : details));
+            swarmId is null ? null : details,
+            swarmId is null ? null : runId));
         var pause = delay ?? DefaultDelay;
         using var client = new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(20) };
         var error = "Wake failed.";
@@ -120,10 +121,12 @@ public static class GrokbotWake
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [property: JsonPropertyName("title")] string? Title = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [property: JsonPropertyName("details")] string? Details = null);
+        [property: JsonPropertyName("details")] string? Details = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [property: JsonPropertyName("run_id")] string? RunId = null);
 }
 
-public sealed record GrokbotWakeCall(string MessageId, bool Act, string Preview, string? SwarmId = null, string? TaskId = null, string? Title = null, string? Details = null);
+public sealed record GrokbotWakeCall(string MessageId, bool Act, string Preview, string? SwarmId = null, string? TaskId = null, string? Title = null, string? Details = null, string? RunId = null);
 
 /// <summary>Trailing debounce for wake pings. <see cref="FlushAsync"/> sends the latest call without waiting out the quiet period.</summary>
 public sealed class GrokbotWakeDebounce

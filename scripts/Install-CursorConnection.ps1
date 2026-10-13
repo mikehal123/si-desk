@@ -2,7 +2,7 @@ param([string]$ArchivePath)
 $ErrorActionPreference='Stop'
 $version='2026.09.23-86fc751'
 $hash='9c7232600ca77e7a6327dc9a0036277bd57b66923c6b65fc7abe9d957eb728e2'
-$root=Join-Path $env:LOCALAPPDATA 'xAIDesk\Tools\CursorAgent'
+$root=Join-Path $env:LOCALAPPDATA 'SovereignAI.Tools\CursorAgent'
 $target=Join-Path $root $version
 if(Test-Path -LiteralPath $target) { throw "Cursor runtime already exists at $target. It was not overwritten." }
 New-Item -ItemType Directory -Path $root -Force | Out-Null
@@ -21,4 +21,4 @@ $allowed=[IO.Path]::GetFullPath($root).TrimEnd('\')+'\'
 foreach($path in @($extract,$target)) { if(![IO.Path]::GetFullPath($path).StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime path escapes tools directory.' } }
 Move-Item -LiteralPath $extract -Destination $target
 @{ version=$version; source="https://downloads.cursor.com/lab/$version/windows/x64/agent-cli-package.zip"; archive_sha256=$hash } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $target 'installation.json') -Encoding UTF8
-Write-Host 'Cursor connection installed. Open xAI Desk, New chat, Cursor, then Sign in with Cursor. Uses your own Cursor account and limits. No PATH changes.'
+Write-Host 'Cursor connection installed. Open Sovereign, New chat, Cursor, then Sign in with Cursor. Uses your own Cursor account and limits. No PATH changes.'

@@ -11,15 +11,19 @@ public sealed partial class MainWindow
 {
     private readonly TextBlock _pageTitle = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
     private readonly TextBlock _pageSubtitle = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _cashValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
+    private readonly TextBlock _equityValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
+    private readonly TextBlock _ordersValue = new() { FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeTitle, Foreground = DeskTheme.Text };
     private readonly TextBlock _emptyState = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(DeskTheme.Space16), FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Muted };
     private readonly StackPanel _draftPanel = new() { Spacing = DeskTheme.Space12 };
     private readonly StackPanel _inspectorPanel = new() { Spacing = DeskTheme.Space12 };
     private readonly StackPanel _settingsPanel = new() { Spacing = DeskTheme.Space12 };
     private readonly StackPanel _runPanel = new() { Spacing = DeskTheme.Space12 };
-    private Grid? _recordToolbar = null;
-    private Grid? _metrics = null;
-    private Border? _inspectorCard = null;
-    private ColumnDefinition? _inspectorColumn = null;
+    private Grid? _recordToolbar;
+    private Grid? _metrics;
+    private Border? _inspectorCard;
+    private ColumnDefinition? _inspectorColumn;
+    private Button? _runButton;
     private string _boundNav = "";
 
     internal static SolidColorBrush Ink(byte r, byte g, byte b) => new(Windows.UI.Color.FromArgb(255, r, g, b));
@@ -57,8 +61,13 @@ public sealed partial class MainWindow
         return button;
     }
 
-    private Grid BuildShell()
+    private Grid BuildShell(Button filter, Button save, Button dup, Button pause, Button activate, Button openUri, Button export, Button offline)
     {
+        _runButton = offline;
+        offline.HorizontalAlignment = HorizontalAlignment.Stretch;
+        offline.Background = DeskTheme.Raised;
+        offline.Foreground = DeskTheme.Text;
+        offline.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
         _banner.Foreground = DeskTheme.Muted;
         _banner.FontSize = DeskTheme.SizeCaption;
         _account.Foreground = DeskTheme.Muted;
@@ -117,22 +126,67 @@ public sealed partial class MainWindow
         navPanel.Children.Add(brand);
         navPanel.Children.Add(_nav);
         navPanel.Children.Add(BuildChatRecents());
-        var accountName = new TextBlock { Text = "Settings", FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, TextTrimming = TextTrimming.CharacterEllipsis, MaxLines = 1, VerticalAlignment = VerticalAlignment.Center };
-        var accountInitial = new TextBlock { Text = "x", FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        _accountName.FontFamily = DeskTheme.UiFont; _accountName.FontSize = DeskTheme.SizeBody; _accountName.Foreground = DeskTheme.Text;
+        _accountName.TextTrimming = TextTrimming.CharacterEllipsis; _accountName.MaxLines = 1;
+        _accountInitial.FontFamily = DeskTheme.UiFont; _accountInitial.FontSize = DeskTheme.SizeBody; _accountInitial.Foreground = DeskTheme.Text;
         var identity = new Grid { ColumnSpacing = DeskTheme.Space12 };
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         identity.ColumnDefinitions.Add(new ColumnDefinition());
-        identity.Children.Add(new Border { Background = DeskTheme.Raised, CornerRadius = new CornerRadius(DeskTheme.Radius6), Width = DeskTheme.Space24 + DeskTheme.Space8, Height = DeskTheme.Space24 + DeskTheme.Space8, Child = accountInitial });
-        Grid.SetColumn(accountName, 1); identity.Children.Add(accountName);
+        identity.Children.Add(new Border { Background = DeskTheme.Raised, CornerRadius = new CornerRadius(DeskTheme.Radius6), Width = DeskTheme.Space24 + DeskTheme.Space8, Height = DeskTheme.Space24 + DeskTheme.Space8, Child = _accountInitial });
+        Grid.SetColumn(_accountName, 1); identity.Children.Add(_accountName);
         var navGrid = new Grid(); navGrid.RowDefinitions.Add(new RowDefinition()); navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         navGrid.Children.Add(new ScrollViewer { Content = navPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         var profileButton = new Button { Content = identity, Background = DeskTheme.Transparent, BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(DeskTheme.Radius6), Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space8, DeskTheme.Space12, DeskTheme.Space8), Margin = new Thickness(DeskTheme.Space8), HorizontalContentAlignment = HorizontalAlignment.Stretch, UseSystemFocusVisuals = true };
-        profileButton.Click += (_,_) => Navigate("settings"); AutomationName(profileButton,"Your xAI Desk account");
+        profileButton.Click += (_,_) => ShowAccountDialog(); AutomationName(profileButton,"Your xAI Desk account");
         var profileRow = new Border { BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0, 1, 0, 0), Child = profileButton };
         Grid.SetRow(profileRow, 1); navGrid.Children.Add(profileRow);
         var sidebar = new Border { Background = DeskTheme.Background, BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0,0,1,0), Child = navGrid };
 
+        var pageHeading = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { Glyph("\uE8A5"), _pageTitle } };
+        _metrics = new Grid { ColumnSpacing = DeskTheme.Space12, Margin = new Thickness(0, DeskTheme.Space16, 0, DeskTheme.Space16) };
+        var metrics = new[] { ("Available cash", _cashValue), ("Portfolio equity", _equityValue), ("Recorded orders", _ordersValue) };
+        for(var i=0;i<metrics.Length;i++)
+        {
+            _metrics.ColumnDefinitions.Add(new ColumnDefinition());
+            var card=Card(new StackPanel { Spacing = DeskTheme.Space4, Children = { Note(metrics[i].Item1), metrics[i].Item2 } });
+            Grid.SetColumn(card,i); _metrics.Children.Add(card);
+        }
+        _recordToolbar = new Grid { ColumnSpacing = DeskTheme.Space8, Margin = new Thickness(0,0,0,DeskTheme.Space8) };
+        _recordToolbar.ColumnDefinitions.Add(new ColumnDefinition()); _recordToolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(filter,1); _recordToolbar.Children.Add(_search); _recordToolbar.Children.Add(filter);
+        var recordGrid = new Grid(); recordGrid.Children.Add(_main); recordGrid.Children.Add(_emptyState);
+        var records=Card(recordGrid); records.MinHeight=220; records.VerticalAlignment=VerticalAlignment.Stretch;
+        var page=new Grid { RowSpacing=DeskTheme.Space8 };
+        for(var i=0;i<5;i++) page.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition());
+        FrameworkElement[] parts=[pageHeading,_pageSubtitle,_metrics,_recordToolbar,_banner,records];
+        for(var i=0;i<parts.Length;i++){Grid.SetRow(parts[i],i);page.Children.Add(parts[i]);}
+
+        _draftPanel.Children.Add(Head("Mandate draft"));
+        _draftPanel.Children.Add(Note("Saved for review, never activated. 100 basis points = 1%; USD minor units are cents."));
+        foreach(var field in new TextBox[] { _name,_universe,_horizon,_schedule,_timezone,_conc,_sector,_cash,_turnover,_sources }) _draftPanel.Children.Add(field);
+        foreach(var control in new UIElement[] { save,dup,_draftStatus,_draftError }) _draftPanel.Children.Add(control);
+        foreach(var control in new UIElement[] { Head("Selected record"),_detail,Head("Supporting evidence"),_evidence,openUri }) _inspectorPanel.Children.Add(control);
+        foreach(var control in new UIElement[] { Head("Workspace settings"),_modes,_scenarios,Note("Preview uses fixtures. Archive is read-only. Native uses the installed engine."),Head("Connection diagnostics"),_engine,_provider,_broker,_recon,_auth,_status,_account,_hint,Head("Host controls"),pause,activate,Head("Support"),export,_export }) _settingsPanel.Children.Add(control);
+        var engineStatus = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { _connectionDot, Note("Offline engine. This dot is not your Sovereign account.") } };
+        foreach(var control in new UIElement[] { Head("Offline engine"), engineStatus, Note("A three-cycle demonstration with synthetic data. No broker or live account."),offline,_host }) _runPanel.Children.Add(control);
+        var refresh=Button("Refresh data",async()=>{await _vm.RefreshAsync();BindHeader();BindList();});
+        refresh.Background=DeskTheme.Raised;refresh.HorizontalAlignment=HorizontalAlignment.Stretch;
+        _runPanel.Children.Add(refresh); _runPanel.Children.Add(Note("Starting again recovers the same run. Trading authority: none."));
+        _homeActions.Children.Add(Head("Open a system"));
+        foreach (var target in XaiDeskIdentity.Navigation)
+        { var link=target; _homeActions.Children.Add(Button(Label(link),()=>Navigate(link))); }
         BuildSettingsPage();
+        var inspector=new StackPanel { Spacing=DeskTheme.Space16,Children={_homeActions,_runPanel,_inspectorPanel,_draftPanel,_settingsPanel} };
+        _inspectorCard=Card(new ScrollViewer { Content=inspector,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollMode=ScrollMode.Enabled });
+        _inspectorCard.VerticalAlignment=VerticalAlignment.Top;_inspectorCard.MinHeight=300;_inspectorCard.MaxHeight=650;
+        var workspace=new Grid { Padding = new Thickness(DeskTheme.Space24),ColumnSpacing=DeskTheme.Space24 };
+        workspace.SizeChanged += (_, e) => { if (_inspectorCard is not null) _inspectorCard.MaxHeight = Math.Max(220, e.NewSize.Height - 48); };
+        workspace.ColumnDefinitions.Add(new ColumnDefinition());_inspectorColumn=new ColumnDefinition { Width=new GridLength(300) };workspace.ColumnDefinitions.Add(_inspectorColumn);
+        Grid.SetColumn(_inspectorCard,1);workspace.Children.Add(page);workspace.Children.Add(_inspectorCard);
+        var content=new Grid { Visibility = Visibility.Collapsed };
+        content.Children.Add(PageScroll(workspace, minimumWidth: 760, fillHeight: true));
+        _workspaceContent = content;
         BuildChatPage();
         BuildRoomPage();
         App.CrashLog("before BuildGrokbotPage");
@@ -146,7 +200,7 @@ public sealed partial class MainWindow
             throw;
         }
         App.CrashLog("after BuildGrokbotPage");
-        var contentHost = new Grid(); contentHost.Children.Add(PageScroll(_chatPage, minimumWidth: 620, fillHeight: true));
+        var contentHost = new Grid(); contentHost.Children.Add(content); contentHost.Children.Add(PageScroll(_chatPage, minimumWidth: 620, fillHeight: true));
         contentHost.Children.Add(PageScroll(_roomPage, minimumWidth: 900, fillHeight: true));
         App.CrashLog("before grokbot PageScroll");
         contentHost.Children.Add(PageScroll(_grokbotPage, minimumWidth: 620, fillHeight: true));
@@ -157,7 +211,7 @@ public sealed partial class MainWindow
         _systemTabs.Spacing = DeskTheme.Space8;
         var tabScroll=new ScrollViewer { Content=_systemTabs, HorizontalScrollBarVisibility=ScrollBarVisibility.Auto, VerticalScrollBarVisibility=ScrollBarVisibility.Disabled, HorizontalScrollMode=ScrollMode.Enabled, Margin = new Thickness(DeskTheme.Space24,DeskTheme.Space8,DeskTheme.Space24,0) };
         App.CrashLog("before control banner");
-        var banners = new StackPanel { Children = { _grokbotControlBanner } };
+        var banners = new StackPanel { Children = { _updateBanner, _grokbotControlBanner } };
         App.CrashLog("after control banner");
         systemHost.Children.Add(banners); Grid.SetRow(tabScroll,1); systemHost.Children.Add(tabScroll); Grid.SetRow(contentHost,2); systemHost.Children.Add(contentHost);
         var layout = DeskLayoutStore.Load(_vm.ProfileDirectory);
@@ -251,6 +305,9 @@ public sealed partial class MainWindow
             _ => "PREVIEW"
         };
         _account.Text = _vm.Account.IsKnown ? "Run loaded · " + _vm.Account.Value!.AccountId : "Inspect connection details in Settings.";
+        _cashValue.Text = _vm.Account.IsKnown ? _vm.CashLabel : "—";
+        _equityValue.Text = _vm.Account.IsKnown ? _vm.EquityLabel : "—";
+        _ordersValue.Text = _vm.Account.IsKnown ? _vm.Orders.Count.ToString() : "—";
         var nav = CurrentSection;
         foreach (ListViewItem item in _nav.Items) ApplyNavigationPresentation(item);
         _pageTitle.Text = Label(nav);
@@ -263,18 +320,18 @@ public sealed partial class MainWindow
         };
         _draftPanel.Visibility = nav == "mandate" ? Visibility.Visible : Visibility.Collapsed;
         _settingsPanel.Visibility = nav == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        _inspectorPanel.Visibility = nav == "decisions" ? Visibility.Visible : Visibility.Collapsed;
+        _inspectorPanel.Visibility = nav is "decisions" or "orders" ? Visibility.Visible : Visibility.Collapsed;
         _runPanel.Visibility = nav is "overview" or "evaluation" ? Visibility.Visible : Visibility.Collapsed;
         _homeActions.Visibility = nav == "home" ? Visibility.Visible : Visibility.Collapsed;
         _banner.Visibility = Visibility.Collapsed;
         if (_inspectorColumn is not null && _inspectorCard is not null)
         {
-            var shown = nav is "home" or "overview" or "evaluation" or "decisions" or "mandate" or "connection";
+            var shown = nav is "home" or "overview" or "evaluation" or "decisions" or "orders" or "mandate" or "connection";
             _inspectorColumn.Width = new GridLength(shown ? 300 : 0);
             _inspectorCard.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         }
         if (_recordToolbar is not null) _recordToolbar.Visibility = nav == "decisions" ? Visibility.Visible : Visibility.Collapsed;
-        if (_metrics is not null) _metrics.Visibility = nav == "overview" ? Visibility.Visible : Visibility.Collapsed;
+        if (_metrics is not null) _metrics.Visibility = nav is "overview" or "portfolio" ? Visibility.Visible : Visibility.Collapsed;
         _emptyState.Visibility = _main.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _emptyState.Text = "No records in this view.";
         if (_boundNav != nav) { _detail.Text = "Select a record to inspect its details."; _evidence.Text = "No evidence selected."; _boundNav = nav; }

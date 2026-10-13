@@ -8,16 +8,15 @@ public sealed class GrokBuildConnectionTextTests
     [Fact]
     public void Format_success_includes_version_email_and_plan()
     {
-        const string account = "user at example.test";
-        var report = new GrokBuildStatusReport("1.2.3", account, "Free", null);
+        var report = new GrokBuildStatusReport("1.2.3", "ada@example.com", "Free", null);
         var text = GrokBuildConnectionText.Format(report);
 
         Assert.Contains("1.2.3", text, StringComparison.Ordinal);
-        Assert.Contains(account, text, StringComparison.Ordinal);
+        Assert.Contains("ada@example.com", text, StringComparison.Ordinal);
         Assert.Contains("Free", text, StringComparison.Ordinal);
-        Assert.Equal("grok 1.2.3 · signed in as " + account + " · plan Free", text);
-        var cliLine = GrokBuildConnectionText.Format(new GrokBuildStatusReport("grok 1.0.50 (c58f321264ba) [stable]", account, "unknown", null));
-        Assert.Equal("grok 1.0.50 (c58f321264ba) [stable] · signed in as " + account + " · plan unknown", cliLine);
+        Assert.Equal("grok 1.2.3 · signed in as ada@example.com · plan Free", text);
+        var cliLine = GrokBuildConnectionText.Format(new GrokBuildStatusReport("grok 1.0.50 (c58f321264ba) [stable]", "ada@example.com", "unknown", null));
+        Assert.Equal("grok 1.0.50 (c58f321264ba) [stable] · signed in as ada@example.com · plan unknown", cliLine);
     }
 
     [Fact]

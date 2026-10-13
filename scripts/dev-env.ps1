@@ -19,6 +19,19 @@ if (Test-Path -LiteralPath $local) {
         }
     }
 }
+if ($dotnet -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $dotnet) 'sdk'))) {
+    foreach ($candidate in @(
+        (Join-Path $env:USERPROFILE '.dotnet\dotnet.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe')
+    )) {
+        if (Test-Path -LiteralPath $candidate) {
+            $dotnet = $candidate
+            $env:DOTNET_ROOT = Split-Path -Parent $dotnet
+            $env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+            break
+        }
+    }
+}
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
 $env:DOTNET_NOLOGO = "1"
 if (-not $dotnet) {

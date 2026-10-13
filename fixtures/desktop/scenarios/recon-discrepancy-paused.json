@@ -1,0 +1,146 @@
+{
+  "scenario_id": "recon-discrepancy-paused",
+  "title": "Reconciliation discrepancy, paused session",
+  "ui_interpretation": "Discrepancy is a first-class state. Pause is not a successful stop acknowledgement.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Paused",
+      "label": "Engine: paused",
+      "reason": "operator pause requested in scenario"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Connected",
+      "label": "Broker: connected (preview)",
+      "reason": "preview"
+    },
+    "reconciliation": {
+      "value": "Discrepancy",
+      "label": "Reconciliation: discrepancy",
+      "reason": "journal cash != broker cash"
+    },
+    "authorization": {
+      "value": "Paused",
+      "label": "Authorization: paused",
+      "reason": "pause requested; completion unknown until host"
+    },
+    "next_cycle": {
+      "presence": "missing",
+      "reason": "session paused"
+    },
+    "unresolved_issues": [
+      {
+        "id": "recon",
+        "severity": "error",
+        "summary": "Cash discrepancy 1500 cents.",
+        "next_step": "Inspect orders/events. Do not activate."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-a",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived vs broker-observed mismatch",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 90000
+    },
+    "holdings": [],
+    "reservations": {
+      "presence": "known",
+      "currency": "USD",
+      "minor_units": 0
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [
+      "broker cash 91500 cents vs journal 90000"
+    ],
+    "source_label": "journal-derived"
+  },
+  "decisions": [],
+  "orders": [],
+  "events": [],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-lookup-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "known",
+      "int": 3
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {
+    "PAUSE_NEW_RISK": {
+      "operation": "PAUSE_NEW_RISK",
+      "status": "Unknown",
+      "detail": "Preview pause control shows simulated interaction only. Not actual authority.",
+      "simulated_preview_acknowledgement": true
+    }
+  }
+}

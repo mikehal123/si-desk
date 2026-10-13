@@ -1,3 +1,4 @@
+using System.Reflection;
 using static Sovereign.Desktop.MainWindow;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -24,6 +25,7 @@ internal sealed partial class ChatConversation
     internal readonly OllamaChatClient _ollamaChat = new();
     internal OllamaChatOptions? _ollamaQaOptions;
     internal OllamaChatReceipt? _lastOllamaReceipt;
+    internal CodexChatClient? _codexChat;
     internal CursorChatClient? _cursorChat;
     internal GrokBuildChatClient? _grokBuild;
     internal XaiApiChatClient? _xaiChat;
@@ -109,6 +111,7 @@ internal sealed partial class ChatConversation
     private StackPanel? _planControls;
     internal string PlanProvider => "grok";
     internal bool PlanChat => false;
+    internal bool CodexChat => false;
     internal bool CursorChat => _chatProvider.SelectedIndex == DeskChatConnections.Cursor;
     internal bool GrokBuildChat => _chatProvider.SelectedIndex == DeskChatConnections.GrokBuild;
     internal bool XaiApiChat => _chatProvider.SelectedIndex == DeskChatConnections.XaiApi;
@@ -121,6 +124,7 @@ internal sealed partial class ChatConversation
     internal bool LocalChat => false;
     internal void ResetChat()
     {
+        _codexChat?.Dispose(); _codexChat = null;
         _cursorChat?.Dispose(); _cursorChat = null;
         _grokBuild?.Dispose(); _grokBuild = null;
         _xaiChat?.Dispose(); _xaiChat = null;
@@ -138,7 +142,7 @@ internal sealed partial class ChatConversation
             _chatLogin.Content = label; AutomationName(_chatLogin, label); _chatLogin.IsEnabled = CursorChat || GrokBuildChat;
         }
         _chatStatus.Text = (CursorChat
-            ? "Cursor · your Cursor account · Grok models only. Open Folder for tools, subagents, and file edits."
+            ? "Cursor · your Cursor account · models from your subscription. Open Folder for tools, subagents, and file edits."
             : XaiApiChat
                 ? "xAI API · Grok models · the key stays in Windows Credential Manager."
                 : "Grok Build · your installed Grok CLI · choose a Grok model. File edits stay in the open project folder.") + contextNote;
@@ -429,11 +433,11 @@ internal sealed partial class ChatConversation
 
     internal async Task ConnectChatAsync()
     {
-        var agentConnection = CursorChat || GrokBuildChat;
+        var agentConnection = CursorChat || GrokBuildChat || CodexChat;
         if (agentConnection)
         {
             // Open Folder owns its busy marker and deliberately connects inside that operation.
-            if (_cursorSendLoop || _cursorConnecting) return;
+            if (_cursorSendLoop || _codexSendLoop || _cursorConnecting) return;
             _cursorConnecting = true;
         }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_phoneSubmission?.Token ?? CancellationToken.None);
@@ -442,12 +446,18 @@ internal sealed partial class ChatConversation
         try
         {
             _chatStatus.Text = "Connecting…";
+            if (_phoneSubmission is not null && _phoneConnectionProbe is not null)
+            {
+                await _phoneConnectionProbe(timeout.Token);
+                return;
+            }
+            string[] models;
             if (XaiApiChat)
             {
                 var key = ReadXaiApiKey();
                 _xaiChat?.Dispose();
                 _xaiChat = new XaiApiChatClient(key);
-                var models = await _xaiChat.ModelsAsync(timeout.Token);
+                models = await _xaiChat.ModelsAsync(timeout.Token);
                 BindChatModels(models.Select(model => (model, (string?)model)).ToArray(), false);
                 if (models.Length > 0) _chatModel.SelectedIndex = 0;
                 _chatReady = models.Length > 0;
@@ -532,7 +542,7 @@ internal sealed partial class ChatConversation
             {
                 var endpoint=_planEndpoint.SelectedItem as string ?? throw new IOException("Select an endpoint.");
                 _planChat?.Dispose(); _planChat=new CodingPlanChatClient(PlanProvider,endpoint,_planKey.Password);
-                var models=await _planChat.ModelsAsync(timeout.Token);
+                models=await _planChat.ModelsAsync(timeout.Token);
                 ConnectionSetup.SaveEndpoint(PlanProvider, endpoint);
                 _planKey.Password = "";
                 BindChatModels(models.Select(model => (model, (string?)model)).ToArray(), true);
@@ -541,14 +551,26 @@ internal sealed partial class ChatConversation
                 _chatStatus.Text=models.Length>0 ? "Provider model list received. Choose a model; message delivery is verified when it responds." : "Key saved. This endpoint does not list models; enter the model ID from your plan. Access is not yet verified.";
                 return;
             }
-            if (LocalChat)
+            else if (LocalChat) models = await _ollamaChat.ModelsAsync(timeout.Token);
+            else
             {
-                var models = await _ollamaChat.ModelsAsync(timeout.Token);
-                BindChatModels(models.Select(model => (model, (string?)model)).ToArray(), false);
-                if (models.Length > 0) _chatModel.SelectedIndex = 0;
-                _chatReady = models.Length > 0;
-                _chatStatus.Text = _chatReady ? "Connected to local Ollama. Choose a downloaded model." : "No models available. Install a local Ollama model.";
+                _codexChat?.Dispose();
+                _needsContext = _saved.Turns.Length > 0;
+                var epoch = ++_projectSessionEpoch;
+                _codexChat = new CodexChatClient(_projectFolder ?? Path.Combine(_profileDirectory, "chat-workspace"),
+                    _projectFolder is null ? null : new CursorProjectOptions {
+                        Mode = _saved.ProjectMode, Permissions = _saved.Permissions, EnableSubagents = _saved.SubagentsEnabled,
+                        SwarmBrief = SwarmManagerBrief(),
+                        RequestPermission = RequestProjectPermissionAsync
+                    }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } }, profile: _profileDirectory);
+                if (!await _codexChat.IsSubscriptionAsync(timeout.Token)) { _chatStatus.Text = "Click Sign in with ChatGPT. API-key billing will not be used in this room."; return; }
+                models = await _codexChat.ModelsAsync(timeout.Token);
             }
+            BindChatModels(models.Select(model => (model, (string?)model)).ToArray(), false);
+            if (models.Length > 0) _chatModel.SelectedIndex = 0;
+            _chatReady = models.Length > 0;
+            _chatStatus.Text = _chatReady ? (LocalChat ? "Connected to local Ollama. Choose a downloaded model." : CodexReadyStatus("Uses your ChatGPT subscription limits."))
+                : "No models available. Install a local Ollama model or check your Codex account access.";
         }
         catch (OperationCanceledException) when (PhoneSendCancelled) { _chatStatus.Text = "Phone send stopped before dispatch."; }
         catch (Exception ex) { _chatStatus.Text = "Connection failed: " + ex.Message; }
@@ -586,9 +608,9 @@ internal sealed partial class ChatConversation
     private void RefreshComposerAction()
     {
         var working = (_chatBusy && _chatCancellation is not null) ||
-            ((CursorChat || GrokBuildChat) && _cursorSendLoop);
+            ((CursorChat || GrokBuildChat) && _cursorSendLoop) || (CodexChat && _codexSendLoop);
         var hasDraft = !string.IsNullOrWhiteSpace(_chatInput.Text) || _draftFiles.Count > 0;
-        var followup = working && hasDraft && (CursorChat || GrokBuildChat) && CursorComposerAvailable;
+        var followup = working && hasDraft && (CursorChat || GrokBuildChat || CodexChat) && CursorComposerAvailable;
         var showStop = working && !followup;
         if (_chatSend is not null)
         {
@@ -598,6 +620,54 @@ internal sealed partial class ChatConversation
         }
         if (_chatStop is not null) _chatStop.Visibility = showStop ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private string CodexReadyStatus(string accountNote)
+    {
+        var existing = _projectFolder is null
+            ? "Connected with ChatGPT subscription. Choose a model; sending uses your subscription limits."
+            : ProjectConnectionStatus(accountNote);
+        var signedIn = DescribeSignedIn(ReadClientProperty(_codexChat, "SubscriptionSignedIn"));
+        var tools = DescribeProjectTools(ReadClientProperty(_codexChat, "ProjectToolsStatus"));
+        if (signedIn is null && tools is null) return existing;
+        var parts = new List<string>();
+        if (signedIn is not null) parts.Add(signedIn);
+        if (tools is not null) parts.Add(tools);
+        parts.Add(existing);
+        return string.Join(" · ", parts);
+    }
+
+    private static object? ReadClientProperty(object? client, string name)
+    {
+        var property = client?.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.Public);
+        return property is { CanRead: true } ? property.GetValue(client) : null;
+    }
+
+    private static string? DescribeSignedIn(object? value) => value switch
+    {
+        null => null,
+        bool signed => signed ? "Signed in" : "Not signed in",
+        string text when text.Equals("true", StringComparison.OrdinalIgnoreCase) => "Signed in",
+        string text when text.Equals("false", StringComparison.OrdinalIgnoreCase) => "Not signed in",
+        string text when text.Trim().Length > 0 => text.Trim(),
+        _ => null
+    };
+
+    private static string? DescribeProjectTools(object? value)
+    {
+        if (value is null) return null;
+        if (value is bool ready) return ready ? "Project tools ready" : "Project tools failed";
+        var text = value.ToString()?.Trim() ?? "";
+        if (text.Length == 0 || text.Equals("not-requested", StringComparison.OrdinalIgnoreCase)) return null;
+        if (text.Equals("true", StringComparison.OrdinalIgnoreCase) || text.Equals("ready", StringComparison.OrdinalIgnoreCase) || text.Equals("ok", StringComparison.OrdinalIgnoreCase))
+            return "Project tools ready";
+        if (text.StartsWith("failed:", StringComparison.OrdinalIgnoreCase))
+            return ClipStatus("Project tools failed" + text["failed".Length..]);
+        if (text.Equals("false", StringComparison.OrdinalIgnoreCase) || text.Contains("fail", StringComparison.OrdinalIgnoreCase) || text.Contains("error", StringComparison.OrdinalIgnoreCase))
+            return "Project tools failed";
+        return ClipStatus("Project tools " + text);
+    }
+
+    private static string ClipStatus(string text) => text.Length <= 240 ? text : text[..240];
 
     private async void ChatInputKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -640,6 +710,7 @@ internal sealed partial class ChatConversation
     internal async Task SendChatAsync()
     {
         if (CursorChat || GrokBuildChat) { await SendCursorChatAsync(); return; }
+        if (CodexChat) { await SendCodexChatAsync(); return; }
         if (_chatBusy || _attachmentBusy) return;
         var text = _chatInput.Text.Trim();
         var model=SelectedChatModel;
@@ -672,7 +743,7 @@ internal sealed partial class ChatConversation
         if (_disposed || PhoneSendCancelled) return;
         // Project investigations may take hours. Stop/dispose and transport failures
         // still cancel; elapsed wall time alone must not kill an active agent.
-        _chatCancellation = (CursorChat || PlanChat) && _projectFolder is not null
+        _chatCancellation = (CodexChat || CursorChat || PlanChat) && _projectFolder is not null
             ? new CancellationTokenSource()
             : new CancellationTokenSource(TimeSpan.FromMinutes(10));
         SetChatBusy(true); _chatInput.Text = "";
@@ -723,11 +794,12 @@ internal sealed partial class ChatConversation
                 _ollamaHistory.Add(new("user", sentText, images.Select(i => i.Data).ToArray())); _ollamaHistory.Add(new("assistant", content.ToString()));
             }
             else if (CursorChat) { ApplySkillGuidance(restoredPrompt); await _cursorChat!.SendAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images); }
+            else { ApplySkillGuidance(restoredPrompt); await _codexChat!.SendAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images); }
             _needsContext = false;
-            _chatStatus.Text = CursorChat && _projectFolder is not null ? "Response complete. Review Changed files in this turn." : "Response complete.";
+            _chatStatus.Text = (CodexChat || CursorChat) && _projectFolder is not null ? "Response complete. Review Changed files in this turn." : "Response complete.";
         }
-        catch (OperationCanceledException) { outcome = "stopped"; _chatStatus.Text = "Response stopped or timed out. Partial text is incomplete. File edits already made are kept. You can edit the draft and send again."; if (!local && !PlanChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _cursorChat?.Dispose(); _cursorChat = null; } }
-        catch (Exception ex) { failureReason = ProjectAgentException.Describe(ex); turn.ShowFailure(failureReason); outcome = "failed"; _chatStatus.Text = "Response failed: " + ex.Message; if (CursorChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _cursorChat?.Dispose(); _cursorChat = null; } }
+        catch (OperationCanceledException) { outcome = "stopped"; _chatStatus.Text = "Response stopped or timed out. Partial text is incomplete. File edits already made are kept. You can edit the draft and send again."; if (!local && !PlanChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _codexChat?.Dispose(); _cursorChat?.Dispose(); _codexChat = null; _cursorChat = null; } }
+        catch (Exception ex) { failureReason = ProjectAgentException.Describe(ex); turn.ShowFailure(failureReason); outcome = "failed"; _chatStatus.Text = "Response failed: " + ex.Message; if (CursorChat || CodexChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _cursorChat?.Dispose(); _cursorChat = null; _codexChat?.Dispose(); _codexChat = null; } }
         finally { if (outcome != "completed" && string.IsNullOrWhiteSpace(_chatInput.Text)) { _chatInput.Text = text; _draftFiles.AddRange(sentFiles); RenderDraftFiles(); }
             try { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
             finally { FinishSubagents(outcome); _activeChatTurn = null; _chatCancellation?.Dispose(); _chatCancellation = null; SetChatBusy(false); } }
@@ -735,6 +807,7 @@ internal sealed partial class ChatConversation
 
     private CancellationTokenSource? _phoneSubmission;
     private bool PhoneSendCancelled => _phoneSubmission?.IsCancellationRequested == true;
+    private Func<CancellationToken, Task>? _phoneConnectionProbe;
 
     internal async Task<string?> SendFromPhoneAsync(string text)
     {

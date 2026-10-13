@@ -61,13 +61,33 @@ public sealed class WebView2PrerequisiteTests
     [InlineData("http://download.microsoft.com/file.exe", false)]
     [InlineData("https://microsoft.com.attacker.test/file.exe", false)]
     [InlineData("https://attacker.test/file.exe", false)]
+    [InlineData("https://user@example.com/file.exe", false)]
     [InlineData("https://microsoft.com:444/file.exe", false)]
     public void Download_redirects_stay_on_Microsoft_https(string uri, bool expected) =>
         Assert.Equal(expected, WindowsWebView2Prerequisite.IsMicrosoftDownloadUri(new Uri(uri)));
 
     [Fact]
-    public void Download_redirects_reject_user_info_on_a_Microsoft_host() =>
-        Assert.False(WindowsWebView2Prerequisite.IsMicrosoftDownloadUri(new UriBuilder("https://microsoft.com/file.exe") { UserName = "user" }.Uri));
+    public void Prerequisite_failure_preserves_existing_app_and_profile_before_shutdown()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "xAI Desk prerequisite 测试 " + Guid.NewGuid().ToString("N"));
+        var payload = Path.Combine(root, "payload");
+        var app = Path.Combine(root, "app");
+        var profile = Path.Combine(root, "profile");
+        Directory.CreateDirectory(payload); Directory.CreateDirectory(app); Directory.CreateDirectory(profile);
+        File.WriteAllText(Path.Combine(payload, "Microsoft.Web.WebView2.Core.dll"), "fixture");
+        File.WriteAllText(Path.Combine(app, "keep.txt"), "old app");
+        File.WriteAllText(Path.Combine(profile, "keep.txt"), "old profile");
+        try
+        {
+            var request = new SetupRequest(SetupAction.Upgrade, app, payload, "SovereignAI.QA", "QA", "0.0.1", profile, "QA", true, null, null);
+            var result = InstallerEngine.Run(request, new Fixture { ValidSignature = false });
+            Assert.Equal(WebView2Prerequisite.FailedExitCode, result.ExitCode);
+            Assert.Equal("old app", File.ReadAllText(Path.Combine(app, "keep.txt")));
+            Assert.Equal("old profile", File.ReadAllText(Path.Combine(profile, "keep.txt")));
+            Assert.False(Directory.Exists(app + ".staging"));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
 
     private sealed class Fixture : IWebView2PrerequisitePlatform
     {

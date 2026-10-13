@@ -1,8 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\..\obj\extraction-process-fixture\</BaseIntermediateOutputPath>
-    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\..\bin\extraction-process-fixture\</BaseOutputPath>
-    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
-  </PropertyGroup>
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..\..\..\..\'))" />
-</Project>

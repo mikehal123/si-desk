@@ -68,7 +68,7 @@ public static class VerifyResultSkill
         description: "Prove a result before calling it done."
         ---
         # Verify Result
-        The skill file was not found. Nothing is done without fresh proof. Missing or weak proof is a fail. Fill in Claim, How tested, Evidence, Paths covered, and Verdict with reason. Risky, costly, or irreversible actions (spending money, publishing, deleting, or touching live systems) stay off unless the user explicitly approves them.
+        The skill file was not found. Missing or weak proof is a fail. Fill in Claim, How tested, Evidence, Paths covered, and Verdict.
         """;
 
     public static string Format(string claim, string how, string evidence, string paths, string verdict) =>

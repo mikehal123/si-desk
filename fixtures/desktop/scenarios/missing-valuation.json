@@ -1,0 +1,202 @@
+{
+  "scenario_id": "missing-valuation",
+  "title": "Missing valuation, holdings remain",
+  "ui_interpretation": "Mark is missing; quantity remains visible. Cash missing. Do not coerce to zero.",
+  "runtime": {
+    "build_id": "desktop-preview-0.1.0",
+    "protocol_version": "sovereign.host/v1",
+    "backend_type": "PreviewFixture",
+    "capabilities": [
+      "read-decisions",
+      "read-account",
+      "local-drafts"
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z",
+    "integration_status": "Native engine not connected. Preview/archive only."
+  },
+  "health": {
+    "engine": {
+      "value": "Running",
+      "label": "Engine: running",
+      "reason": "preview"
+    },
+    "provider": {
+      "value": "Connected",
+      "label": "Provider: connected (preview)",
+      "reason": "preview"
+    },
+    "broker": {
+      "value": "Unknown",
+      "label": "Broker: unknown",
+      "reason": "no observation"
+    },
+    "reconciliation": {
+      "value": "Incomplete",
+      "label": "Reconciliation: incomplete",
+      "reason": "missing marks"
+    },
+    "authorization": {
+      "value": "None",
+      "label": "Authorization: none",
+      "reason": "preview"
+    },
+    "next_cycle": {
+      "presence": "known",
+      "text": "2026-09-16T14:30:00Z"
+    },
+    "unresolved_issues": [
+      {
+        "id": "marks",
+        "severity": "warning",
+        "summary": "Holdings visible without marks.",
+        "next_step": "Do not size a new order from this view."
+      }
+    ],
+    "observation_timestamp": "2026-09-15T12:00:00Z"
+  },
+  "account": {
+    "presence": "known",
+    "account_id": "preview-paper-b",
+    "environment": "offline-preview",
+    "balance_basis": "journal-derived; marks incomplete",
+    "observed_at": "2026-09-15T12:00:00Z",
+    "cash": {
+      "presence": "missing",
+      "reason": "cash mark missing"
+    },
+    "holdings": [
+      {
+        "instrument": "BBB",
+        "quantity": {
+          "presence": "known",
+          "decimal": "40"
+        },
+        "mark": {
+          "presence": "missing",
+          "reason": "quote unavailable"
+        },
+        "quantity_source": "journal-derived",
+        "incomplete_valuation_reason": "quote unavailable"
+      }
+    ],
+    "reservations": {
+      "presence": "unknown",
+      "reason": "reservation unknown"
+    },
+    "open_order_ids": [],
+    "incomplete_valuation_reasons": [
+      "BBB quote unavailable"
+    ],
+    "source_label": "journal-derived"
+  },
+  "decisions": [
+    {
+      "id": "dec-bbb-hold",
+      "action": "Hold",
+      "instrument": "BBB",
+      "quantity": {
+        "presence": "known",
+        "decimal": "40"
+      },
+      "price": {
+        "presence": "missing",
+        "reason": "no mark"
+      },
+      "evidence_ids": [
+        "ev-aaa-admission"
+      ],
+      "account_revision": "rev-3",
+      "reasons": [
+        "HOLD because marks are missing; not an ABSTAIN."
+      ],
+      "admission": {
+        "verdict": "Unknown",
+        "reason": "Admission not evaluated without quote."
+      },
+      "risk": {
+        "verdict": "Unknown",
+        "reason": "Risk not evaluated without mark."
+      },
+      "execution": {
+        "verdict": "Blocked",
+        "reason": "Cannot execute without valuation."
+      },
+      "observed_at": "2026-09-15T12:00:00Z",
+      "related_order_id": null
+    }
+  ],
+  "orders": [],
+  "events": [],
+  "jobs": [],
+  "capabilities": [
+    {
+      "id": "rig.search_desk_knowledge",
+      "version": "planned",
+      "status": "planned",
+      "provider": "host-lookup-worker",
+      "permission_scope": "read-approved-library",
+      "required_capabilities": [
+        "library-read"
+      ],
+      "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
+      "cost_status": "unknown",
+      "last_outcome": null,
+      "catalog_status": "preview"
+    },
+    {
+      "id": "paper.submit_order",
+      "version": "n3+",
+      "status": "unavailable",
+      "provider": "paper-transport",
+      "permission_scope": "paper-submit",
+      "required_capabilities": [
+        "authenticated-session",
+        "paper-grant"
+      ],
+      "availability_reason": "Host paper transport is not connected. Desktop cannot grant this.",
+      "cost_status": "not-applicable",
+      "last_outcome": null,
+      "catalog_status": "reference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-aaa-admission",
+      "title": "AAA admission note",
+      "media_type": "text/plain",
+      "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
+      "allowed_uri_schemes": [
+        "https",
+        "http"
+      ],
+      "source_uris": [
+        "https://example.invalid/lookup/aaa",
+        "javascript:alert(1)",
+        "file:///C:/Windows/win.ini"
+      ]
+    }
+  ],
+  "evaluation": {
+    "campaign_id": "preview-campaign",
+    "sample_count": {
+      "presence": "unknown",
+      "reason": "valuation incomplete"
+    },
+    "coverage": {
+      "presence": "known",
+      "text": "3 of 3 cycles recorded"
+    },
+    "performance_basis": "journal-derived cents; not a live broker NAV",
+    "benchmark_assumptions": "buy-hold same universe, zero borrow",
+    "cost_assumptions": "10 bps modeled; not broker-reported",
+    "missed_count": 0,
+    "late_count": 0,
+    "abstain_count": 0,
+    "blocked_count": 0,
+    "software_result": "desktop-preview-component",
+    "operational_readiness": "native-host-not-connected",
+    "investment_verdict": "INSUFFICIENT_EVIDENCE",
+    "plot_absence_reason": "No plot: sample is synthetic and insufficient for an investment-success badge."
+  },
+  "operations": {}
+}

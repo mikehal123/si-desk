@@ -228,7 +228,7 @@ public sealed class ShellOpenHost : IDisposable
         _thread = new Thread(() => AcceptLoop(pipeName, deliver, ready))
         {
             IsBackground = true,
-            Name = "xAIDesk.OpenFile"
+            Name = "SovereignAI.OpenFile"
         };
         _thread.Start();
         if (!ready.Wait(TimeSpan.FromSeconds(5)))

@@ -12,7 +12,7 @@ namespace Sovereign.Desktop;
 public sealed partial class MainWindow
 {
     private readonly Grid _roomPage = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(DeskTheme.Space24 + DeskTheme.Space4), RowSpacing = DeskTheme.Space12 };
-    private readonly TextBox _roomName = new() { Header = "Your name", Text = "Host", MaxLength = 40, Width = 180 };
+    private readonly TextBox _roomName = new() { Header = "Your name", Text = "Sign in first", IsReadOnly = true, MaxLength = 40, Width = 180 };
     private readonly TextBox _roomInvite = new() { Header = "Invitation · about 20 minutes · one use", PlaceholderText = "https://…/#…", IsSpellCheckEnabled = false };
     private readonly TextBlock _roomStatus = Note("Create a room on this PC, or paste an invitation to join. Nothing is shared until you connect.");
     private readonly TextBlock _roomMembers = Note("");
@@ -34,7 +34,6 @@ public sealed partial class MainWindow
     private Button? _roomShare;
     private Button? _roomDiscard;
     private Button? _roomJump;
-    private Button? _roomRetry;
     private Border? _roomDraftCard;
     private bool _roomBusy;
     private bool _roomFollowTail = true;
@@ -60,11 +59,8 @@ public sealed partial class MainWindow
             Act("Create online room", CreateRoomAsync), Act("Join room", JoinRoomAsync),
             Act("Copy invitation", CopyRoomInvitationAsync), Act("New invitation", RotateRoomInvitationAsync),
             Act("Leave / stop room", StopRoomAsync) } };
-        _roomRetry = Button("Retry", () => RunRoom(CreateRoomAsync));
-        _roomRetry.Visibility = Visibility.Collapsed;
-        _roomActions.Add(_roomRetry);
         var saved = new Expander { Header = "Rooms on this PC", IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = _savedRooms };
-        var top = new StackPanel { Spacing = DeskTheme.Space8, Children = { Head("Shared room"), _roomName, actions, _roomInvite, _roomStatus, _roomRetry, _roomMembers, saved } };
+        var top = new StackPanel { Spacing = DeskTheme.Space8, Children = { Head("Shared room"), _roomName, actions, _roomInvite, _roomStatus, _roomMembers, saved } };
         _roomPage.Children.Add(top);
         _roomMessages.Children.Add(_roomEmpty);
         _roomScroll = new ScrollViewer { Content = _roomMessages, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Enabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -133,7 +129,6 @@ public sealed partial class MainWindow
     {
         if (_roomBusy) return;
         SetRoomBusy(true);
-        if (_roomRetry is not null) _roomRetry.Visibility = Visibility.Collapsed;
         try { await action(); }
         catch (Exception ex) { _roomStatus.Text = ex.Message; }
         finally { SetRoomBusy(false); }
@@ -189,25 +184,22 @@ public sealed partial class MainWindow
         _roomStatus.Text = "Starting your room and temporary internet relay…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(75));
         try {
-            using (var download = new CancellationTokenSource(TimeSpan.FromMinutes(3)))
-                await CloudflaredTool.EnsureAsync(downloading: () => _roomStatus.Text = "Downloading tunnel tool…", ct: download.Token);
-            _roomStatus.Text = "Starting your room and temporary internet relay…";
-            var name = string.IsNullOrWhiteSpace(_roomName.Text) ? "Host" : _roomName.Text.Trim();
-            _roomHost = new SharedRoomHost(_vm.ProfileDirectory, name); await _roomHost.StartAsync(timeout.Token);
+            var identity = await RequireAccountAsync(timeout.Token);
+            _roomHost = new SharedRoomHost(_vm.ProfileDirectory, identity, (proof, ct) => _accountClient!.VerifyIdentityAsync(proof, null, ct)); await _roomHost.StartAsync(timeout.Token);
             _roomTunnel = new RoomTunnel(); _roomPublicAddress = await _roomTunnel.StartAsync(AppContext.BaseDirectory, _vm.ProfileDirectory, _roomHost.Address, timeout.Token);
             _roomConnection = new RoomConnection(_roomHost.Address, _roomHost.Owner);
             _roomInvite.Text = _roomHost.NewInvitation(_roomPublicAddress); StartRoomPolling();
             _roomStatus.Text = "Hosting on this PC. Copy the invitation for the person you're inviting. It expires in about 20 minutes. Keep this app open.";
             RefreshSavedRooms();
-        } catch { await StopRoomAsync(); if (_roomRetry is not null) _roomRetry.Visibility = Visibility.Visible; throw; }
+        } catch { await StopRoomAsync(); throw; }
     }
     private async Task JoinRoomAsync()
     {
         if (_roomConnection is not null) throw new IOException("Leave the current room first.");
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var name = string.IsNullOrWhiteSpace(_roomName.Text) ? "Guest" : _roomName.Text.Trim();
-        _roomConnection = await RoomConnection.JoinAsync(_roomInvite.Text, name, timeout.Token);
-        _roomInvite.Text = ""; StartRoomPolling(); _roomStatus.Text = "Joined. Keep this app open while you are in the room.";
+        var identity = await RequireAccountAsync(timeout.Token);
+        _roomConnection = await RoomConnection.JoinAsync(_roomInvite.Text, identity.Name, timeout.Token, _accountSession!.IdToken, identity.Subject);
+        _roomInvite.Text = ""; StartRoomPolling(); _roomStatus.Text = "Joined with your verified Sovereign account. Room identity expires with your sign-in token.";
     }
     private void StartRoomPolling()
     {

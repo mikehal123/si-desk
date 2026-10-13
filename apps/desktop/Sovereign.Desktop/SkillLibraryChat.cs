@@ -16,7 +16,7 @@ internal sealed partial class ChatConversation
         var guidance = "";
         try
         {
-            if (_owner.Skills.Enabled && (CursorChat || GrokBuildChat) && _saved.SubagentsEnabled)
+            if (_owner.Skills.Enabled && (CursorChat || GrokBuildChat || CodexChat) && _saved.SubagentsEnabled)
             {
                 var retrieval = _owner.Skills.Retrieve(query);
                 _turnSkillCaption = retrieval.Caption;
@@ -27,6 +27,7 @@ internal sealed partial class ChatConversation
         { guidance = ""; _chatStatus.Text = "Skill library could not be read: " + ex.Message; }
         if (_cursorChat is not null) _cursorChat.SkillGuidance = guidance;
         if (_grokBuild is not null) _grokBuild.SkillGuidance = guidance;
+        if (_codexChat is not null) _codexChat.SkillGuidance = guidance;
     }
 
     private void RememberSkill(CursorSubagent child)

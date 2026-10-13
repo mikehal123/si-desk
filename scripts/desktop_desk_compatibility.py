@@ -34,11 +34,11 @@ def expected(publish, version):
 def verify(publish, version):
     path = Path(publish) / 'desk-compatibility.json'
     if not path.is_file() or path.is_symlink() or path.stat().st_size > 65536:
-        raise ValueError('A bounded, fresh desk compatibility manifest is required.')
+        raise ValueError('A bounded, fresh lookup compatibility manifest is required.')
     actual = json.loads(path.read_text(encoding='utf-8-sig'))
     target = expected(publish, version)
     if actual != target or any(type(actual[k]) is not int for k in ('protocol_version', 'min_read_schema', 'max_read_schema', 'write_schema')):
-        raise ValueError('Desk compatibility manifest differs from staged worker/version.')
+        raise ValueError('Lookup compatibility manifest differs from staged worker/version.')
     return actual
 
 
@@ -52,4 +52,4 @@ if __name__ == '__main__':
         raise SystemExit('Use a fresh publish directory; compatibility metadata already exists.')
     path.write_text(json.dumps(expected(args.publish, args.version), indent=2) + '\n', encoding='utf-8')
     verify(args.publish, args.version)
-    print('Desk compatibility metadata matches the staged worker.')
+    print('Lookup compatibility metadata matches the staged worker.')

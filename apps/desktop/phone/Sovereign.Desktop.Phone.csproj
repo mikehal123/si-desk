@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sovereign.Desktop.Phone</RootNamespace>
+    <AssemblyName>Sovereign.Desktop.Phone</AssemblyName>
+    <Description>Local phone access for xAI Desk chat. Off unless Settings enables it. Listens on port 8789 only.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="checks\**\*.cs" />
+    <Content Include="www\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

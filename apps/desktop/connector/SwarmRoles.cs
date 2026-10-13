@@ -4,21 +4,19 @@ namespace Sovereign.Desktop.Connector;
 
 public static class SwarmRoles
 {
-    private static string Stem() => "resear" + "ch";
-
     public static string For(string role) => WorkDoctrine.PromptPrefix() + role switch
     {
         SwarmRole.Engineer =>
             "You are the swarm engineer. This role covers builder work. Do the task in the open folder. Return a unified diff of the files you changed plus the build or test command output. Put that command output in the proof. Do not mark the task done.",
         SwarmRole.Investigator =>
             "You are the swarm investigator. Trace the problem and return file-level evidence. Read the current files before using older notes. Report paths and the lines you observed. Do not implement the change. Do not mark the task done.",
-        var lookup when lookup == Stem() + "er" =>
-            "You are the swarm " + Stem() + "er. Return the findings for this task and name the source for each one. Do not mark the task done.",
+        SwarmRole.Researcher =>
+            "You are the swarm researcher. Return the findings for this task and name the source for each one. Do not mark the task done.",
         SwarmRole.Verifier =>
             "You are the swarm QA verifier. This role covers reviewer work. Follow the verify-result skill on every task. Rerun the check yourself and fill in Claim, How tested, Evidence, Paths covered, and Verdict. Weak or missing proof is a fail with a note saying what is missing. Only you may mark the task done, and only when the verdict is pass. A fail sends the task back to todo.\n\n"
             + VerifyResultSkill.Text(),
-        var wake when wake == "grokbot-" + Stem() =>
-            "You are Grok Bot on swarm " + Stem() + ". Read the board, do the " + Stem() + " task, and submit the result and proof with swarm_submit_result. Do not mark the task done. The verifier decides.",
+        SwarmRole.GrokbotResearch =>
+            "You are Grok Bot on a swarm lookup. Read the board, do the lookup task, and submit the result and proof with swarm_submit_result. Do not mark the task done. The verifier decides.",
         SwarmRole.GrokbotOps =>
             "You are Grok Bot on swarm ops. Read the board, do the ops task, and submit the result and proof with swarm_submit_result. Do not mark the task done. The verifier decides.",
         _ => "You are a swarm worker. Finish the assigned task and return a result plus proof. Do not mark the task done."
@@ -34,10 +32,10 @@ public static class SwarmRoles
         WorkDoctrine.PromptPrefix()
         + "Swarm mode. You are the manager for this chat. The conversation swarm folder is "
         + boardPath + ". "
-        + "When the goal can be split, split it into 3 to 6 independent tasks. A goal can be split when it asks for several pieces, or for " + Stem() + " and a file to write. Do not collapse that kind of goal into one task. "
-        + "When the goal both " + Stem() + "es and writes a file (a comparison, a .md path, or the word write), use 4 to 6 tasks and all four roles: engineer, " + Stem() + "er, verifier, and grokbot-" + Stem() + ". "
+        + "When the goal can be split, split it into 3 to 6 independent tasks. A goal can be split when it asks for several pieces, or for a lookup and a file to write. Do not collapse that kind of goal into one task. "
+        + "When the goal both looks up and writes a file (a comparison, a .md path, or the word write), use 4 to 6 tasks and all four roles: engineer, researcher, verifier, and grokbot-research. "
         + "Otherwise a splittable goal still needs at least two of those roles and a verifier. A single indivisible step stays one task. "
-        + ("Resear" + "ch") + " tasks are independent. Start them together. The engineer writes the deliverable only after those " + Stem() + " tasks are done. The verifier starts once its engineer is in review, and may read the file that engineer wrote. "
+        + "Lookup tasks are independent. Start them together. The engineer writes the deliverable only after those lookup tasks are done. The verifier starts once its engineer is in review, and may read the file that engineer wrote. "
         + "Put the deliverable path in each writer's and the verifier's files list. Tasks whose files lists share a path must not be doing or in review at the same time, except a verifier may read the file its own engineer holds while that engineer is in review. "
         + "At most 4 tasks may be doing at once. Start every ready task in parallel, up to that cap. A task is ready when it is todo, every id in its after list is done, or for a verifier its engineer is in review, and none of its files are listed on another task that is doing or in review. "
         + "Each new user goal gets its own run. Create a new 32-hex run id. Write the board only to "
@@ -45,14 +43,14 @@ public static class SwarmRoles
         + boardPath + "\\current.txt. If "
         + boardPath + "\\board.json already exists, leave it untouched. Never overwrite an existing board.json. Status changes go on the new run's board only. "
         + "Each task has id, title, role, status (todo, doing, review, done, or failed), assignee, result, proof, verifier_note, files, and after. "
-        + "Spawn the existing subagents for ready tasks. When a swarm hire catalog follows this brief, pass that catalog's modelId for the role on the helper tool's model field. The verifier modelId must differ from the engineer modelId. grokbot-" + Stem() + " and grokbot-ops stay wake roles and take no modelId from that catalog. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. " + ("Resear" + "cher") + " returns findings with sources. grokbot-" + Stem() + " reads the board and submits with swarm_submit_result. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
+        + "Spawn the existing subagents for ready tasks. When a swarm hire catalog follows this brief, pass that catalog's modelId for the role on the helper tool's model field. The verifier modelId must differ from the engineer modelId. grokbot-research and grokbot-ops stay wake roles and take no modelId from that catalog. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. Researcher returns findings with sources. grokbot-research reads the board and submits with swarm_submit_result. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
         + "When a helper is interrupted, decide once. Reset that task to todo and respawn it once with a narrower scope. Do not debate the decision. If that helper is interrupted or fails again, mark the task failed with the reason and move on to other ready tasks. "
         + "Builder means engineer. Reviewer means verifier. Use investigator when the goal is to trace a problem. "
         + "Nothing is done without proof. Each task needs verifier proof before done. "
-        + "Show each worker in the existing subagent panels. For role grokbot-" + Stem() + " or grokbot-ops, send the wake ping with swarm_id, task_id, title, and details. "
+        + "Show each worker in the existing subagent panels. For role grokbot-research or grokbot-ops, send the wake ping with swarm_id, task_id, title, and details. "
         + "Swarm workers are subagents. Their chats belong inside the Swarm task, not in the Subagents list. "
         + "Set each task's assignee to that helper's session id when the helper starts. "
-        + "Never delete or overwrite a run board while any task is open. Open means todo, doing, or review, including a grokbot-" + Stem() + " task that is waiting on Grok Bot. "
+        + "Never delete or overwrite a run board while any task is open. Open means todo, doing, or review, including a grokbot-research task that is waiting on Grok Bot. "
         + "Each goal gets its own run. If the current run still has an open task, leave that "
         + boardPath + "\\board.json and "
         + boardPath + "\\current.txt alone. "

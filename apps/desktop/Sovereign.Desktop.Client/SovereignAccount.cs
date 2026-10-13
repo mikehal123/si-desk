@@ -15,34 +15,12 @@ namespace Sovereign.Desktop.Client;
 
 public sealed record AccountConfiguration(string Issuer, string ClientId)
 {
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Issuer) && !string.IsNullOrWhiteSpace(ClientId);
-
-    public static AccountConfiguration Read(string path)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return new("", "");
-            using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object) return new("", "");
-            var issuer = root.TryGetProperty("issuer", out var issuerValue) && issuerValue.ValueKind == JsonValueKind.String ? issuerValue.GetString() ?? "" : "";
-            var clientId = root.TryGetProperty("clientId", out var clientValue) && clientValue.ValueKind == JsonValueKind.String ? clientValue.GetString() ?? "" : "";
-            return new(issuer, clientId);
-        }
-        catch (Exception ex) when (ex is JsonException or IOException)
-        {
-            return new("", "");
-        }
-    }
-
     public void Validate()
     {
-        if (!IsConfigured)
-            throw new IOException("xAI Desk sign-in is not configured.");
         if (!Uri.TryCreate(Issuer, UriKind.Absolute, out var u) || u.Scheme != "https" || u.AbsolutePath != "/" || u.UserInfo.Length != 0 || u.Query.Length != 0 || u.Fragment.Length != 0)
             throw new IOException("Invalid account service address.");
-        if (ClientId.Length > 256 || ClientId.Any(char.IsControl))
-            throw new IOException("xAI Desk sign-in is not configured.");
+        if (string.IsNullOrWhiteSpace(ClientId) || ClientId.Length > 256 || ClientId.Any(char.IsControl))
+            throw new IOException("Sovereign sign-in is not configured. The release needs its public Clerk Client ID.");
     }
 }
 
@@ -121,7 +99,7 @@ public sealed class SovereignAccountClient : IDisposable
         using var request=new HttpRequestMessage(HttpMethod.Get,"oauth/userinfo");
         request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",current.AccessToken);
         using var response=await _http.SendAsync(request,ct);
-        if(!response.IsSuccessStatusCode) throw new IOException("Your xAI Desk session could not be verified. Please sign in again.");
+        if(!response.IsSuccessStatusCode) throw new IOException("Your Sovereign session could not be verified. Please sign in again.");
         using var user=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         if(user.RootElement.GetProperty("sub").GetString()!=identity.Subject) throw new IOException("Account identity mismatch.");
         return(current,identity);
@@ -164,7 +142,7 @@ public sealed class SovereignAccountClient : IDisposable
             throw new SecurityTokenValidationException("A verified email address is required.");
         var name=Claim("name").Trim();
         if(string.IsNullOrEmpty(name)) name=(Claim("given_name")+" "+Claim("family_name")).Trim();
-        if(string.IsNullOrEmpty(name)) name="xAI Desk member";
+        if(string.IsNullOrEmpty(name)) name="Sovereign member";
         name=new string(name.Where(c=>!char.IsControl(c)).Take(40).ToArray());
         return new(Claim("sub"),name,Claim("email"),DateTimeOffset.FromUnixTimeSeconds(long.Parse(Claim("exp"),System.Globalization.CultureInfo.InvariantCulture)));
     }

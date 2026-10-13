@@ -14,12 +14,18 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\apps\desktop\Sovereign.Desktop.Updates\Sovereign.Desktop.Updates.csproj" />
     <ProjectReference Include="..\..\..\apps\desktop\Sovereign.Desktop.Core\Sovereign.Desktop.Core.csproj" />
     <ProjectReference Include="..\..\..\apps\desktop\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
     <ProjectReference Include="..\..\..\apps\desktop\Sovereign.Desktop.Presentation\Sovereign.Desktop.Presentation.csproj" />
     <ProjectReference Include="..\..\..\apps\desktop\Sovereign.Desktop.SetupLib\Sovereign.Desktop.SetupLib.csproj" />
+    <ProjectReference Include="..\Sovereign.Desktop.G3Harness\Sovereign.Desktop.G3Harness.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\fixtures\desktop\**\*" CopyToOutputDirectory="PreserveNewest" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="..\..\..\contracts\observed\**\*" CopyToOutputDirectory="PreserveNewest" Link="contracts\observed\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="$(PrivateTestsCompileRemove)" Condition="'$(PrivateTestsCompileRemove)' != ''" />
   </ItemGroup>
 </Project>

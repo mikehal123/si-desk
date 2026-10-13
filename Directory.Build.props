@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)local.private.props" Condition="Exists('$(MSBuildThisFileDirectory)local.private.props')" />
   <PropertyGroup>
     <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>

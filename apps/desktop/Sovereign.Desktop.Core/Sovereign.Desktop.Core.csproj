@@ -6,6 +6,7 @@
     <Description>Desktop-owned models, draft validation, archive import and support export. No engine or WinUI dependency.</Description>
 </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Desk\**" />
     <EmbeddedResource Include="..\..\..\.cursor\skills\work-doctrine\SKILL.md" LogicalName="Sovereign.Desktop.Core.work-doctrine.md" />
   </ItemGroup>
 </Project>

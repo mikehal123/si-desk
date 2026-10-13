@@ -86,7 +86,7 @@ public sealed partial class MainWindow
                 SelectChat(_currentChat);
                 checks.Add(width + ": Chat, Subagents, Connection and Settings captured from the actual controls");
             }
-            if (_currentChat._cursorChat is not null || _currentChat._grokBuild is not null)
+            if (_currentChat._cursorChat is not null || _currentChat._codexChat is not null || _currentChat._grokBuild is not null)
                 throw new IOException("UI capture unexpectedly connected a provider.");
             checks.Add("No provider connections or live calls");
             File.WriteAllText(Path.Combine(output, "receipt.json"), JsonSerializer.Serialize(new { passed = true, checks, provider_calls = 0,
@@ -133,7 +133,7 @@ internal sealed partial class ChatConversation
             _chatInput.Text = "";
             UiPolishComposerState(classic, working: true);
             _chatMessages.Children.Clear(); _pendingInstructionViews.Clear(); _deliveredInstructionIds.Clear();
-            _steeringQueue = new(); _removedInstructionLabels.Clear();
+            _steeringQueue = new(); _instructionStatus.Clear(); _instructionFailures.Clear(); _removedInstructionLabels.Clear();
             var view = new ChatActivityView("Grok 4.7 High Fast", _ => { }, () => { }, SetComposerStatus, () => { }, classicChat: classic);
             try
             {
@@ -285,7 +285,7 @@ internal sealed partial class ChatConversation
 
     internal void UiPolishComposerState(bool classic, bool working)
     {
-        if (_cursorChat is not null || _grokBuild is not null)
+        if (_cursorChat is not null || _codexChat is not null || _grokBuild is not null)
             throw new IOException("Composer preview requires a disconnected QA chat.");
         _classicChat = classic;
         ApplyChatChrome();
@@ -321,7 +321,7 @@ internal sealed partial class ChatConversation
             throw new IOException("Stop square, circle or visibility is incorrect.");
         if (working && _tuiStop?.Visibility != Visibility.Collapsed)
             throw new IOException("Duplicate text Stop control is visible.");
-        checks.Add($"{width}: {(_classicChat ? "classic" : "terminal")} {(working ? "working" : "idle")}; both dividers hit at ±6px; xAI Desk Send/Stop icons");
+        checks.Add($"{width}: {(_classicChat ? "classic" : "terminal")} {(working ? "working" : "idle")}; both dividers hit at ±6px; Sovereign Send/Stop icons");
         UIElement XamlRootContent() => _chatPage.XamlRoot.Content;
     }
 

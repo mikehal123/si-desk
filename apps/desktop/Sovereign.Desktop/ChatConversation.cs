@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Sovereign.Desktop.Client;
+using Sovereign.Desktop.Phone;
 using static Sovereign.Desktop.MainWindow;
 
 namespace Sovereign.Desktop;
@@ -28,7 +29,7 @@ internal sealed partial class ChatConversation : IDisposable
     private readonly List<CursorActivityEvent> _savedActivity = [];
     private bool _savePending;
     private int _savedTurnIndex = -1;
-    public bool IsWorking => _chatBusy || _attachmentBusy || _cursorSendLoop || _acceptingCursorInstruction;
+    public bool IsWorking => _chatBusy || _attachmentBusy || _cursorSendLoop || _codexSendLoop || _acceptingCursorInstruction;
     public string Id => _saved.Id;
     public string Title => _saved.Title;
     public string? ProjectId => _saved.ProjectId;
@@ -38,6 +39,27 @@ internal sealed partial class ChatConversation : IDisposable
     public string RecentLabel => (_chatBusy ? "◌ " : "") + Title;
     internal string PhoneProviderLabel => CursorChat ? "Cursor" : XaiApiChat ? "xAI API" : "Grok Build";
     internal string? PhoneModel => _saved.Model ?? SelectedChatModel;
+
+    internal PhoneChatDetail PhoneSnapshot()
+    {
+        var live = _savedReply + string.Concat(_partialReply);
+        var phase = _chatStatus.Text;
+        if (_partialActivity.Any(item => item.Kind == "permission") || _subagentRows.Values.Any(item => item.CurrentWork.Contains("Waiting for your approval", StringComparison.Ordinal)))
+            phase = "Waiting for your approval";
+        var turns = _saved.Turns.Select((turn, index) =>
+        {
+            var reply = index == _saved.Turns.Length - 1 && turn.Outcome == "running" && live.Length > 0 ? live : turn.Reply;
+            return new PhoneChatTurn(PhoneClip(turn.Prompt), PhoneClip(reply), turn.Outcome, turn.Model);
+        }).ToArray();
+        var agents = _subagentRows.Values.Select(item => new PhoneSubagentStatus(item.Name, item.State, PhoneClip(item.CurrentWork))).ToArray();
+        return new PhoneChatDetail(Id, Title, PhoneProviderLabel, PhoneModel, PhoneClip(_chatStatus.Text), IsWorking, ProjectId, PhoneClip(live), PhoneClip(phase), turns, agents);
+    }
+
+    private static string PhoneClip(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value.Length <= 20000 ? value : value[..20000] + "…";
+    }
     public Grid View => _chatPage;
 
     public ChatConversation(MainWindow owner, string profile, ChatArchive archive, SavedChat saved,
@@ -263,7 +285,12 @@ internal sealed partial class ChatConversation : IDisposable
             _saved = _saved with { Provider = DeskChatConnections.Stored(_chatProvider.SelectedIndex), Connection = DeskChatConnections.Key(_chatProvider.SelectedIndex), Folder = _projectFolder,
                 Model = _chatReady ? SelectedChatModel : _saved.Model, Draft = _chatInput.Text, DraftAttachments = _draftFiles.ToArray(),
                 PendingInstructions = _steeringQueue.Count > 0 ? _steeringQueue.Snapshot : null };
-            _archive.Save(_saved);
+            _archive.Save(_saved); _teamBook?.Save();
+            if (_teamBook?.Warning is { } teamWarning && !string.Equals(_teamWarning, teamWarning, StringComparison.Ordinal))
+            {
+                _teamWarning = teamWarning;
+                ApplyTeamWarning();
+            }
             _savePending = false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -311,7 +338,7 @@ internal sealed partial class ChatConversation : IDisposable
         if (changedFolder)
         {
             _steeringQueue.Pause();
-            ResetChat(); _reconnectOnSend = model is not null && (CursorChat || GrokBuildChat);
+            ResetChat(); _reconnectOnSend = model is not null && (CursorChat || GrokBuildChat || CodexChat);
             _restoring = true; RestoreProjectBehavior(); _restoring = false;
             SetChatBusy(false);
             _chatStatus.Text = full is null ? "Folder closed. This conversation and its messages are kept."
@@ -337,6 +364,6 @@ internal sealed partial class ChatConversation : IDisposable
         foreach (var panel in _openSubagentPanels.Values) panel.Release();
         _openSubagentPanels.Clear();
         foreach (var view in _subagentViews.Values) view.Retire();
-        _cursorChat?.Dispose(); _grokBuild?.Dispose(); _xaiChat?.Dispose(); _planChat?.Dispose(); _ollamaChat.Dispose();
+        _codexChat?.Dispose(); _cursorChat?.Dispose(); _grokBuild?.Dispose(); _xaiChat?.Dispose(); _planChat?.Dispose(); _ollamaChat.Dispose();
     }
 }
