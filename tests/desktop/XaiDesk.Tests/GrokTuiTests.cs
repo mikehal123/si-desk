@@ -118,21 +118,57 @@ public sealed class GrokTuiTests
     }
 
     [Fact]
-    public void Classic_chat_defaults_off_and_roundtrips()
+    public void Classic_chat_missing_or_unreadable_file_is_enabled()
     {
         var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(profile);
         try
         {
-            Assert.False(ClassicChatPreference.Load(profile));
-            ClassicChatPreference.Save(profile, true);
+            Assert.False(File.Exists(Path.Combine(profile, "classic-chat.json")));
             Assert.True(ClassicChatPreference.Load(profile));
-            Assert.Equal("{\"enabled\":true}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+
+            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{");
+            Assert.True(ClassicChatPreference.Load(profile));
+        }
+        finally
+        {
+            if (Directory.Exists(profile)) Directory.Delete(profile, true);
+        }
+    }
+
+    [Fact]
+    public void Classic_chat_explicit_false_is_respected()
+    {
+        var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profile);
+        try
+        {
+            ClassicChatPreference.Save(profile, false);
+            Assert.Equal("{\"enabled\":false}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+            Assert.False(ClassicChatPreference.Load(profile));
 
             File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{\"Enabled\":false}");
             Assert.False(ClassicChatPreference.Load(profile));
-            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{");
-            Assert.False(ClassicChatPreference.Load(profile));
+        }
+        finally
+        {
+            if (Directory.Exists(profile)) Directory.Delete(profile, true);
+        }
+    }
+
+    [Fact]
+    public void Classic_chat_explicit_true_is_respected()
+    {
+        var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profile);
+        try
+        {
+            ClassicChatPreference.Save(profile, true);
+            Assert.Equal("{\"enabled\":true}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+            Assert.True(ClassicChatPreference.Load(profile));
+
+            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{\"enabled\":true}");
+            Assert.True(ClassicChatPreference.Load(profile));
         }
         finally
         {

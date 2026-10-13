@@ -6,6 +6,10 @@
 - Connect, refresh, and Grok Build silence errors name what is missing (xAI API key, Cursor sign-in, Grok CLI on PATH, auth, or network) and the next step.
 - First launch and Settings include a setup check for the xAI API key, Cursor login, and Grok Build. Each line is OK or Missing. Secret values are not shown.
 
+## 0.3.63
+
+- Classic chat view, with rounded bubbles and cleaner panels, is now on by default.
+
 ## 0.3.62
 
 - Easy install (`bfc6992`): the .NET 10 SDK rolls forward within the 10.0 band, `scripts/publish-release.ps1` builds a self-contained win-x64 zip, and setup does a real per-user install.
