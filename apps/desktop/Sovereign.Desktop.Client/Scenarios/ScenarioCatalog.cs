@@ -13,7 +13,7 @@ public sealed class ScenarioDocument
     public Presence<AccountView> Account { get; init; } = Presence<AccountView>.Missing("no account in this scenario");
     public IReadOnlyList<DecisionRecord> Decisions { get; init; } = [];
     public IReadOnlyList<ClientEvent> Events { get; init; } = [];
-    public IReadOnlyList<ResearchJob> Jobs { get; init; } = [];
+    public IReadOnlyList<InquiryJob> Jobs { get; init; } = [];
     public IReadOnlyList<CapabilityItem> Capabilities { get; init; } = [];
     public IReadOnlyList<EvidenceDocument> Evidence { get; init; } = [];
     public required EvaluationSummary Evaluation { get; init; }
@@ -160,7 +160,7 @@ public static class ScenarioCatalog
         e.DecisionId,
         e.GapBefore);
 
-    private static ResearchJob MapJob(JobDto j) => new(
+    private static InquiryJob MapJob(JobDto j) => new(
         j.Id ?? throw new InvalidOperationException("job id required"),
         j.Title ?? j.Id,
         j.Status ?? "unknown",

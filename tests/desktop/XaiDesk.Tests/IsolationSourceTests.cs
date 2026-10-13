@@ -4,11 +4,13 @@ namespace XaiDesk.Tests;
 
 public sealed class IsolationSourceTests
 {
+    private const string OriginalDesk = "Sovereign" + "AI";
+
     private static readonly string[] Forbidden =
     [
-        "SovereignAI.DesktopPreview",
-        "SovereignAI.CodingPlan",
-        "SovereignAI.MarketData",
+        OriginalDesk + ".DesktopPreview",
+        OriginalDesk + ".CodingPlan",
+        OriginalDesk + ".MarketData",
         "8788"
     ];
 

@@ -424,6 +424,7 @@ internal sealed partial class ChatConversation
             Margin = new Thickness(DeskTheme.Space12, DeskTheme.Space4, DeskTheme.Space12, DeskTheme.Space12),
             Children = { SwarmNoteLine("Claim", note.Claim), SwarmNoteLine("Evidence", note.Evidence), SwarmNoteLine("Verdict", note.Verdict), chatHost }
         };
+        if (CursorChat && SwarmRoleModels.IsMixed(_saved.SwarmHire)) InsertCursorModelHire(notes, task);
         var row = SubagentExpander(SubagentHeaderChrome(header), notes, false);
         AutomationName(row, "Swarm task " + titleText + " " + label);
         if (label == "doing") PulseSwarmPill(pill, 1, 0.45, 780);
@@ -431,6 +432,75 @@ internal sealed partial class ChatConversation
         else if (pop) PopSwarmPill(pill);
         else if (shake) ShakeSwarmPill(pill);
         return row;
+    }
+
+    private void InsertCursorModelHire(StackPanel notes, SwarmTask task)
+    {
+        SwarmRoleModels.EnsureDefaults(_profileDirectory);
+        var loaded = SwarmRoleModels.Load(_profileDirectory);
+        var advertised = AdvertisedForHire();
+        var chatModelId = SelectedChatModel;
+        if (string.IsNullOrWhiteSpace(chatModelId)) chatModelId = _saved.Model;
+        string? overrideId = null;
+        if (!string.IsNullOrWhiteSpace(_saved.Id) && !string.IsNullOrWhiteSpace(task.Id))
+            loaded.Overrides.TryGetValue(_saved.Id + "/" + task.Id, out overrideId);
+        var wake = IsCursorWakeRole(task.Role);
+        var picked = wake ? null : SwarmRoleModels.ForRole(advertised, loaded.Roles, task.Role, chatModelId, overrideId);
+        string hireLabel;
+        if (wake) hireLabel = "Wake role";
+        else if (string.IsNullOrWhiteSpace(picked)) hireLabel = "No model hire";
+        else hireLabel = ChatModelLabel.Display(picked, AdvertisedName(advertised, picked));
+        var caption = SubagentCaption("Model: " + hireLabel);
+        notes.Children.Insert(0, caption);
+        if (wake || advertised.Length == 0) return;
+
+        var combo = new ComboBox
+        {
+            FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption, MinWidth = 180, MaxWidth = 360,
+            HorizontalAlignment = HorizontalAlignment.Left, PlaceholderText = "Choose a model"
+        };
+        var selected = -1;
+        for (var i = 0; i < advertised.Length; i++)
+        {
+            var model = advertised[i];
+            combo.Items.Add(new ComboBoxItem { Content = ChatModelLabel.Display(model.Id, model.Name), Tag = model.Id });
+            if (selected < 0 && string.Equals(model.Id, picked, StringComparison.Ordinal)) selected = i;
+        }
+        if (selected >= 0) combo.SelectedIndex = selected;
+        var ready = false;
+        var shown = picked;
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (!ready) return;
+            if (combo.SelectedItem is not ComboBoxItem item || item.Tag is not string selectedId || string.IsNullOrWhiteSpace(selectedId)) return;
+            if (string.Equals(selectedId, shown, StringComparison.Ordinal)) return;
+            shown = selectedId;
+            SwarmRoleModels.SaveOverride(_profileDirectory, _saved.Id, task.Id, selectedId);
+            caption.Text = "Model: " + ChatModelLabel.Display(selectedId, AdvertisedName(advertised, selectedId));
+        };
+        combo.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, e) => e.Handled = true), true);
+        var hireTitle = string.IsNullOrWhiteSpace(task.Title) ? task.Id : task.Title.Trim();
+        AutomationName(combo, "Model for swarm worker " + hireTitle);
+        notes.Children.Insert(1, combo);
+        ready = true;
+    }
+
+    private CursorChatModel[] AdvertisedForHire()
+    {
+        var live = _cursorChat?.AdvertisedModels;
+        if (live is { Length: > 0 }) return live;
+        return CursorModelCatalog.Load(_profileDirectory);
+    }
+
+    private static bool IsCursorWakeRole(string? role) =>
+        string.Equals(role, "grokbot-" + "resear" + "ch", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(role, "grokbot-ops", StringComparison.OrdinalIgnoreCase);
+
+    private static string? AdvertisedName(IReadOnlyList<CursorChatModel> advertised, string id)
+    {
+        foreach (var model in advertised)
+            if (model is not null && string.Equals(model.Id, id, StringComparison.Ordinal)) return model.Name;
+        return null;
     }
 
     private static TextBlock SwarmNoteLine(string name, string? value)

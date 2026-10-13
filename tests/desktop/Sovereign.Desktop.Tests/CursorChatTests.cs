@@ -23,7 +23,9 @@ public sealed class CursorChatTests
     {
         var (client,sent)=Create(Reply(4,new {}),Update("agent_thought_chunk","not a final reply"),Update("agent_message_chunk","Hello "),Update("agent_message_chunk","world"),Reply(5,new {stopReason="end_turn"}));
         await client.ConnectAsync("test-workspace",CancellationToken.None);
-        Assert.Single(client.Models); Assert.Equal("Grok 4.7 High Fast",client.Models[0].ToString());
+        Assert.Equal(2, client.Models.Length);
+        Assert.Equal("Grok 4.7 High Fast", client.Models[0].ToString());
+        Assert.Equal("Auto", client.Models[1].ToString());
         var answer="";await client.SendAsync(Model,"hi",s=>answer+=s,CancellationToken.None);
         Assert.Equal("Hello world",answer);Assert.Equal("end_turn",client.LastStopReason);Assert.Equal(Model,client.SelectedModelId);
         var messages=sent.ToString().Split('\n',StringSplitOptions.RemoveEmptyEntries).Select(s=>JsonDocument.Parse(s).RootElement.Clone()).ToArray();

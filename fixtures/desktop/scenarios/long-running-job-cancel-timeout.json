@@ -56,7 +56,7 @@
   },
   "account": {
     "presence": "missing",
-    "reason": "Research workspace scenario does not imply an account."
+    "reason": "Inquiry workspace scenario does not imply an account."
   },
   "decisions": [],
   "events": [
@@ -114,7 +114,7 @@
       "id": "rig.search_desk_knowledge",
       "version": "planned",
       "status": "planned",
-      "provider": "host-research-worker",
+      "provider": "host-inquiry-worker",
       "permission_scope": "read-approved-library",
       "required_capabilities": [
         "library-read"

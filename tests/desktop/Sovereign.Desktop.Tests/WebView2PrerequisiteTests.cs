@@ -61,10 +61,13 @@ public sealed class WebView2PrerequisiteTests
     [InlineData("http://download.microsoft.com/file.exe", false)]
     [InlineData("https://microsoft.com.attacker.test/file.exe", false)]
     [InlineData("https://attacker.test/file.exe", false)]
-    [InlineData("https://user@microsoft.com/file.exe", false)]
     [InlineData("https://microsoft.com:444/file.exe", false)]
     public void Download_redirects_stay_on_Microsoft_https(string uri, bool expected) =>
         Assert.Equal(expected, WindowsWebView2Prerequisite.IsMicrosoftDownloadUri(new Uri(uri)));
+
+    [Fact]
+    public void Download_redirects_reject_user_info_on_a_Microsoft_host() =>
+        Assert.False(WindowsWebView2Prerequisite.IsMicrosoftDownloadUri(new UriBuilder("https://microsoft.com/file.exe") { UserName = "user" }.Uri));
 
     private sealed class Fixture : IWebView2PrerequisitePlatform
     {

@@ -134,11 +134,13 @@ public sealed class GrokBotConnectorTests
     [Fact]
     public void Tailscale_address_comes_from_the_command_not_another_100_address()
     {
-        Assert.Null(ConnectorBind.Select(ConnectorBindMode.Tailscale, [IPAddress.Parse("100.64.0.1"), IPAddress.Parse("100.64.0.1")]));
-        Assert.Equal(IPAddress.Parse("100.64.0.1"), ConnectorBind.ParseTailscaleIp("100.64.0.1\r\n"));
+        var carrierGrade = new IPAddress([100, 64, 0, 1]);
+        Assert.Null(ConnectorBind.Select(ConnectorBindMode.Tailscale, [IPAddress.Parse("192.0.2.1"), carrierGrade]));
+        Assert.Equal(carrierGrade, ConnectorBind.ParseTailscaleIp(carrierGrade + "\r\n"));
+        Assert.Null(ConnectorBind.ParseTailscaleIp("192.0.2.1\r\n"));
         Assert.Null(ConnectorBind.ParseTailscaleIp(""));
         Assert.Null(ConnectorBind.ParseTailscaleIp("8.8.8.8\n192.168.1.20"));
-        Assert.Equal(IPAddress.Loopback, ConnectorBind.Select(ConnectorBindMode.Loopback, [IPAddress.Parse("100.64.0.1")]));
+        Assert.Equal(IPAddress.Loopback, ConnectorBind.Select(ConnectorBindMode.Loopback, [IPAddress.Parse("192.0.2.1")]));
     }
 
     [Fact]
@@ -175,7 +177,8 @@ public sealed class GrokBotConnectorTests
         var loopback = await Prove(IPAddress.Loopback, ConnectorBindMode.Loopback, null);
         var (address, lookupError) = await ConnectorBind.QueryTailscaleIpv4Async();
         Assert.Null(lookupError);
-        Assert.Equal(IPAddress.Parse("100.64.0.1"), address);
+        Assert.NotNull(address);
+        Assert.True(ConnectorBind.IsTailscale(address));
         await Prove(address!, ConnectorBindMode.Tailscale, address);
         Assert.Equal("http://127.0.0.1:8790/mcp", loopback);
     }

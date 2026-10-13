@@ -14,7 +14,7 @@ public sealed class SwarmInterruptTests
             var board = SwarmBoard.Create("Trace two files",
             [
                 new SwarmTask { Id = "t-a", Title = "Trace title", Role = SwarmRole.Investigator, Details = "Read title.txt and every neighbor.", Status = SwarmStatus.Doing, Assignee = "helper-1" },
-                new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo }
+                new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Inquirer, Status = SwarmStatus.Todo }
             ], root);
 
             var first = board.Interrupt("t-a", "helper stopped");

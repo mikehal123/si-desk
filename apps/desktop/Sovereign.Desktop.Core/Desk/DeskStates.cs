@@ -2,7 +2,7 @@ namespace Sovereign.Desktop.Core.Desk;
 
 public enum DataState { NotFound, FailedToRead, LoadedEmpty, Stale, Loaded }
 public enum JobState { Queued, Running, WaitingForApproval, Cancelling, Completed, Cancelled, Interrupted, Failed, BudgetExhausted, RegimeRefused }
-public enum ResearchState { Unstarted, Investigating, Blocked, ReviewReady, Sufficient, Monitoring, Archived }
+public enum InquiryState { Unstarted, Investigating, Blocked, ReviewReady, Sufficient, Monitoring, Archived }
 public enum DecisionState { Unassessed, NeedMoreEvidence, Watch, Conditional, Reject, HumanApprovedAction }
 public enum OperationState { Reserved, Dispatched, Succeeded, Failed, Cancelled, OutcomeUnknown }
 

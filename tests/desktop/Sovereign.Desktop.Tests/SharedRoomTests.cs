@@ -47,7 +47,7 @@ public sealed class SharedRoomTests
         http.DefaultRequestHeaders.Add("Origin", "https://attacker.invalid");
         Assert.Equal(HttpStatusCode.Forbidden,(await http.GetAsync("/")).StatusCode);
         Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new Uri("http://192.168.1.20/")));
-        Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new Uri("https://user:pass@example.com/")));
+        Assert.Throws<ArgumentException>(() => RoomConnection.ValidateAddress(new UriBuilder("https://example.com/") { UserName = "user", Password = "pass" }.Uri));
         await Assert.ThrowsAsync<IOException>(() => peer.SendAsync(new RoomPost(Guid.NewGuid(),"system","","fake authority"),CancellationToken.None));
     }
 }

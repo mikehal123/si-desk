@@ -5,7 +5,7 @@ public sealed record CaseRecord(int SchemaVersion, Guid CaseId, string Title, Da
 public sealed record CaseRevision(int SchemaVersion, Guid RevisionId, Guid CaseId, Guid? ParentRevisionId,
     Guid? OriginatingRunId, string Question, Guid? ContextRevisionId, Guid? MandateRevisionId,
     Guid[] QuestionIds, Guid[] ClaimIds, Guid[] EvidenceIds, Guid[] CalculationIds,
-    ResearchState ResearchState, DecisionState ProposedDisposition, Guid ContentArtifactId,
+    InquiryState InquiryState, DecisionState ProposedDisposition, Guid ContentArtifactId,
     DateTimeOffset CreatedAt, DateTimeOffset? ReviewedAt);
 public sealed record ProviderRoute(string ProviderId, string ModelId, string ConnectionRef);
 public sealed record BudgetPolicy(int MaxModelCalls, int MaxSourceCalls, int MaxOutputTokens,
@@ -35,7 +35,7 @@ public sealed record Claim(int SchemaVersion, Guid ClaimId, string Text, string 
 public sealed record Observation(int SchemaVersion, Guid ObservationId, string? DecimalValue, string? TextValue,
     string Units, string? Currency, string? Period, DateTimeOffset? AsOf, string AdjustmentBasis,
     Guid EvidenceRevisionId, EvidenceLocator Locator, string ExtractionMethod, string VerificationStatus);
-public sealed record ResearchQuestion(int SchemaVersion, Guid QuestionId, string Text, string DecisionRelevance,
+public sealed record InquiryQuestion(int SchemaVersion, Guid QuestionId, string Text, string DecisionRelevance,
     Guid[] DependencyIds, string Status, string AcceptableEvidence, string StoppingCondition, string CostClass);
 public sealed record ContextRevision(int SchemaVersion, Guid RevisionId, Guid? ParentRevisionId, string Owner,
     string Scope, string Horizon, string[] Constraints, Guid[] EvidenceIds, DateTimeOffset AsOf,

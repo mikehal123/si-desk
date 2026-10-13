@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Sovereign.Desktop.Connector;
 using Sovereign.Desktop.Core;
 using Xunit;
@@ -16,15 +17,18 @@ public sealed class WorkDoctrineTests
         Assert.StartsWith("# Work Doctrine", skill, StringComparison.Ordinal);
         Assert.Contains("REVERSIBLE", skill, StringComparison.Ordinal);
         Assert.Contains("nothing is done without proof per the verify-result skill", skill, StringComparison.Ordinal);
-        var index = File.ReadAllText(Path.Combine(Directory.GetParent(path)!.Parent!.FullName, "index.json"));
-        foreach (var role in new[] { "main", "subagent", "engineer", "researcher", "verifier", "grokbot-research", "grokbot-ops", "manager" })
-            Assert.Contains("\"" + role + "\"", index, StringComparison.Ordinal);
+        using var index = JsonDocument.Parse(File.ReadAllText(Path.Combine(Directory.GetParent(path)!.Parent!.FullName, "index.json")));
+        var indexedRoles = index.RootElement.GetProperty("skills").EnumerateArray()
+            .Single(skill => skill.GetProperty("name").GetString() == "work-doctrine")
+            .GetProperty("roles").EnumerateArray().Select(role => role.GetString()).ToList();
+        foreach (var role in new[] { "main", "subagent", SwarmRole.Engineer, SwarmRole.Inquirer, SwarmRole.Verifier, SwarmRole.GrokbotInquiry, SwarmRole.GrokbotOps, "manager" })
+            Assert.Contains(role, indexedRoles);
 
         var prefix = WorkDoctrine.PromptPrefix();
         Assert.Contains("main agent loads it by default", prefix, StringComparison.Ordinal);
         Assert.Contains("put the Work Doctrine text below at the top of that helper's task", prefix, StringComparison.Ordinal);
 
-        foreach (var role in new[] { SwarmRole.Engineer, SwarmRole.Researcher, SwarmRole.Verifier, SwarmRole.GrokbotResearch, SwarmRole.GrokbotOps, "worker" })
+        foreach (var role in new[] { SwarmRole.Engineer, SwarmRole.Inquirer, SwarmRole.Verifier, SwarmRole.GrokbotInquiry, SwarmRole.GrokbotOps, "worker" })
         {
             var prompt = SwarmRoles.For(role);
             Assert.Contains("# Work Doctrine", prompt, StringComparison.Ordinal);

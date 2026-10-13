@@ -11,7 +11,7 @@
     <Company>xAI Desk</Company>
     <Authors>xAI Desk</Authors>
     <Copyright>Copyright (c) xAI Desk</Copyright>
-    <Version>0.3.60</Version>
+    <Version>0.3.61</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
     <InformationalVersion>$(Version)-desk-foundation</InformationalVersion>

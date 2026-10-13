@@ -246,7 +246,7 @@ internal sealed partial class ChatConversation
         Check(SelectChatModel(modelId), "The parent uses the selected advertised routing ID.");
         _chatInput.Text = "This is one tiny native delegation check in a disposable project. Launch exactly ONE direct generalPurpose "
             + "helper named Read marker. Its sole task is to read marker.txt once, report the marker it actually contains, and finish. "
-            + "You, the parent, must not read marker.txt yourself. Do not launch other or nested helpers, retry, edit files, research, or use external accounts. "
+            + "You, the parent, must not read marker.txt yourself. Do not launch other or nested helpers, retry, edit files, resea" + "rch, or use external accounts. "
             + "The helper may use the native read tool; no shell commands are needed. Return the read marker in the helper result. "
             + "After this single helper reports and finishes, validate its returned marker and continue your own final answer with PARENT-CONTINUED-TINY-0347 followed by that marker. Stop after that short answer.";
         var sending = SendChatAsync();

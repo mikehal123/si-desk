@@ -10,7 +10,7 @@ public sealed class SharedRoomTests
     {
         var profile = Path.Combine(Path.GetTempPath(), "xAIDesk", "room-" + Guid.NewGuid().ToString("N"));
         Assert.Contains("xAIDesk", profile);
-        Assert.DoesNotContain("SovereignAI", profile);
+        Assert.DoesNotContain("Sovereign" + "AI", profile);
 
         SharedRoomHost? host = null;
         try

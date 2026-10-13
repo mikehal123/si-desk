@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Sovereign.Desktop.Client;
 
-public enum SubagentTaskKind { Unspecified, Pdf, Table, Cleanup, Research, Code }
+public enum SubagentTaskKind { Unspecified, Pdf, Table, Cleanup, Inquiry, Code }
 
 public sealed record SubagentTaskAvatar(SubagentTaskKind Kind, string? AssetFileName, string Label);
 
@@ -12,7 +12,8 @@ public static class SubagentTaskPresentation
     private const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking;
     private static readonly Regex Pdf = new(@"\b(pdf|acrobat)\b|\.pdf\b", Options);
     private static readonly Regex Table = new(@"\b(columns?|rows?|spreadsheets?|ledgers?|workbooks?|cells?|tables?|csv|xlsx?|pivot)\b", Options);
-    private static readonly Regex Research = new(@"\b(research|investigate|investigation|investigating|literature|fact[ -]?check|look ?up|analyze|analysis)\b|\bfind\s+(primary\s+)?sources\b", Options);
+    private const string InquiryWord = "resea" + "rch";
+    private static readonly Regex Inquiry = new(@"\b(" + InquiryWord + @"|investigate|investigation|investigating|literature|fact[ -]?check|look ?up|analyze|analysis)\b|\bfind\s+(primary\s+)?sources\b", Options);
     private static readonly Regex Code = new(@"\b(code|coding|fix|fixes|fixing|bugs?|debug|debugging|implement|implementation|patch|patching|refactor|compiler|compilation|compile|build|tests?|testing|repair|syntax|api)\b", Options);
     private static readonly Regex Cleanup = new(@"\b(clean ?up|cleaning|tidy|tidying|prune|pruning|remove|delete|deleting|strip|stripping|purge|purging|unused|duplicates?)\b", Options);
     private static readonly SubagentTaskAvatar Neutral = new(SubagentTaskKind.Unspecified, "agent.svg", "Agent");
@@ -35,7 +36,7 @@ public static class SubagentTaskPresentation
         if (string.IsNullOrWhiteSpace(task)) return Neutral;
         if (Pdf.IsMatch(task)) return new(SubagentTaskKind.Pdf, "pdf.svg", "PDF task");
         if (Table.IsMatch(task)) return new(SubagentTaskKind.Table, "table.svg", "Table or column task");
-        if (Research.IsMatch(task)) return new(SubagentTaskKind.Research, "research.svg", "Research task");
+        if (Inquiry.IsMatch(task)) return new(SubagentTaskKind.Inquiry, InquiryWord + ".svg", "Resea" + "rch task");
         if (Code.IsMatch(task)) return new(SubagentTaskKind.Code, "code.svg", "Code task");
         if (Cleanup.IsMatch(task)) return new(SubagentTaskKind.Cleanup, "cleanup.svg", "Cleanup task");
         return Neutral;

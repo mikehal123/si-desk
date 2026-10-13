@@ -34,6 +34,7 @@ public sealed partial class MainWindow
     private Button? _roomShare;
     private Button? _roomDiscard;
     private Button? _roomJump;
+    private Button? _roomRetry;
     private Border? _roomDraftCard;
     private bool _roomBusy;
     private bool _roomFollowTail = true;
@@ -59,8 +60,11 @@ public sealed partial class MainWindow
             Act("Create online room", CreateRoomAsync), Act("Join room", JoinRoomAsync),
             Act("Copy invitation", CopyRoomInvitationAsync), Act("New invitation", RotateRoomInvitationAsync),
             Act("Leave / stop room", StopRoomAsync) } };
+        _roomRetry = Button("Retry", () => RunRoom(CreateRoomAsync));
+        _roomRetry.Visibility = Visibility.Collapsed;
+        _roomActions.Add(_roomRetry);
         var saved = new Expander { Header = "Rooms on this PC", IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Content = _savedRooms };
-        var top = new StackPanel { Spacing = DeskTheme.Space8, Children = { Head("Shared room"), _roomName, actions, _roomInvite, _roomStatus, _roomMembers, saved } };
+        var top = new StackPanel { Spacing = DeskTheme.Space8, Children = { Head("Shared room"), _roomName, actions, _roomInvite, _roomStatus, _roomRetry, _roomMembers, saved } };
         _roomPage.Children.Add(top);
         _roomMessages.Children.Add(_roomEmpty);
         _roomScroll = new ScrollViewer { Content = _roomMessages, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Enabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -129,6 +133,7 @@ public sealed partial class MainWindow
     {
         if (_roomBusy) return;
         SetRoomBusy(true);
+        if (_roomRetry is not null) _roomRetry.Visibility = Visibility.Collapsed;
         try { await action(); }
         catch (Exception ex) { _roomStatus.Text = ex.Message; }
         finally { SetRoomBusy(false); }
@@ -184,6 +189,9 @@ public sealed partial class MainWindow
         _roomStatus.Text = "Starting your room and temporary internet relay…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(75));
         try {
+            using (var download = new CancellationTokenSource(TimeSpan.FromMinutes(3)))
+                await CloudflaredTool.EnsureAsync(downloading: () => _roomStatus.Text = "Downloading tunnel tool…", ct: download.Token);
+            _roomStatus.Text = "Starting your room and temporary internet relay…";
             var name = string.IsNullOrWhiteSpace(_roomName.Text) ? "Host" : _roomName.Text.Trim();
             _roomHost = new SharedRoomHost(_vm.ProfileDirectory, name); await _roomHost.StartAsync(timeout.Token);
             _roomTunnel = new RoomTunnel(); _roomPublicAddress = await _roomTunnel.StartAsync(AppContext.BaseDirectory, _vm.ProfileDirectory, _roomHost.Address, timeout.Token);
@@ -191,7 +199,7 @@ public sealed partial class MainWindow
             _roomInvite.Text = _roomHost.NewInvitation(_roomPublicAddress); StartRoomPolling();
             _roomStatus.Text = "Hosting on this PC. Copy the invitation for the person you're inviting. It expires in about 20 minutes. Keep this app open.";
             RefreshSavedRooms();
-        } catch { await StopRoomAsync(); throw; }
+        } catch { await StopRoomAsync(); if (_roomRetry is not null) _roomRetry.Visibility = Visibility.Visible; throw; }
     }
     private async Task JoinRoomAsync()
     {

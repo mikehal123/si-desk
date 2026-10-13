@@ -11,7 +11,7 @@ It is **not affiliated with, endorsed by, or supported by xAI.**
   - your Grok Build CLI subscription
   - a paid xAI API key
 - **Subagents** that help with parts of a task.
-- **Swarm mode.** A manager splits a goal into parallel engineer, researcher and verifier tasks. Nothing counts as done until a verifier proves it. If a worker fails, you can press Respawn to retry it once.
+- **Swarm mode.** A manager splits a goal into parallel engineer, fact-finding and verifier tasks. Nothing counts as done until a verifier proves it. If a worker fails, you can press Respawn to retry it once.
 - **Changes review tab** to look over edits before you keep them.
 - **Grok Bot connector** (optional) to add a main assistant.
 - **Shared room** to build together. Send an invite and other people can join.
@@ -48,10 +48,7 @@ This is the expected build command. Please check it against the project files be
 
 ## Shared room setup
 
-Shared room invites need cloudflared, which is not included in this repo.
-
-1. Download the Windows amd64 build of cloudflared from https://github.com/cloudflare/cloudflared/releases
-2. Rename it `cloudflared.exe` if needed, and put it in `apps/desktop/room-tunnel/`.
+Shared room invites need cloudflared, which is not included in this repo. On first use it is downloaded automatically, pinned to 2026.10.0, SHA256 verified, and saved to `%LOCALAPPDATA%\xai-desk\tools\cloudflared.exe`.
 
 ## Status
 

@@ -26,12 +26,12 @@ public sealed class GrokBuildAccountTests
     {
         var report = GrokBuildAccount.Interpret(
             "grok 1.0.50",
-            """{"acct":{"email":"ada@x.ai"}}""",
+            """{"acct":{"email":"user at example.test"}}""",
             "HTTP 429 free-usage-exhausted",
             null);
         Assert.Contains("HTTP 429 free-usage-exhausted", report.Error);
         Assert.Equal("free", report.Plan);
-        Assert.Equal("ada@x.ai", report.SignedInAs);
+        Assert.Equal("user at example.test", report.SignedInAs);
         Assert.False(report.Ok);
     }
 
@@ -41,12 +41,12 @@ public sealed class GrokBuildAccountTests
         const string secret = "super-secret-token";
         var report = GrokBuildAccount.Interpret(
             "grok 1.0.50",
-            "{\"acct\":{\"email\":\"ada@x.ai\",\"first_name\":\"Ada\",\"api_key\":\"" + secret + "\",\"refresh_token\":\"" + secret + "\"}}",
+            "{\"acct\":{\"email\":\"user at example.test\",\"first_name\":\"Ada\",\"api_key\":\"" + secret + "\",\"refresh_token\":\"" + secret + "\"}}",
             "grok-4.7\ngrok-3",
             null);
         Assert.True(report.Ok);
         Assert.Null(report.Error);
-        Assert.Equal("ada@x.ai", report.SignedInAs);
+        Assert.Equal("user at example.test", report.SignedInAs);
         Assert.Equal("grok 1.0.50", report.Version);
         Assert.Equal("unknown", report.Plan);
         Assert.DoesNotContain(secret, report.SignedInAs);

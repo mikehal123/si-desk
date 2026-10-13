@@ -99,7 +99,7 @@
       "id": "rig.search_desk_knowledge",
       "version": "planned",
       "status": "planned",
-      "provider": "host-research-worker",
+      "provider": "host-inquiry-worker",
       "permission_scope": "read-approved-library",
       "required_capabilities": [
         "library-read"
@@ -121,7 +121,7 @@
         "http"
       ],
       "source_uris": [
-        "https://example.invalid/research/aaa",
+        "https://example.invalid/inquiry/aaa",
         "javascript:alert(1)",
         "file:///C:/Windows/win.ini"
       ]

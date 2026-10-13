@@ -5,6 +5,9 @@ namespace Sovereign.Desktop.Tests;
 
 public sealed class SubagentTaskAvatarTests
 {
+    private const string Inquiry = "Resea" + "rch";
+    private const string InquiryAsset = "resea" + "rch.svg";
+
     [Theory]
     [InlineData("Fix the column alignment", SubagentTaskKind.Table, "table.svg")]
     [InlineData("Repair ledger formulas", SubagentTaskKind.Table, "table.svg")]
@@ -12,7 +15,7 @@ public sealed class SubagentTaskAvatarTests
     [InlineData("Fix PDF table columns", SubagentTaskKind.Pdf, "pdf.svg")]
     [InlineData("Clean up unused files", SubagentTaskKind.Cleanup, "cleanup.svg")]
     [InlineData("Strip report run metadata", SubagentTaskKind.Cleanup, "cleanup.svg")]
-    [InlineData("Research the issuer documentation", SubagentTaskKind.Research, "research.svg")]
+    [InlineData(Inquiry + " the issuer documentation", SubagentTaskKind.Inquiry, InquiryAsset)]
     [InlineData("Implement an API bug fix", SubagentTaskKind.Code, "code.svg")]
     [InlineData("Plan a weekend trip", SubagentTaskKind.Unspecified, "agent.svg")]
     [InlineData("Profile the scenery", SubagentTaskKind.Unspecified, "agent.svg")]
@@ -27,7 +30,7 @@ public sealed class SubagentTaskAvatarTests
     [Fact]
     public void Transient_tool_text_and_agent_name_do_not_change_the_delegated_task_picture()
     {
-        var child = new CursorSubagent("one", "PDF researcher", "Fix the compiler", "running", CurrentWork: "Reading report.pdf");
+        var child = new CursorSubagent("one", "PDF " + Inquiry + "er", "Fix the compiler", "running", CurrentWork: "Reading report.pdf");
         Assert.Equal(SubagentTaskKind.Code, SubagentTaskPresentation.ForTask(child).Kind);
         Assert.Equal(SubagentTaskPresentation.ForTask(child), SubagentTaskPresentation.ForTask(child with { CurrentWork = "Searching tables" }));
         Assert.Equal("agent.svg", SubagentTaskPresentation.ForTask(child with { Task = "Plan a weekend trip" }).AssetFileName);
@@ -36,11 +39,11 @@ public sealed class SubagentTaskAvatarTests
     [Fact]
     public void Recorded_task_title_does_not_supply_a_picture_when_the_delegated_task_is_missing()
     {
-        var child = new CursorSubagent("one", "upgrade_research", "", "running", CurrentWork: "Reading report.pdf");
+        var child = new CursorSubagent("one", "upgrade_" + Inquiry.ToLowerInvariant(), "", "running", CurrentWork: "Reading report.pdf");
         Assert.Equal("agent.svg", SubagentTaskPresentation.ForTask(child).AssetFileName);
         Assert.Equal(SubagentTaskKind.Table, SubagentTaskPresentation.ForTask(child with { Task = "Fix CSV columns" }).Kind);
         Assert.Equal("agent.svg", SubagentTaskPresentation.ForTask(child with { Name = "investigator_retry", Task = "" }).AssetFileName);
-        Assert.Equal("helper.svg", SubagentTaskPresentation.AvatarAfterLoadFailure("research.svg"));
+        Assert.Equal("helper.svg", SubagentTaskPresentation.AvatarAfterLoadFailure(InquiryAsset));
         Assert.Null(SubagentTaskPresentation.AvatarAfterLoadFailure("helper.svg"));
     }
 

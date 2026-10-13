@@ -13,7 +13,9 @@ public sealed record GrokbotMail(
     DateTimeOffset Created,
     string? Reply,
     DateTimeOffset? AnsweredAt,
-    string? WakeNote = null);
+    string? WakeNote = null,
+    DateTimeOffset? PickedUpAt = null,
+    bool Liked = false);
 
 public enum GrokbotLinkState { Off, Waiting, Connected }
 
@@ -26,6 +28,8 @@ public sealed class GrokbotPreferences
     public bool Screenshots { get; set; }
     public bool Stopped { get; set; }
     public string WakeUrl { get; set; } = "";
+    public string AvatarColor { get; set; } = GrokbotAvatarChoice.DefaultColor;
+    public string AvatarShape { get; set; } = GrokbotAvatarChoice.DefaultShape;
 }
 
 public sealed record GrokbotAuditLine(DateTimeOffset At, string Tool, string Args, string Result);
@@ -133,7 +137,7 @@ public sealed class GrokbotMailbox
                 if (mail.Status == GrokbotMailStatus.Answered) continue;
                 if (cutoff is DateTimeOffset from && mail.Created <= from) continue;
                 if (mail.Status == GrokbotMailStatus.Queued)
-                    mail = mail with { Status = GrokbotMailStatus.PickedUp };
+                    mail = mail with { Status = GrokbotMailStatus.PickedUp, PickedUpAt = mail.PickedUpAt ?? DateTimeOffset.UtcNow };
                 _messages[i] = mail;
                 picked.Add(mail);
             }
@@ -154,6 +158,20 @@ public sealed class GrokbotMailbox
             if (current.Status == GrokbotMailStatus.Answered)
                 throw new InvalidOperationException("That message is already answered.");
             var updated = current with { Status = GrokbotMailStatus.Answered, Reply = clean, AnsweredAt = DateTimeOffset.UtcNow };
+            _messages[index] = updated;
+            SaveMessages();
+            return updated;
+        }
+    }
+
+    public GrokbotMail SetLiked(string id, bool liked)
+    {
+        if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("message_id is required.");
+        lock (_gate)
+        {
+            var index = _messages.FindIndex(item => item.Id == id);
+            if (index < 0) throw new KeyNotFoundException("That inbox message is not in the Grokbot tab.");
+            var updated = _messages[index] with { Liked = liked };
             _messages[index] = updated;
             SaveMessages();
             return updated;
@@ -232,7 +250,7 @@ public sealed class GrokbotMailbox
         {
             var saved = JsonSerializer.Deserialize<MailFile>(line, Json);
             if (saved is null || string.IsNullOrWhiteSpace(saved.Id)) return;
-            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote));
+            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked));
         });
         while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         LoadLines(Path.Combine(_directory, "audit.jsonl"), line =>
@@ -256,6 +274,8 @@ public sealed class GrokbotMailbox
             if (saved.Screenshots is bool shots) _preferences.Screenshots = shots;
             if (saved.Stopped is bool stopped) _preferences.Stopped = stopped;
             if (saved.WakeUrl is string wake) _preferences.WakeUrl = wake;
+            if (saved.AvatarColor is string color) _preferences.AvatarColor = GrokbotAvatarChoice.NormalizeColor(color);
+            if (saved.AvatarShape is string shape) _preferences.AvatarShape = GrokbotAvatarChoice.NormalizeShape(shape);
             _lastPoll = saved.LastPoll;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
@@ -293,6 +313,8 @@ public sealed class GrokbotMailbox
             Screenshots = _preferences.Screenshots,
             Stopped = _preferences.Stopped,
             WakeUrl = _preferences.WakeUrl ?? "",
+            AvatarColor = GrokbotAvatarChoice.NormalizeColor(_preferences.AvatarColor),
+            AvatarShape = GrokbotAvatarChoice.NormalizeShape(_preferences.AvatarShape),
             LastPoll = _lastPoll
         };
         WriteAtomic(Path.Combine(_directory, "state.json"), JsonSerializer.Serialize(state, Json));
@@ -320,7 +342,9 @@ public sealed class GrokbotMailbox
         AllowControl = source.AllowControl,
         Screenshots = source.Screenshots,
         Stopped = source.Stopped,
-        WakeUrl = source.WakeUrl ?? ""
+        WakeUrl = source.WakeUrl ?? "",
+        AvatarColor = GrokbotAvatarChoice.NormalizeColor(source.AvatarColor),
+        AvatarShape = GrokbotAvatarChoice.NormalizeShape(source.AvatarShape)
     };
 
     private static string Clip(string? value, int max)
@@ -337,6 +361,8 @@ public sealed class GrokbotMailbox
         public bool? Screenshots { get; set; }
         public bool? Stopped { get; set; }
         public string? WakeUrl { get; set; }
+        public string? AvatarColor { get; set; }
+        public string? AvatarShape { get; set; }
         public DateTimeOffset? LastPoll { get; set; }
     }
 
@@ -350,5 +376,7 @@ public sealed class GrokbotMailbox
         public string? Reply { get; set; }
         public DateTimeOffset? AnsweredAt { get; set; }
         public string? WakeNote { get; set; }
+        public DateTimeOffset? PickedUpAt { get; set; }
+        public bool Liked { get; set; }
     }
 }

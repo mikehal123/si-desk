@@ -151,7 +151,7 @@ public sealed class GrokBuildChatClient : IDisposable
         LastStopReason = null;
         _assistantChars = 0;
         await CallAsync("session/set_model", new { sessionId = _sessionId, modelId = model }, null, ct);
-        var prompt = Sovereign.Desktop.Core.WorkDoctrine.PromptPrefix() + (string.IsNullOrWhiteSpace(SkillGuidance) ? "" : SkillGuidance.Trim() + "\n\n") + SessionPreface() + text;
+        var prompt = Sovereign.Desktop.Core.WorkDoctrine.PromptPrefix() + (string.IsNullOrWhiteSpace(SkillGuidance) ? "" : SkillGuidance.Trim() + "\n\n") + SessionPreface(model) + text;
         _reportActivity = true;
         var length = 0;
         try
@@ -700,24 +700,28 @@ public sealed class GrokBuildChatClient : IDisposable
         return choices.Any(option => option.Id == chosen && GrokBuildAcp.IsSelectablePermissionKind(option.Kind)) ? chosen : null;
     }
 
-    private string SessionPreface()
+    private string SessionPreface(string parentModelId)
     {
         if (_project is null)
             return "xAI Desk conversation: answer using the supplied conversation. Do not call tools, access files, or act on accounts.\n\n";
         var preface = _project.Mode == CursorProjectMode.Plan
             ? "xAI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
             : "xAI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n";
-        if (_project.SubagentsAllowed != true || !_supportsSubagents) return preface + SwarmSuffix();
-        return preface + "Native subagents are enabled. Delegate independent work to up to three direct generalPurpose helpers concurrently, at most sixteen identities per session. Use the runtime-advertised generalPurpose type and omit model overrides. Helpers inherit this chat's mode and permission policy and must follow the same workspace instructions; they must not spawn nested helpers or act beyond the user's request. Give implementation helpers separate files or tasks to avoid conflicting edits. Summarize their actual results. Stop response stops the entire session. Helpers load the work-doctrine skill by default. Put that skill at the top of every helper task.\n\n"
+        var swarmHire = SwarmSuffix(parentModelId);
+        if (_project.SubagentsAllowed != true || !_supportsSubagents) return preface + swarmHire;
+        var helperModelClause = swarmHire.Length > 0
+            ? "Use the runtime-advertised generalPurpose type and pass one modelId from the swarm hire catalog on the helper tool's model field. "
+            : "Use the runtime-advertised generalPurpose type and omit model overrides. ";
+        return preface + "Native subagents are enabled. Delegate independent work to up to three direct generalPurpose helpers concurrently, at most sixteen identities per session. " + helperModelClause + "Helpers inherit this chat's mode and permission policy and must follow the same workspace instructions; they must not spawn nested helpers or act beyond the user's request. Give implementation helpers separate files or tasks to avoid conflicting edits. Summarize their actual results. Stop response stops the entire session. Helpers load the work-doctrine skill by default. Put that skill at the top of every helper task.\n\n"
             + (_project.Mode == CursorProjectMode.Plan
                 ? "Plan helpers must stay read-only: inspect and report, never edit files or execute commands.\n\n"
                 : _project.Permissions == CursorPermissionPolicy.AlwaysAsk
                     ? "Helpers use Always ask: request the user's approval through runtime permissions when required, just like the parent.\n\n"
-                    : "Helpers use this chat's Always allow setting, subject to the existing runtime sandbox and project policy.\n\n") + SwarmSuffix();
+                    : "Helpers use this chat's Always allow setting, subject to the existing runtime sandbox and project policy.\n\n") + swarmHire;
     }
 
-    private string SwarmSuffix() =>
-        _project?.SwarmBrief is { Length: > 0 } swarm ? swarm + "\n\n" : "";
+    private string SwarmSuffix(string parentModelId) =>
+        _project?.SwarmBrief is { Length: > 0 } swarm ? swarm + "\n\n" + SwarmModelHire.Catalog(Models, parentModelId) + "\n\n" : "";
 
     private string? SubagentDisplayName(JsonElement update)
     {

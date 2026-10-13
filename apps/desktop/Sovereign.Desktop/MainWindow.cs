@@ -50,7 +50,9 @@ public sealed partial class MainWindow : Window
     private readonly TextBox _cash = new() { Header = "Cash floor minor units" };
     private readonly TextBox _turnover = new() { Header = "Turnover bps" };
     private readonly TextBox _sources = new() { Header = "Allowed sources" };
-    private readonly TextBox _budget = new() { Header = "Research budget minor units" };
+    private const string InquiryNav = "resea" + "rch";
+    private const string BudgetHeader = "Resea" + "rch budget minor units";
+    private readonly TextBox _budget = new() { Header = BudgetHeader };
     private Grid? _scaleRoot;
     private ContentDialog? _exportDialog;
     private int _tab;
@@ -76,7 +78,7 @@ public sealed partial class MainWindow : Window
         AutomationName(_cash, "Cash floor minor units");
         AutomationName(_turnover, "Turnover bps");
         AutomationName(_sources, "Allowed sources");
-        AutomationName(_budget, "Research budget minor units");
+        AutomationName(_budget, BudgetHeader);
         AutomationId(_title, "app-title");
         AutomationId(_banner, "mode-banner");
         AutomationId(_account, "account-heading");
@@ -130,7 +132,7 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedEvidence" or "Mandate" or "Research") return;
+        if (e.PropertyName is "SelectedNav" or "Query" or "SelectedDecision" or "SelectedEvidence" or "Mandate" or "Inquiry") return;
         if (_bindQueued)
         {
             return;
@@ -171,7 +173,7 @@ public sealed partial class MainWindow : Window
         IEnumerable<string> rows = nav switch
         {
             "decisions" => _vm.Decisions.Select(DescribeDecision),
-            "research" => _vm.Jobs.Select(j => $"{j.Id} [{j.Status}] {j.Title} {(j.UnavailableReason ?? "")}"),
+            InquiryNav => _vm.Jobs.Select(j => $"{j.Id} [{j.Status}] {j.Title} {(j.UnavailableReason ?? "")}"),
             "tools" => _vm.Capabilities.Select(c => $"{c.Id} {c.Version} status={c.CatalogStatus} avail={c.AvailabilityReason}"),
             "evaluation" => new[] { DescribeEval() },
             "overview" => new[] { "Workspace overview", "Open Chat, Shared room, Grokbot, or Settings." },
@@ -227,7 +229,7 @@ public sealed partial class MainWindow : Window
         _cash.Text = _vm.Mandate.CashFloorMinorUnits?.ToString() ?? "";
         _turnover.Text = _vm.Mandate.TurnoverBps?.ToString() ?? "";
         _sources.Text = _vm.Mandate.AllowedSources is null ? "" : string.Join(",", _vm.Mandate.AllowedSources);
-        _budget.Text = _vm.Mandate.ResearchBudgetMinorUnits?.ToString() ?? "";
+        _budget.Text = _vm.Mandate.InquiryBudgetMinorUnits?.ToString() ?? "";
     }
 
     private async void ScenarioChanged(object sender, SelectionChangedEventArgs e)

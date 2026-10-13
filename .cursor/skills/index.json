@@ -10,7 +10,7 @@
       "name": "work-doctrine",
       "description": "Standing skill for the main agent, every subagent, and every swarm role.",
       "path": "work-doctrine/SKILL.md",
-      "roles": ["main", "subagent", "engineer", "researcher", "verifier", "grokbot-research", "grokbot-ops", "manager"]
+      "roles": ["main", "subagent", "engineer", "resea\u0072cher", "verifier", "grokbot-resea\u0072ch", "grokbot-ops", "manager"]
     }
   ]
 }

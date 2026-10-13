@@ -1,6 +1,6 @@
 namespace Sovereign.Desktop.Core;
 
-/// <summary>Identity for the xAI Desk clone. Kept separate from SovereignAI data, keys, and single-instance names.</summary>
+/// <summary>Identity for the xAI Desk clone. Kept separate from the original desk's data, keys, and single-instance names.</summary>
 public static class XaiDeskIdentity
 {
     public const string AppName = "xAI Desk";

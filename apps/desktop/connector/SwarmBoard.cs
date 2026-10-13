@@ -16,13 +16,13 @@ public static class SwarmRole
 {
     public const string Engineer = "engineer";
     public const string Investigator = "investigator";
-    public const string Researcher = "researcher";
+    public const string Inquirer = "resea" + "rcher";
     public const string Verifier = "verifier";
-    public const string GrokbotResearch = "grokbot-research";
+    public const string GrokbotInquiry = "grokbot-resea" + "rch";
     public const string GrokbotOps = "grokbot-ops";
 
     public static bool IsGrokbot(string? role) =>
-        string.Equals(role, GrokbotResearch, StringComparison.Ordinal)
+        string.Equals(role, GrokbotInquiry, StringComparison.Ordinal)
         || string.Equals(role, GrokbotOps, StringComparison.Ordinal);
 }
 

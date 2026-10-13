@@ -498,15 +498,34 @@ internal sealed partial class ChatConversation
                     _projectFolder is null ? null : new CursorProjectOptions {
                         Mode = _saved.ProjectMode, Permissions = _saved.Permissions, EnableSubagents = _saved.SubagentsEnabled,
                         SwarmBrief = SwarmManagerBrief(),
+                        SwarmRoleModelsDirectory = _profileDirectory,
+                        SwarmMixedModels = SwarmRoleModels.IsMixed(_saved.SwarmHire),
                         RequestPermission = RequestProjectPermissionAsync
                     }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } });
-                var cursorModels = DeskChatConnections.GrokModels(await _cursorChat.ModelsAsync(timeout.Token));
+                CursorChatModel[]? live = null;
+                try
+                {
+                    live = await _cursorChat.ModelsAsync(timeout.Token);
+                }
+                catch (Exception) when (!PhoneSendCancelled)
+                {
+                    _cursorChat?.Dispose();
+                    _cursorChat = null;
+                }
+                var cached = CursorModelCatalog.Load(_profileDirectory);
+                var usingCache = live is not { Length: > 0 };
+                var cursorModels = CursorModelCatalog.Resolve(live, cached);
+                if (live is { Length: > 0 }) CursorModelCatalog.Save(_profileDirectory, live);
                 BindChatModels(cursorModels.Select(model => (model.Id, (string?)model.Name)).ToArray(), false);
-                if (cursorModels.Length > 0) _chatModel.SelectedIndex = 0;
-                _chatReady = cursorModels.Length > 0;
-                _chatStatus.Text = _chatReady ? (_projectFolder is null ? "Cursor chat connected. Open Folder to work on files."
-                    : ProjectConnectionStatus("Uses your Cursor account. Tools, subagents, and file edits stay in this folder."))
-                    : "Cursor returned no Grok models. Sign in with Cursor, then Connect again.";
+                var pick = CursorModelCatalog.SelectDefault(cursorModels, _saved.Model, null);
+                if (pick is not null) SelectChatModel(pick);
+                _chatReady = !usingCache && cursorModels.Length > 0;
+                _chatStatus.Text = _chatReady
+                    ? (_projectFolder is null ? "Cursor chat connected. Open Folder to work on files."
+                        : ProjectConnectionStatus("Uses your Cursor account. Tools, subagents, and file edits stay in this folder."))
+                    : usingCache && cursorModels.Length > 0
+                        ? "Cursor is offline. Showing the last saved model list. Connect again to send."
+                        : "Cursor returned no models. Sign in with Cursor, then Connect again.";
                 return;
             }
             if(PlanChat)

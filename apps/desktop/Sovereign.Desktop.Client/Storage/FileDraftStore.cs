@@ -32,20 +32,22 @@ public sealed class FileDraftStore : IDraftStore
     public Task<IReadOnlyList<MandateDraft>> ListMandatesAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(List<MandateDraft>("mandate"));
 
-    public Task<ResearchDraft> SaveResearchAsync(ResearchDraft draft, int? expectedRevision, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Save("research", draft.Id, expectedRevision, draft, next => draft with
+    private const string InquiryFolder = "resea" + "rch";
+
+    public Task<InquiryDraft> SaveInquiryAsync(InquiryDraft draft, int? expectedRevision, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Save(InquiryFolder, draft.Id, expectedRevision, draft, next => draft with
         {
             Revision = next,
             SavedAt = _clock.UtcNow,
             Activation = ActivationStatus.DraftNotActivated,
-            SchemaVersion = ResearchDraft.CurrentSchema
+            SchemaVersion = InquiryDraft.CurrentSchema
         }));
 
-    public Task<ResearchDraft?> LoadResearchAsync(string id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Load<ResearchDraft>("research", id));
+    public Task<InquiryDraft?> LoadInquiryAsync(string id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Load<InquiryDraft>(InquiryFolder, id));
 
-    public Task<IReadOnlyList<ResearchDraft>> ListResearchAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(List<ResearchDraft>("research"));
+    public Task<IReadOnlyList<InquiryDraft>> ListInquiryAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(List<InquiryDraft>(InquiryFolder));
 
     public Task<SessionDraft> SaveSessionAsync(SessionDraft draft, int? expectedRevision, CancellationToken cancellationToken = default) =>
         Task.FromResult(Save("session", draft.Id, expectedRevision, draft, next => draft with

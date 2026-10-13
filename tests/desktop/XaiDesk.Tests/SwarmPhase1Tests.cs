@@ -53,22 +53,22 @@ public sealed class SwarmPhase1Tests
         var root = Temp();
         try
         {
-            var board = SwarmLoop.OpenGoal("Check a claim", "Check it", SwarmRole.Researcher, "sources required", root);
+            var board = SwarmLoop.OpenGoal("Check a claim", "Check it", SwarmRole.Inquirer, "sources required", root);
             var id = board.Tasks.Single().Id;
-            board.Start(id, "researcher");
+            board.Start(id, SwarmRole.Inquirer);
             board.Submit(id, "finding", "source: local note");
             var first = board.Verify(id, false, "source missing");
             Assert.Equal(SwarmStatus.Todo, first.Status);
             Assert.Equal(1, first.Retries);
             Assert.Equal("source missing", first.VerifierNote);
 
-            board.Start(id, "researcher");
+            board.Start(id, SwarmRole.Inquirer);
             board.Submit(id, "finding", "source: local note");
             var second = board.Verify(id, false, "still missing");
             Assert.Equal(SwarmStatus.Todo, second.Status);
             Assert.Equal(2, second.Retries);
 
-            board.Start(id, "researcher");
+            board.Start(id, SwarmRole.Inquirer);
             board.Submit(id, "finding", "source: local note");
             var third = board.Verify(id, false, "gave up");
             Assert.Equal(SwarmStatus.Failed, third.Status);
@@ -166,7 +166,7 @@ public sealed class SwarmPhase1Tests
         var root = Temp();
         try
         {
-            var board = SwarmLoop.OpenGoal("Look up the note", "Read the desk note", SwarmRole.GrokbotResearch, "The note is on the board only.", root);
+            var board = SwarmLoop.OpenGoal("Look up the note", "Read the desk note", SwarmRole.GrokbotInquiry, "The note is on the board only.", root);
             var task = board.Tasks.Single();
             Assert.Equal(SwarmStatus.Todo, task.Status);
             board.Start(task.Id, "Grok Bot");
@@ -217,7 +217,7 @@ public sealed class SwarmPhase1Tests
                     "The submitted proof names the task",
                     "Read the board after swarm_submit_result and compared the proof with the task id.",
                     "source: board " + task.Id,
-                    "Success: the proof cites this task. Skipped: no file was produced by this research handoff.",
+                    "Success: the proof cites this task. Skipped: no file was produced by this Grok Bot handoff.",
                     "pass because the proof names the task id"))
                 : reviewed;
             Assert.Equal(SwarmStatus.Done, done.Status);

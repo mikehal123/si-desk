@@ -85,7 +85,7 @@ public sealed partial class MainWindow
         {
             var tag = (string)item.Tag;
             var glyph = tag switch { "chat" => "\uE8F2", "room" => "\uE902", "grokbot" => "\uE99A", "settings" => "\uE713", _ => "\uE8F2" };
-            UIElement mark = tag == "grokbot" ? GrokbotNavMark() : Glyph(glyph);
+            UIElement mark = tag == "grokbot" ? GrokbotNavHost() : Glyph(glyph);
             item.Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space12, Children = { mark, new TextBlock { Text = Label(tag), FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, VerticalAlignment = VerticalAlignment.Center } } };
             item.MinHeight = DeskTheme.Space24 + DeskTheme.Space16;
             item.Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space8, DeskTheme.Space12, DeskTheme.Space8);

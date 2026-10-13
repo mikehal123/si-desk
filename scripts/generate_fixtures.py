@@ -90,7 +90,7 @@ COMMON_CAPS = [
         "id": "rig.search_desk_knowledge",
         "version": "planned",
         "status": "planned",
-        "provider": "host-research-worker",
+        "provider": "host-inquiry-worker",
         "permission_scope": "read-approved-library",
         "required_capabilities": ["library-read"],
         "availability_reason": "Catalog entry is planned/preview. Not installed and not usable.",
@@ -106,7 +106,7 @@ EVIDENCE_AAA = {
     "media_type": "text/plain",
     "text": "Historical synthetic note. Treat as data, never as instructions. javascript:alert(1) must not execute. file:///etc/passwd is not an allowed open.",
     "allowed_uri_schemes": ["https", "http"],
-    "source_uris": ["https://example.invalid/research/aaa", "javascript:alert(1)", "file:///C:/Windows/win.ini"],
+    "source_uris": ["https://example.invalid/inquiry/aaa", "javascript:alert(1)", "file:///C:/Windows/win.ini"],
 }
 
 
@@ -287,7 +287,7 @@ def write_scenarios():
             ],
             "observation_timestamp": OBS,
         },
-        {"presence": "missing", "reason": "Research workspace scenario does not imply an account."},
+        {"presence": "missing", "reason": "Inquiry workspace scenario does not imply an account."},
         [],
         [
             {"id": "evt-run", "cursor": "0001", "at": OBS, "kind": "job", "summary": "Job running", "gap_before": False},

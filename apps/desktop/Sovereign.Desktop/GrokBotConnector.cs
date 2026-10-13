@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Sovereign.Desktop.Connector;
 using Sovereign.Desktop.Core;
@@ -23,6 +24,7 @@ public sealed partial class MainWindow
     private readonly TextBox _wakeUrl = new() { Header = "Wake webhook URL", IsSpellCheckEnabled = false };
     private readonly PasswordBox _wakeKey = new() { Header = "Webhook sender key" };
     private readonly SemaphoreSlim _connectorGate = new(1, 1);
+    private readonly List<Button> _grokbotAvatarButtons = [];
     private bool _connectorUi;
     private ConnectorHost? _connectorHost;
     private readonly VaultConnectorSecrets _connectorSecrets = new();
@@ -46,6 +48,7 @@ public sealed partial class MainWindow
         _connectorEnabled.Toggled += async (_, _) => await ApplyConnectorSettingsAsync();
         _connectorBind.SelectionChanged += async (_, _) => { if (_connectorBind.SelectedIndex >= 0) await ApplyConnectorSettingsAsync(); };
         Closed += async (_, _) => await StopConnectorAsync();
+        var avatarPicker = BuildGrokbotAvatarPicker();
         LoadConnectorControls();
         var copy = Button("Copy", CopyConnectorToken);
         AutomationName(copy, "Copy Grok Bot connector token");
@@ -85,6 +88,8 @@ public sealed partial class MainWindow
             _grokbotAllow,
             Note("Screenshots"),
             _grokbotShots,
+            Note("Grokbot avatar"),
+            avatarPicker,
             _wakeUrl,
             _wakeKey,
             new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { saveWake, testWake, clearWake } } } };
@@ -99,11 +104,115 @@ public sealed partial class MainWindow
         _connectorToken.Text = "";
         _connectorToken.Visibility = Visibility.Collapsed;
         LoadGrokbotSettings(_grokbotTab, _grokbotAllow, _grokbotShots);
+        var avatar = _grokbotMail.PreferencesCopy();
+        ShowGrokbotAvatarSelection(avatar.AvatarColor, avatar.AvatarShape);
+        RefreshGrokbotAvatarMarks();
+        DispatcherQueue.TryEnqueue(RefreshGrokbotAvatarMarks);
         _wakeUrl.Text = _grokbotMail.PreferencesCopy().WakeUrl ?? "";
         ShowWakeKeyMask();
         _connectorUi = false;
         _connectorStatus.Text = settings.Enabled ? "Starting…" : "Off. Nothing is listening.";
         _connectorAddress.Text = "http://127.0.0.1:" + XaiDeskIdentity.GrokBotPort + "/mcp";
+    }
+
+    private ScrollViewer BuildGrokbotAvatarPicker()
+    {
+        _grokbotAvatarButtons.Clear();
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
+        foreach (var color in GrokbotAvatarChoice.Colors)
+        {
+            foreach (var shape in GrokbotAvatarChoice.Shapes)
+            {
+                var pickColor = color;
+                var pickShape = shape;
+                var button = new Button
+                {
+                    Content = GrokbotAvatar.Mark(pickColor, pickShape, 28),
+                    Tag = pickColor + " " + pickShape,
+                    Padding = new Thickness(DeskTheme.Space4),
+                    Background = DeskTheme.Transparent,
+                    BorderBrush = DeskTheme.Text,
+                    BorderThickness = new Thickness(0),
+                    CornerRadius = new CornerRadius(DeskTheme.Radius6),
+                    MinWidth = 0,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                AutomationName(button, "Grokbot avatar " + pickColor + " " + pickShape);
+                button.Click += (_, _) => ChooseGrokbotAvatar(pickColor, pickShape);
+                row.Children.Add(button);
+                _grokbotAvatarButtons.Add(button);
+            }
+        }
+        return new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Enabled,
+            VerticalScrollMode = ScrollMode.Disabled,
+            Content = row
+        };
+    }
+
+    private void ChooseGrokbotAvatar(string color, string shape)
+    {
+        if (_connectorUi) return;
+        var prefs = _grokbotMail.PreferencesCopy();
+        prefs.AvatarColor = color;
+        prefs.AvatarShape = shape;
+        _grokbotMail.SavePreferences(prefs);
+        var saved = _grokbotMail.PreferencesCopy();
+        ShowGrokbotAvatarSelection(saved.AvatarColor, saved.AvatarShape);
+        RefreshGrokbotAvatarMarks();
+    }
+
+    private void ShowGrokbotAvatarSelection(string? color, string? shape)
+    {
+        var selected = GrokbotAvatarChoice.NormalizeColor(color) + " " + GrokbotAvatarChoice.NormalizeShape(shape);
+        foreach (var button in _grokbotAvatarButtons)
+        {
+            var on = button.Tag as string == selected;
+            button.BorderThickness = new Thickness(on ? 2 : 0);
+        }
+    }
+
+    internal void RefreshGrokbotAvatarMarks()
+    {
+        var prefs = _grokbotMail.PreferencesCopy();
+        foreach (ListViewItem item in _nav.Items)
+        {
+            if (item.Tag is not string tag || tag != "grokbot") continue;
+            if (item.Content is not StackPanel row || row.Orientation != Orientation.Horizontal || row.Children.Count == 0) continue;
+            var mark = GrokbotAvatar.Mark(prefs.AvatarColor, prefs.AvatarShape, 28);
+            // The mark grid is named Grokbot. The nav host is not, so only its avatar child is replaced and the unread badge stays.
+            if (row.Children[0] is Grid host && AutomationProperties.GetName(host) != "Grokbot")
+                ReplaceGrokbotAvatarMark(host, mark);
+            else
+                ReplaceChild(row.Children, 0, mark);
+        }
+        if (_grokbotPage.Children.Count == 0) return;
+        if (_grokbotPage.Children[0] is not StackPanel header || header.Orientation != Orientation.Horizontal || header.Children.Count == 0) return;
+        ReplaceChild(header.Children, 0, GrokbotAvatar.Mark(prefs.AvatarColor, prefs.AvatarShape, 36));
+    }
+
+    private static void ReplaceGrokbotAvatarMark(Grid host, UIElement mark)
+    {
+        var markIndex = -1;
+        for (var i = 0; i < host.Children.Count; i++)
+        {
+            if (host.Children[i] is FrameworkElement element && AutomationProperties.GetName(element) == "Grokbot unread")
+                continue;
+            markIndex = i;
+            break;
+        }
+        if (markIndex < 0) host.Children.Insert(0, mark);
+        else ReplaceChild(host.Children, markIndex, mark);
+    }
+
+    private static void ReplaceChild(UIElementCollection children, int index, UIElement next)
+    {
+        children.RemoveAt(index);
+        children.Insert(index, next);
     }
 
     internal async Task StartConnectorIfEnabledAsync()

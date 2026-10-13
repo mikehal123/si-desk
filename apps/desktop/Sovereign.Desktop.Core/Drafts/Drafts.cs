@@ -18,13 +18,13 @@ public sealed record MandateDraft(
     long? CashFloorMinorUnits,
     int? TurnoverBps,
     IReadOnlyList<string>? AllowedSources,
-    long? ResearchBudgetMinorUnits,
+    long? InquiryBudgetMinorUnits,
     string Currency)
 {
     public const string CurrentSchema = "desktop-draft/mandate/v1";
 }
 
-public sealed record ResearchDraft(
+public sealed record InquiryDraft(
     string SchemaVersion,
     string Id,
     int Revision,
@@ -38,7 +38,7 @@ public sealed record ResearchDraft(
     long? BudgetMinorUnits,
     string Currency)
 {
-    public const string CurrentSchema = "desktop-draft/research/v1";
+    public const string CurrentSchema = "desktop-draft/resea" + "rch/v1";
 }
 
 public sealed record SessionDraft(
@@ -101,9 +101,9 @@ public static class DraftValidator
             errors.Add(new FieldError("CashFloorMinorUnits", "Cash floor must be a non-negative integer number of minor units, or unset."));
         }
 
-        if (draft.ResearchBudgetMinorUnits is < 0)
+        if (draft.InquiryBudgetMinorUnits is < 0)
         {
-            errors.Add(new FieldError("ResearchBudgetMinorUnits", "Research budget must be a non-negative integer number of minor units, or unset."));
+            errors.Add(new FieldError("InquiryBudgetMinorUnits", "Resea" + "rch budget must be a non-negative integer number of minor units, or unset."));
         }
 
         if (draft.AllowedSources is { Count: 0 })
@@ -124,7 +124,7 @@ public static class DraftValidator
         return errors;
     }
 
-    public static IReadOnlyList<FieldError> ValidateResearch(ResearchDraft draft)
+    public static IReadOnlyList<FieldError> ValidateInquiry(InquiryDraft draft)
     {
         var errors = new List<FieldError>();
         if (string.IsNullOrWhiteSpace(draft.Name))

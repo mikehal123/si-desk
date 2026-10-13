@@ -38,6 +38,7 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     public string? LastStopReason => _session?.LastStopReason;
     public bool SupportsImages => _session?.SupportsImages == true;
     public bool SupportsSubagents => _session?.SupportsSubagents == true;
+    public CursorChatModel[] AdvertisedModels => _session?.Models ?? [];
     internal int? InternalProcessId => _process?.Id;
     internal string? InternalSessionId => _session?.SessionId;
 
@@ -222,10 +223,8 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
         // Older ACP runtimes can still serve ordinary project chats. Helpers are offered only after negotiation.
         var session = await CallAsync("session/new", new { cwd = workspace, mcpServers = Array.Empty<object>() }, null, ct);
         _sessionId = session.GetProperty("sessionId").GetString() ?? throw new IOException("Cursor returned no session.");
-        Models = session.GetProperty("models").GetProperty("availableModels").EnumerateArray()
-            .Select(m => new CursorChatModel(m.GetProperty("modelId").GetString()!, m.GetProperty("name").GetString()!))
-            .Where(m => !string.IsNullOrWhiteSpace(m.Id) && !m.Id.StartsWith("default", StringComparison.Ordinal))
-            .OrderByDescending(m => m.Id.StartsWith("grok-4.7[", StringComparison.Ordinal)).ToArray();
+        var listing = CursorModelCatalog.Parse(session.GetProperty("models"));
+        Models = listing.Models;
         await CallAsync("session/set_mode", new { sessionId = _sessionId, modeId = project?.ModeId ?? "ask" }, null, ct);
     }
 
@@ -241,6 +240,22 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
         _reportActivity = true;
         var length = 0;
         JsonElement reply;
+        var swarmBrief = project?.SwarmBrief;
+        var swarmHire = "";
+        if (swarmBrief is { Length: > 0 })
+        {
+            var directory = project?.SwarmRoleModelsDirectory;
+            var swarmCatalog = project?.SwarmMixedModels switch
+            {
+                true when !string.IsNullOrWhiteSpace(directory) => SwarmRoleModels.Catalog(Models, model, SwarmRoleModels.Load(directory)),
+                false => SwarmRoleModels.SingleCatalog(Models, model),
+                _ => SwarmModelHire.Catalog(Models, model)
+            };
+            swarmHire = swarmBrief + "\n\n" + swarmCatalog + "\n\n";
+        }
+        var helperModelClause = swarmHire.Length > 0
+            ? "Use the runtime-advertised generalPurpose type and pass one modelId from the swarm hire catalog on the helper tool's model field. "
+            : "Use the runtime-advertised generalPurpose type and omit model overrides. ";
         using var turn = new PromptTurn(ct);
         using var drainRegistration = turn.Drain.Token.Register(() => turn.Read.Cancel());
         try { reply = await CallAsync("session/prompt", new { sessionId = _sessionId, prompt = new object[] { new {
@@ -249,10 +264,10 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
                 : project.Mode == CursorProjectMode.Plan
                     ? "xAI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
             : "xAI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n") + (project?.SubagentsAllowed == true && _supportsSubagents
-            ? "Native subagents are enabled. Delegate independent work to up to three direct generalPurpose helpers concurrently, at most sixteen identities per session. Use the runtime-advertised generalPurpose type and omit model overrides. Helpers inherit this chat's mode and permission policy and must follow the same workspace instructions; they must not spawn nested helpers or act beyond the user's request. Give implementation helpers separate files or tasks to avoid conflicting edits. Summarize their actual results. Stop response stops the entire session. Helpers load the work-doctrine skill by default. Put that skill at the top of every helper task.\n\n" +
+            ? "Native subagents are enabled. Delegate independent work to up to three direct generalPurpose helpers concurrently, at most sixteen identities per session. " + helperModelClause + "Helpers inherit this chat's mode and permission policy and must follow the same workspace instructions; they must not spawn nested helpers or act beyond the user's request. Give implementation helpers separate files or tasks to avoid conflicting edits. Summarize their actual results. Stop response stops the entire session. Helpers load the work-doctrine skill by default. Put that skill at the top of every helper task.\n\n" +
                 (project.Mode == CursorProjectMode.Plan ? "Plan helpers must stay read-only: inspect and report, never edit files or execute commands.\n\n" :
                     project.Permissions == CursorPermissionPolicy.AlwaysAsk ? "Helpers use Always ask: request the user's approval through runtime permissions when required, just like the parent.\n\n" :
-                    "Helpers use this chat's Always allow setting, subject to the existing runtime sandbox and project policy.\n\n") : "") + (project?.SwarmBrief is { Length: > 0 } swarmBrief ? swarmBrief + "\n\n" : "") + text
+                    "Helpers use this chat's Always allow setting, subject to the existing runtime sandbox and project policy.\n\n") : "") + swarmHire + text
         } }.Concat((images ?? []).Select(i => (object)new { type = "image", mimeType = i.MimeType, data = i.Data })).ToArray() }, piece => { length += piece.Length; if (length > 200000) throw new IOException("Cursor response exceeded the chat limit."); delta(piece); }, ct, turn);
             foreach (var child in _subagents.FinishRunning(turn.SteeringSent ? "Correction requested · completion unconfirmed" : "Parent turn ended · completion unconfirmed"))
                 Report(new("subagent", Subagent: child));

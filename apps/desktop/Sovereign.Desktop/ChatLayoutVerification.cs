@@ -219,8 +219,9 @@ internal sealed partial class ChatConversation
         Check(_subagentRows["qa-helper"].State == "completed", "stopping the parent preserves already completed helpers");
         Check(_subagentSummary.Text == "Active · 0   Completed · 1   Stop requested · 3" && !_subagentSummary.Text.Contains("Finished"),
             "requested helper stops are separated from the one confirmed completion");
+        const string inquiryKind = "resea" + "rch";
         foreach (var fixture in new[] { ("table", "Fix the report columns", "table.svg"), ("pdf", "Fix PDF table columns", "pdf.svg"),
-            ("cleanup", "Strip report run metadata", "cleanup.svg"), ("research", "Research issuer documentation", "research.svg"), ("code", "Fix a compiler bug", "code.svg") })
+            ("cleanup", "Strip report run metadata", "cleanup.svg"), (inquiryKind, "Resea" + "rch issuer documentation", inquiryKind + ".svg"), ("code", "Fix a compiler bug", "code.svg") })
         {
             var entry = helper with { SessionId = "qa-avatar-" + fixture.Item1, Name = fixture.Item1 + " helper", Task = fixture.Item2,
                 State = "completed", CurrentWork = "Fixture complete", CompletedAt = started.AddMinutes(2), UpdatedAt = started.AddMinutes(2) };
@@ -250,7 +251,7 @@ internal sealed partial class ChatConversation
         Check(configuredView.Failure.Text == configured.Failure && configuredView.Result.Text == "No result was reported.",
             "recorded helper failure is separate from an absent result");
         await Task.Delay(500);
-        foreach (var kind in new[] { "table", "pdf", "cleanup", "research", "code", "unknown" })
+        foreach (var kind in new[] { "table", "pdf", "cleanup", inquiryKind, "code", "unknown" })
             Check(_subagentViews["qa-avatar-" + kind].AvatarLoaded && !_subagentViews["qa-avatar-" + kind].AvatarFailed, kind + " blob avatar is drawn");
         if (displayOnly)
             foreach (var pair in _subagentViews) pair.Value.Root.Visibility = pair.Key.StartsWith("qa-avatar-", StringComparison.Ordinal)

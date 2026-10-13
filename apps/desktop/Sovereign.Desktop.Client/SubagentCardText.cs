@@ -21,6 +21,16 @@ public static class SubagentCardText
         return "Model not reported";
     }
 
+    public static string CardLine(CursorSubagent child)
+    {
+        var line = IdentityLine(child);
+        if (!HasReportedIdentity(child) || !SubagentModelPresentation.HasRequestedModel(child)) return line;
+        var requested = SubagentModelPresentation.RequestedDisplay(child);
+        var reported = SubagentModelPresentation.Display(child);
+        if (requested == SubagentModelPresentation.Unknown || string.Equals(requested, reported, StringComparison.OrdinalIgnoreCase)) return line;
+        return line + " · requested " + requested;
+    }
+
     public static string IdentityDetail(CursorSubagent child)
     {
         var lines = new List<string> { "Identity: " + IdentityLine(child) };

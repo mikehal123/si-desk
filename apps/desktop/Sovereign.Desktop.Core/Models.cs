@@ -61,7 +61,7 @@ public sealed record ClientEvent(
     string? DecisionId,
     bool GapBefore);
 
-public sealed record ResearchJob(
+public sealed record InquiryJob(
     string Id,
     string Title,
     string Status,
@@ -115,7 +115,7 @@ public sealed record HomeSnapshot(
     SystemHealth Health,
     Presence<AccountView> Account,
     Presence<DecisionRecord> LatestDecision,
-    IReadOnlyList<ResearchJob> Jobs,
+    IReadOnlyList<InquiryJob> Jobs,
     IReadOnlyList<AttentionItem> Attention);
 
 public sealed record OperationRequest(

@@ -21,7 +21,7 @@ public static class DeskChatConnections
         _ => "cursor"
     };
 
-    /// <summary>Combo position to the saved provider id. Cursor stays 4, matching SovereignAI chats.</summary>
+    /// <summary>Combo position to the saved provider id. Cursor stays 4, matching the original desk's chats.</summary>
     public static int Stored(int comboIndex) => comboIndex switch
     {
         GrokBuild => GrokBuildStored,

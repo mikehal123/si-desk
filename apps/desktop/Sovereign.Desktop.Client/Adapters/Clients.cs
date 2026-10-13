@@ -57,7 +57,7 @@ public sealed class PreviewOperatorClient : IOperatorClient
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_inbox.Snapshot());
 
-    public Task<IReadOnlyList<ResearchJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<InquiryJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Jobs);
 
     public Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default) =>
@@ -182,7 +182,7 @@ public sealed class ArchiveOperatorClient : IOperatorClient
     public Task<IReadOnlyList<ClientEvent>> ListEventsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Events);
 
-    public Task<IReadOnlyList<ResearchJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<InquiryJob>> ListJobsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_scenario.Jobs);
 
     public Task<IReadOnlyList<CapabilityItem>> ListCapabilitiesAsync(CancellationToken cancellationToken = default) =>

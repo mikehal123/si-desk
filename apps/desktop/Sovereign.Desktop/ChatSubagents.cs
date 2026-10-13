@@ -14,6 +14,10 @@ internal sealed partial class ChatConversation
 {
     private readonly CheckBox _subagentOption = new() { Content = "Allow subagents" };
     private readonly CheckBox _swarmOption = new() { Content = "Plan big goals as a swarm (uses subagents)" };
+    private readonly ComboBox _swarmHire = new() { MinWidth = 150 };
+    private readonly TextBlock _swarmHireLabel = SubagentCaption("Swarm mode");
+    private readonly StackPanel _swarmHireRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
+    private bool _swarmHireFilling;
     private readonly StackPanel _subagentOptionRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
     private readonly Button _subagentsToggle = new() { Content = "Subagents · 0" };
     private readonly StackPanel _subagentList = new() { Spacing = DeskTheme.Space8, Visibility = Visibility.Collapsed };
@@ -52,9 +56,31 @@ internal sealed partial class ChatConversation
             else _saved = _saved with { SwarmMode = false };
             await ProjectPreferencesChangedAsync();
         };
+        _swarmHire.Items.Add("Single model");
+        _swarmHire.Items.Add("Mixed models");
+        _swarmHire.SelectedIndex = SwarmRoleModels.IsMixed(_saved.SwarmHire) ? 1 : 0;
+        AutomationName(_swarmHire, "Swarm mode");
+        ToolTipService.SetToolTip(_swarmHire, "Single model uses the model selected in this chat for every worker. Mixed models hires from the role rankings and allows a per-worker override.");
+        _swarmHire.SelectionChanged += async (_, _) =>
+        {
+            if (_restoring || _swarmHireFilling || _chatBusy) return;
+            var mixed = _swarmHire.SelectedIndex == 1;
+            if (SwarmRoleModels.IsMixed(_saved.SwarmHire) == mixed && (mixed || _saved.SwarmHire is not null)) return;
+            if (!mixed && _saved.SwarmHire is null) return;
+            _saved = _saved with { SwarmHire = mixed ? SwarmRoleModels.MixedMode : SwarmRoleModels.SingleMode };
+            await ProjectPreferencesChangedAsync();
+        };
+        _subagentOption.VerticalAlignment = VerticalAlignment.Top;
+        _swarmHireLabel.VerticalAlignment = VerticalAlignment.Center;
+        _swarmHireRow.Children.Clear();
+        _swarmHireRow.Children.Add(_swarmHireLabel);
+        _swarmHireRow.Children.Add(_swarmHire);
+        var swarmBlock = new StackPanel { Spacing = DeskTheme.Space4 };
+        swarmBlock.Children.Add(_swarmOption);
+        swarmBlock.Children.Add(_swarmHireRow);
         _subagentOptionRow.Children.Clear();
         _subagentOptionRow.Children.Add(_subagentOption);
-        _subagentOptionRow.Children.Add(_swarmOption);
+        _subagentOptionRow.Children.Add(swarmBlock);
         return _subagentOptionRow;
     }
 
@@ -67,6 +93,15 @@ internal sealed partial class ChatConversation
         _subagentOption.IsEnabled = !_chatBusy;
         _swarmOption.IsEnabled = !_chatBusy && _saved.SubagentsEnabled;
         _swarmOption.Opacity = _saved.SubagentsEnabled ? 1 : 0.45;
+        var hireVisible = CursorChat ? show : Visibility.Collapsed;
+        _swarmHire.Visibility = hireVisible;
+        _swarmHireRow.Visibility = hireVisible;
+        _swarmHire.IsEnabled = CursorChat && !_chatBusy && _saved.SubagentsEnabled && _saved.SwarmEnabled;
+        _swarmHire.Opacity = _swarmHire.IsEnabled ? 1 : 0.45;
+        _swarmHireLabel.Opacity = _swarmHire.Opacity;
+        _swarmHireFilling = true;
+        _swarmHire.SelectedIndex = SwarmRoleModels.IsMixed(_saved.SwarmHire) ? 1 : 0;
+        _swarmHireFilling = false;
         _subagentOption.IsChecked = _saved.SubagentsEnabled;
         _swarmOption.IsChecked = _saved.SubagentsEnabled && _saved.SwarmEnabled;
     }

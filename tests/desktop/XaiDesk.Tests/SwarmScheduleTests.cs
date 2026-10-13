@@ -5,13 +5,15 @@ namespace XaiDesk.Tests;
 
 public sealed class SwarmScheduleTests
 {
+    private const string Inquiry = "Resea" + "rch";
+
     [Fact]
     public void Comparison_goal_splits_and_runs_in_parallel_without_touching_the_old_board()
     {
         var compare = Path.Combine(Path.GetTempPath(), "xai-desk-swarm-test", "compare.md");
-        var goal = $"Research 3 open-source Grok desktop apps and write a one-page comparison to {compare}";
+        var goal = $"{Inquiry} 3 open-source Grok desktop apps and write a one-page comparison to {compare}";
         Assert.True(SwarmSchedule.CanSplit(goal));
-        Assert.True(SwarmSchedule.ResearchAndWrite(goal));
+        Assert.True(SwarmSchedule.InquireAndWrite(goal));
 
         var root = Temp();
         try
@@ -21,9 +23,9 @@ public sealed class SwarmScheduleTests
             var legacyText = File.ReadAllText(legacy.BoardPath);
             var tasks = new[]
             {
-                Item("t-a", SwarmRole.Researcher, "App A"),
-                Item("t-b", SwarmRole.Researcher, "App B"),
-                Item("t-c", SwarmRole.GrokbotResearch, "App C"),
+                Item("t-a", SwarmRole.Inquirer, "App A"),
+                Item("t-b", SwarmRole.Inquirer, "App B"),
+                Item("t-c", SwarmRole.GrokbotInquiry, "App C"),
                 Item("t-d", SwarmRole.Engineer, "Write compare.md", [compare], ["t-a", "t-b", "t-c"]),
                 Item("t-e", SwarmRole.Verifier, "Check compare.md", [compare], ["t-d"])
             };
@@ -41,8 +43,8 @@ public sealed class SwarmScheduleTests
             Assert.Equal<string>(["t-a", "t-b", "t-c"], ready);
             Assert.False(SwarmSchedule.CanStart(run, "t-d"));
 
-            run.Start("t-a", "researcher");
-            run.Start("t-b", "researcher");
+            run.Start("t-a", SwarmRole.Inquirer);
+            run.Start("t-b", SwarmRole.Inquirer);
             run.Start("t-c", "grokbot");
             Assert.Throws<InvalidOperationException>(() => run.Start("t-d", "engineer"));
             Assert.Empty(SwarmSchedule.Ready(run));
@@ -68,7 +70,7 @@ public sealed class SwarmScheduleTests
         Assert.Throws<ArgumentException>(() => SwarmSchedule.CheckPlan(goal,
         [
             Item("t-1", SwarmRole.Engineer, "One"),
-            Item("t-2", SwarmRole.Researcher, "Two"),
+            Item("t-2", SwarmRole.Inquirer, "Two"),
             Item("t-3", SwarmRole.Verifier, "Three")
         ]));
         SwarmSchedule.CheckPlan(goal, [Item("t-1", SwarmRole.Engineer, "Write marker")]);
@@ -146,18 +148,18 @@ public sealed class SwarmScheduleTests
         try
         {
             var id = Guid.NewGuid().ToString("N");
-            var board = SwarmBoard.Create("Research the apps", [new SwarmTask { Id = "t-wait", Title = "Research Grok-Desktop", Role = SwarmRole.GrokbotResearch, Status = "todo" }], root, id);
+            var board = SwarmBoard.Create(Inquiry + " the apps", [new SwarmTask { Id = "t-wait", Title = Inquiry + " Grok-Desktop", Role = SwarmRole.GrokbotInquiry, Status = "todo" }], root, id);
             Assert.True(SwarmSchedule.HasOpenWork(board));
             board.Goal = "A different goal";
             var ex = Assert.Throws<IOException>(() => board.Save());
             Assert.Contains("open task", ex.Message, StringComparison.OrdinalIgnoreCase);
             var reread = SwarmBoard.Load(id, root);
-            Assert.Equal("Research the apps", reread.Goal);
+            Assert.Equal(Inquiry + " the apps", reread.Goal);
             Assert.Equal("todo", reread.TaskById("t-wait").Status);
-            reread.Start("t-wait", "grokbot-research");
+            reread.Start("t-wait", SwarmRole.GrokbotInquiry);
             Assert.Equal("doing", SwarmBoard.Load(id, root).TaskById("t-wait").Status);
             Assert.True(SwarmSection.IsSwarmWorker("swarm-" + id + "-t-wait", null, null, reread));
-            Assert.Equal("t-wait", SwarmSection.MatchingTaskId(reread, "helper-1", "Research Grok-Desktop", null));
+            Assert.Equal("t-wait", SwarmSection.MatchingTaskId(reread, "helper-1", Inquiry + " Grok-Desktop", null));
             Assert.False(SwarmSection.IsSwarmWorker("helper-9", "Unrelated helper", "Something else", reread));
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }

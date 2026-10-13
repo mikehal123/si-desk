@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace Sovereign.Desktop.Client;
@@ -10,10 +9,9 @@ public sealed class RoomTunnel : IDisposable
     public async Task<Uri> StartAsync(string install, string profile, Uri local, CancellationToken ct)
     {
         if (!local.IsLoopback || local.Scheme != "http") throw new ArgumentException("Tunnel origin must be loopback.");
-        var executable = Path.Combine(install, "room-tunnel", "cloudflared.exe");
-        await using (var file = File.OpenRead(executable)) {
-            if (!Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).Equals("2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712", StringComparison.OrdinalIgnoreCase)) throw new IOException("Room tunnel hash mismatch. Repair the app.");
-        }
+        // Callers still pass the app directory. The tool is stored under LocalApplicationData.
+        _ = install;
+        var executable = await CloudflaredTool.EnsureAsync(ct: ct);
         var home = Path.Combine(profile, "shared-rooms", "tunnel-home"); Directory.CreateDirectory(home);
         var config = Path.Combine(home, "empty.yml"); await File.WriteAllTextAsync(config, "{}\n", ct);
         var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true, WorkingDirectory = home };

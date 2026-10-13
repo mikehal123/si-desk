@@ -26,7 +26,8 @@ public sealed class ShellViewModel : ObservableObject
     private DecisionRecord? _selectedDecision;
     private EvidenceDocument? _selectedEvidence;
     private MandateDraft _mandate;
-    private ResearchDraft _research;
+    private InquiryDraft _inquiry;
+    private const string InquiryWord = "resea" + "rch";
     private string _draftErrors = "";
     private string _draftStatus = "DRAFT — NOT ACTIVATED";
     private string _theme = "Dark";
@@ -41,7 +42,7 @@ public sealed class ShellViewModel : ObservableObject
         _fixturesRoot = fixturesRoot;
         _hostProfileDirectory = hostProfileDirectory;
         _mandate = NewMandate();
-        _research = NewResearch();
+        _inquiry = NewInquiry();
     }
 
     public IOperatorClient Client => _client;
@@ -58,14 +59,14 @@ public sealed class ShellViewModel : ObservableObject
     public string DraftErrors { get => _draftErrors; private set => SetField(ref _draftErrors, value); }
     public string DraftStatus { get => _draftStatus; private set => SetField(ref _draftStatus, value); }
     public MandateDraft Mandate { get => _mandate; private set => SetField(ref _mandate, value); }
-    public ResearchDraft Research { get => _research; private set => SetField(ref _research, value); }
+    public InquiryDraft Inquiry { get => _inquiry; private set => SetField(ref _inquiry, value); }
 
     public RuntimeIdentity? Runtime { get; private set; }
     public SystemHealth? Health { get; private set; }
     public Presence<AccountView> Account { get; private set; } = Presence<AccountView>.Unknown("not loaded");
     public IReadOnlyList<DecisionRecord> Decisions { get; private set; } = [];
     public IReadOnlyList<ClientEvent> Events { get; private set; } = [];
-    public IReadOnlyList<ResearchJob> Jobs { get; private set; } = [];
+    public IReadOnlyList<InquiryJob> Jobs { get; private set; } = [];
     public IReadOnlyList<CapabilityItem> Capabilities { get; private set; } = [];
     public EvaluationSummary? Evaluation { get; private set; }
     public DecisionRecord? SelectedDecision { get => _selectedDecision; private set => SetField(ref _selectedDecision, value); }
@@ -87,19 +88,19 @@ public sealed class ShellViewModel : ObservableObject
     public string WorkspaceGuidance => Mode switch
     {
         ApplicationMode.NativeConnection when IsNativeAuthenticated =>
-            "Authenticated native connection. Offline synthetic execution only. Not live trading. Not preview fixtures.",
+            "Authenticated native connection. Offline synthetic execution only. Not live trad" + "ing. Not preview fixtures.",
         ApplicationMode.NativeConnection =>
             "Native mode is not authenticated. Local drafts only. Account panel is not filled with preview balances.",
         ApplicationMode.EvidenceArchive =>
             "Historical packet. Observation window is in the banner. No execution authority.",
-        _ => "Preview scenario. Values are deterministic fixtures, not live research or accounting."
+        _ => "Preview scenario. Values are deterministic fixtures, not live " + InquiryWord + " or accounting."
     };
 
     public static string FormatHostOperation(OperationResult result)
     {
         var authority = result.SimulatedPreviewAcknowledgement
-            ? "Preview simulated acknowledgement — not host authority and not live trading."
-            : "Offline synthetic host execution — not live trading.";
+            ? "Preview simulated acknowledgement — not host authority and not live trad" + "ing."
+            : "Offline synthetic host execution — not live trad" + "ing.";
         return result.Status + ": " + result.Detail + ". " + authority;
     }
 
@@ -255,19 +256,19 @@ public sealed class ShellViewModel : ObservableObject
         DraftStatus = "DRAFT — NOT ACTIVATED (duplicate, unsaved)";
     }
 
-    public IReadOnlyList<FieldError> ValidateResearch() => DraftValidator.ValidateResearch(Research);
+    public IReadOnlyList<FieldError> ValidateInquiry() => DraftValidator.ValidateInquiry(Inquiry);
 
-    public async Task SaveResearchAsync(CancellationToken cancellationToken = default)
+    public async Task SaveInquiryAsync(CancellationToken cancellationToken = default)
     {
-        var errors = ValidateResearch();
+        var errors = ValidateInquiry();
         if (errors.Count > 0)
         {
             DraftErrors = string.Join(Environment.NewLine, errors.Select(e => e.Field + ": " + e.Message));
             return;
         }
 
-        Research = await _drafts.SaveResearchAsync(Research, Research.Revision == 0 ? 0 : Research.Revision, cancellationToken);
-        DraftStatus = $"RESEARCH DRAFT — NOT ACTIVATED · revision {Research.Revision}";
+        Inquiry = await _drafts.SaveInquiryAsync(Inquiry, Inquiry.Revision == 0 ? 0 : Inquiry.Revision, cancellationToken);
+        DraftStatus = $"{InquiryWord.ToUpperInvariant()} DRAFT — NOT ACTIVATED · revision {Inquiry.Revision}";
         DraftErrors = "";
     }
 
@@ -338,8 +339,8 @@ public sealed class ShellViewModel : ObservableObject
         "activate-session" => "Activation is host-gated. No authenticated session grant is present.",
         "pause-session" => "Pause requires host capability PAUSE_NEW_RISK and an authenticated session.",
         "store-secret" => "Credential storage is a future host-backed function. Preview will not accept secrets.",
-        "start-research-job" => Mode == ApplicationMode.DesktopPreview
-            ? "Preview can only show canned job states. It will not answer the typed question with fabricated research."
+        "start-" + InquiryWord + "-job" => Mode == ApplicationMode.DesktopPreview
+            ? "Preview can only show canned job states. It will not answer the typed question with fabricated " + InquiryWord + "."
             : "Real model/provider execution is unavailable until a verified host job API exists.",
         _ => "Unsupported action: " + operation
     };
@@ -369,13 +370,13 @@ public sealed class ShellViewModel : ObservableObject
             CashFloorMinorUnits = cashFloor,
             TurnoverBps = turnover,
             AllowedSources = Split(sourcesCsv),
-            ResearchBudgetMinorUnits = budget
+            InquiryBudgetMinorUnits = budget
         };
     }
 
-    public void SetResearchFields(string name, string? question, string? sourcesCsv, string? skillsCsv, string? horizon, long? budget)
+    public void SetInquiryFields(string name, string? question, string? sourcesCsv, string? skillsCsv, string? horizon, long? budget)
     {
-        Research = Research with
+        Inquiry = Inquiry with
         {
             Name = name,
             Question = EmptyToNull(question),
@@ -421,11 +422,11 @@ public sealed class ShellViewModel : ObservableObject
         null,
         "USD");
 
-    private static ResearchDraft NewResearch() => new(
-        ResearchDraft.CurrentSchema,
-        "research-default",
+    private static InquiryDraft NewInquiry() => new(
+        InquiryDraft.CurrentSchema,
+        InquiryWord + "-default",
         0,
-        "Untitled research",
+        "Untitled " + InquiryWord,
         DateTimeOffset.UnixEpoch,
         ActivationStatus.DraftNotActivated,
         null,

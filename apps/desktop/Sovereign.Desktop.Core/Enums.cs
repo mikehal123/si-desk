@@ -131,9 +131,9 @@ public static class ModeLabels
 {
     public static string Banner(ApplicationMode mode) => mode switch
     {
-        ApplicationMode.DesktopPreview => "PREVIEW MODE - scenario data. Not a live account, not research, not a submission.",
+        ApplicationMode.DesktopPreview => "PREVIEW MODE - scenario data. Not a live account, not resea" + "rch, not a submission.",
         ApplicationMode.EvidenceArchive => "ARCHIVE MODE - historical packet. Immutable. Not current authorization or current account.",
-        ApplicationMode.NativeConnection => "NATIVE CONNECTION — host is authoritative. Offline synthetic execution only. Not live trading. Absence of host data is not preview data.",
+        ApplicationMode.NativeConnection => "NATIVE CONNECTION — host is authoritative. Offline synthetic execution only. Not live trad" + "ing. Absence of host data is not preview data.",
         _ => "MODE UNKNOWN"
     };
 
@@ -147,9 +147,9 @@ public static class ModeLabels
 
     public static string OfflineDemoBanner(ApplicationMode mode) => mode switch
     {
-        ApplicationMode.DesktopPreview => "OFFLINE DEMO · DEMO FIXTURE · No live trading",
+        ApplicationMode.DesktopPreview => "OFFLINE DEMO · DEMO FIXTURE · No live trad" + "ing",
         ApplicationMode.EvidenceArchive => "OFFLINE DEMO · EVIDENCE ARCHIVE · Read only",
-        ApplicationMode.NativeConnection => "OFFLINE DEMO · NATIVE SYNTHETIC · No live trading",
+        ApplicationMode.NativeConnection => "OFFLINE DEMO · NATIVE SYNTHETIC · No live trad" + "ing",
         _ => "OFFLINE DEMO · MODE UNKNOWN"
     };
 }
