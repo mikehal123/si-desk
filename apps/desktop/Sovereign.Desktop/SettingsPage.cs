@@ -114,7 +114,7 @@ public sealed partial class MainWindow
         identity.ColumnDefinitions.Add(new ColumnDefinition());
         identity.Children.Add(DeskLogo(DeskTheme.Space24 + DeskTheme.Space8));
         var details = new StackPanel { Spacing = DeskTheme.Space4, VerticalAlignment = VerticalAlignment.Center, Children = {
-            Head(XaiDeskIdentity.AppName), SettingsCaption("Version " + ShellViewModel.AppVersion) } };
+            Head("Super Intelligence Desk"), SettingsCaption("Version " + ShellViewModel.AppVersion) } };
         Grid.SetColumn(details, 1); identity.Children.Add(details);
         return new StackPanel { Spacing = DeskTheme.Space12, Children = { Head("About"), identity } };
     }
