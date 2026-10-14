@@ -7,7 +7,6 @@ using Microsoft.UI.Xaml.Controls;
 using Sovereign.Desktop.Connector;
 using Sovereign.Desktop.Core;
 using Windows.ApplicationModel.DataTransfer;
-using Windows.Security.Credentials;
 
 namespace Sovereign.Desktop;
 
@@ -27,7 +26,9 @@ public sealed partial class MainWindow
     private readonly List<Button> _grokbotAvatarButtons = [];
     private bool _connectorUi;
     private ConnectorHost? _connectorHost;
-    private readonly VaultConnectorSecrets _connectorSecrets = new();
+    private CancellationTokenSource? _connectorRetry;
+    private Task? _connectorStart;
+    private readonly StoredConnectorSecrets _connectorSecrets = DeskVault.ConnectorSecrets();
 
     private StackPanel ConnectorSection()
     {
@@ -238,24 +239,25 @@ public sealed partial class MainWindow
                 _connectorAddress.Text = "http://127.0.0.1:" + XaiDeskIdentity.GrokBotPort + "/mcp";
                 return;
             }
-            if (_connectorSecrets.Current() is null)
+            var created = _connectorSecrets.Current() is null;
+            var token = _connectorSecrets.LoadOrCreate();
+            if (created)
             {
-                _connectorStatus.Text = "Generate a token first. Nothing is listening.";
-                ConnectorSettings.AfterFailedStart(settings).Save(_vm.ProfileDirectory);
-                return;
+                _connectorToken.Text = token;
+                _connectorToken.Visibility = Visibility.Visible;
             }
             _connectorStatus.Text = "Starting…";
-            _connectorHost = new ConnectorHost(_connectorSecrets, new DeskBridge(this), new ConnectorAudit(ConnectorAudit.DefaultPath()));
-            var error = await _connectorHost.StartAsync(true, settings.Bind);
-            if (error is not null || !_connectorHost.IsBound || string.IsNullOrWhiteSpace(_connectorHost.Url))
+            var host = new ConnectorHost(_connectorSecrets, new DeskBridge(this), new ConnectorAudit(ConnectorAudit.DefaultPath()));
+            var retry = new CancellationTokenSource();
+            _connectorHost = host;
+            _connectorRetry = retry;
+            var start = host.StartWithRetryAsync(true, settings.Bind, busy =>
             {
-                _connectorStatus.Text = error ?? "Grok Bot connector did not bind. Nothing is listening.";
-                await StopConnectorAsync();
-                ConnectorSettings.AfterFailedStart(settings).Save(_vm.ProfileDirectory);
-                return;
-            }
-            _connectorAddress.Text = _connectorHost.Url;
-            _connectorStatus.Text = settings.Bind == ConnectorBindMode.Tailscale ? "On. Tailscale only." : "On. This PC only.";
+                _connectorStatus.Text = busy;
+                App.CrashLog("Grok Bot connector: " + busy + " every " + (int)ConnectorHost.BindRetryInterval.TotalSeconds + "s.");
+            }, retry.Token);
+            _connectorStart = start;
+            _ = FinishConnectorStartAsync(host, settings, start, retry.Token, created);
         }
         catch (Exception ex)
         {
@@ -263,6 +265,27 @@ public sealed partial class MainWindow
             try { await StopConnectorAsync(); } catch (Exception) { }
         }
         finally { _connectorGate.Release(); }
+    }
+
+    private async Task FinishConnectorStartAsync(ConnectorHost host, ConnectorSettings settings, Task<string?> start, CancellationToken ct, bool created)
+    {
+        string? error;
+        try { error = await start; }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex) { error = "Grok Bot connector could not start. " + ConnectorBind.OneLine(ex.Message); }
+        if (ct.IsCancellationRequested || !ReferenceEquals(_connectorHost, host)) return;
+        if (error is not null || !host.IsBound || string.IsNullOrWhiteSpace(host.Url))
+        {
+            _connectorStatus.Text = error ?? "Grok Bot connector did not bind. Nothing is listening.";
+            await _connectorGate.WaitAsync();
+            try { if (ReferenceEquals(_connectorHost, host)) await StopConnectorAsync(); }
+            finally { _connectorGate.Release(); }
+            ConnectorSettings.AfterFailedStart(settings).Save(_vm.ProfileDirectory);
+            return;
+        }
+        _connectorAddress.Text = host.Url;
+        var on = settings.Bind == ConnectorBindMode.Tailscale ? "On. Tailscale only." : "On. This PC only.";
+        _connectorStatus.Text = created ? on + " New token. Copy it now. It is not shown again." : on;
     }
 
     private void CopyConnectorToken()
@@ -414,38 +437,20 @@ public sealed partial class MainWindow
 
     private async Task StopConnectorAsync()
     {
+        var retry = _connectorRetry;
+        var start = _connectorStart;
+        _connectorRetry = null;
+        _connectorStart = null;
+        retry?.Cancel();
+        if (start is not null)
+        {
+            try { await start; }
+            catch (Exception) { /* A cancelled or failed start has nothing left to stop. */ }
+        }
+        retry?.Dispose();
         if (_connectorHost is not { } host) return;
         _connectorHost = null;
         await host.DisposeAsync();
-    }
-
-    private sealed class VaultConnectorSecrets : IConnectorSecrets
-    {
-        public string? Current()
-        {
-            try
-            {
-                return DeskVault.ReadPassword(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            }
-            catch { return null; }
-        }
-
-        public string Generate()
-        {
-            var token = ConnectorToken.Create();
-            DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            new PasswordVault().Add(new PasswordCredential(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount, token));
-            return token;
-        }
-
-        public void Revoke()
-        {
-            try
-            {
-                DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            }
-            catch { /* Already revoked. */ }
-        }
     }
 
     private sealed class DeskBridge(MainWindow window) : IGrokBotDesk

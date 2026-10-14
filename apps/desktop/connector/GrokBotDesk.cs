@@ -77,6 +77,20 @@ public static class ConnectorBind
         return false;
     }
 
+    /// <summary>True when the exception or any inner exception says the address and port are already taken.</summary>
+    public static bool IsAddressInUse(Exception? ex)
+    {
+        for (var item = ex; item is not null; item = item.InnerException)
+        {
+            if (item is SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse }) return true;
+            if (item.GetType().Name == "AddressInUseException") return true;
+            if (item is IOException && item.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    public static string BusyStatus(int port) => "Port " + port + " busy, retrying";
+
     public static string OneLine(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";

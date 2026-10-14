@@ -17,8 +17,11 @@ public sealed class ConnectorHost : IAsyncDisposable
     private readonly ConnectorRateGate _rate;
     private WebApplication? _app;
     private ConnectorBindMode _mode = ConnectorBindMode.Loopback;
+    public static readonly TimeSpan BindRetryInterval = TimeSpan.FromSeconds(5);
     public bool Running => _app is not null;
     public string? Url { get; private set; }
+    /// <summary>The last start failed because another listener already holds the address and port.</summary>
+    public bool PortBusy { get; private set; }
 
     public ConnectorHost(IConnectorSecrets secrets, IGrokBotDesk desk, ConnectorAudit audit, ConnectorRateGate? rate = null)
     {
@@ -30,6 +33,7 @@ public sealed class ConnectorHost : IAsyncDisposable
 
     public async Task<string?> StartAsync(bool enabled, ConnectorBindMode mode, CancellationToken ct = default, Func<CancellationToken, Task<(IPAddress? Address, string? Error)>>? tailscale = null)
     {
+        PortBusy = false;
         if (!enabled) return "Grok Bot connector is off.";
         if (mode == ConnectorBindMode.Loopback)
             return await ListenAsync(IPAddress.Loopback, ConnectorBind.Port, mode, ct);
@@ -44,8 +48,35 @@ public sealed class ConnectorHost : IAsyncDisposable
     public Task<string?> ListenForChecksAsync(IPAddress address, int port, ConnectorBindMode mode, CancellationToken ct = default) =>
         ListenAsync(address, port, mode, ct);
 
+    /// <summary>
+    /// Like <see cref="StartAsync"/>, but while the port is taken it waits and tries again until it binds or <paramref name="ct"/> is cancelled.
+    /// <paramref name="busy"/> runs once, on the first busy attempt. Other failures return right away.
+    /// </summary>
+    public Task<string?> StartWithRetryAsync(bool enabled, ConnectorBindMode mode, Action<string>? busy, CancellationToken ct = default, TimeSpan? interval = null, Func<CancellationToken, Task<(IPAddress? Address, string? Error)>>? tailscale = null) =>
+        RetryAsync(token => StartAsync(enabled, mode, token, tailscale), ConnectorBind.Port, busy, interval, ct);
+
+    public Task<string?> ListenWithRetryForChecksAsync(IPAddress address, int port, ConnectorBindMode mode, Action<string>? busy, TimeSpan interval, CancellationToken ct = default) =>
+        RetryAsync(token => ListenAsync(address, port, mode, token), port, busy, interval, ct);
+
+    private async Task<string?> RetryAsync(Func<CancellationToken, Task<string?>> attempt, int port, Action<string>? busy, TimeSpan? interval, CancellationToken ct)
+    {
+        var told = false;
+        while (true)
+        {
+            var error = await attempt(ct);
+            if (error is null || !PortBusy || ct.IsCancellationRequested) return error;
+            if (!told)
+            {
+                told = true;
+                busy?.Invoke(ConnectorBind.BusyStatus(port));
+            }
+            await Task.Delay(interval ?? BindRetryInterval, ct);
+        }
+    }
+
     private async Task<string?> ListenAsync(IPAddress address, int port, ConnectorBindMode mode, CancellationToken ct)
     {
+        PortBusy = false;
         if (!ConnectorBind.ConnectionAllowed(address, mode))
             return "Refusing an address that is not loopback or Tailscale.";
         await StopAsync();
@@ -83,6 +114,7 @@ public sealed class ConnectorHost : IAsyncDisposable
         catch (Exception ex)
         {
             await ReleaseAsync(app);
+            PortBusy = ConnectorBind.IsAddressInUse(ex);
             return "Grok Bot connector could not start. " + ConnectorBind.OneLine(ex.Message);
         }
         var boundPort = BoundPort(app, port);
