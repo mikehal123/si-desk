@@ -16,8 +16,16 @@ internal sealed partial class ChatConversation
     private readonly CheckBox _swarmOption = new() { Content = "Plan big goals as a swarm (uses subagents)" };
     private readonly ComboBox _swarmHire = new() { MinWidth = 150 };
     private readonly TextBlock _swarmHireLabel = SubagentCaption("Swarm mode");
+    private readonly CheckBox _grokbotReview = new() { Content = "Grokbot reviews handoffs" };
+    private readonly TextBlock _grokbotReviewCapLabel = SubagentCaption("Review loop cap");
+    private readonly NumberBox _grokbotReviewCap = new()
+    {
+        Minimum = 1, Maximum = 99, Value = SwarmHandoffReview.DefaultCap, SmallChange = 1, Width = 88,
+        SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+    };
     private readonly StackPanel _swarmHireRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
     private bool _swarmHireFilling;
+    private bool _grokbotReviewFilling;
     private readonly StackPanel _subagentOptionRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
     private readonly Button _subagentsToggle = new() { Content = "Subagents · 0" };
     private readonly StackPanel _subagentList = new() { Spacing = DeskTheme.Space8, Visibility = Visibility.Collapsed };
@@ -70,11 +78,39 @@ internal sealed partial class ChatConversation
             _saved = _saved with { SwarmHire = mixed ? SwarmRoleModels.MixedMode : SwarmRoleModels.SingleMode };
             await ProjectPreferencesChangedAsync();
         };
+        _grokbotReview.IsChecked = _saved.GrokbotReviewsHandoffs == true;
+        _grokbotReview.VerticalAlignment = VerticalAlignment.Center;
+        AutomationName(_grokbotReview, "Grokbot reviews handoffs");
+        ToolTipService.SetToolTip(_grokbotReview, "After a handoff, Grokbot reviews the swarm before the next main-agent instruction. Off until checked.");
+        _grokbotReview.Click += (_, _) =>
+        {
+            if (_restoring || _chatBusy) return;
+            _saved = _saved with { GrokbotReviewsHandoffs = _grokbotReview.IsChecked == true };
+            Save();
+        };
+        _grokbotReviewCap.Value = SwarmHandoffReview.LoopCap(_saved.GrokbotReviewLoopCap);
+        _grokbotReviewCap.VerticalAlignment = VerticalAlignment.Center;
+        _grokbotReviewCapLabel.VerticalAlignment = VerticalAlignment.Center;
+        AutomationName(_grokbotReviewCap, "Review loop cap");
+        AutomationName(_grokbotReviewCapLabel, "Review loop cap");
+        ToolTipService.SetToolTip(_grokbotReviewCap, "Maximum handoff reviews for one swarm run. Default 3.");
+        _grokbotReviewCap.ValueChanged += (_, _) =>
+        {
+            if (_restoring || _grokbotReviewFilling || _chatBusy) return;
+            if (double.IsNaN(_grokbotReviewCap.Value)) return;
+            var cap = (int)Math.Round(_grokbotReviewCap.Value);
+            if (cap < 1 || _saved.GrokbotReviewLoopCap == cap) return;
+            _saved = _saved with { GrokbotReviewLoopCap = cap };
+            Save();
+        };
         _subagentOption.VerticalAlignment = VerticalAlignment.Top;
         _swarmHireLabel.VerticalAlignment = VerticalAlignment.Center;
         _swarmHireRow.Children.Clear();
         _swarmHireRow.Children.Add(_swarmHireLabel);
         _swarmHireRow.Children.Add(_swarmHire);
+        _swarmHireRow.Children.Add(_grokbotReview);
+        _swarmHireRow.Children.Add(_grokbotReviewCapLabel);
+        _swarmHireRow.Children.Add(_grokbotReviewCap);
         var swarmBlock = new StackPanel { Spacing = DeskTheme.Space4 };
         swarmBlock.Children.Add(_swarmOption);
         swarmBlock.Children.Add(_swarmHireRow);
@@ -95,13 +131,27 @@ internal sealed partial class ChatConversation
         _swarmOption.Opacity = _saved.SubagentsEnabled ? 1 : 0.45;
         var hireVisible = CursorChat ? show : Visibility.Collapsed;
         _swarmHire.Visibility = hireVisible;
-        _swarmHireRow.Visibility = hireVisible;
+        _swarmHireLabel.Visibility = hireVisible;
+        _swarmHireRow.Visibility = show;
+        _grokbotReview.Visibility = show;
+        _grokbotReviewCap.Visibility = show;
+        _grokbotReviewCapLabel.Visibility = show;
         _swarmHire.IsEnabled = CursorChat && !_chatBusy && _saved.SubagentsEnabled && _saved.SwarmEnabled;
         _swarmHire.Opacity = _swarmHire.IsEnabled ? 1 : 0.45;
         _swarmHireLabel.Opacity = _swarmHire.Opacity;
+        var reviewEnabled = !_chatBusy && _saved.SubagentsEnabled && _saved.SwarmEnabled;
+        _grokbotReview.IsEnabled = reviewEnabled;
+        _grokbotReviewCap.IsEnabled = reviewEnabled;
+        _grokbotReview.Opacity = reviewEnabled ? 1 : 0.45;
+        _grokbotReviewCap.Opacity = _grokbotReview.Opacity;
+        _grokbotReviewCapLabel.Opacity = _grokbotReview.Opacity;
         _swarmHireFilling = true;
         _swarmHire.SelectedIndex = SwarmRoleModels.IsMixed(_saved.SwarmHire) ? 1 : 0;
         _swarmHireFilling = false;
+        _grokbotReviewFilling = true;
+        _grokbotReview.IsChecked = _saved.GrokbotReviewsHandoffs == true;
+        _grokbotReviewCap.Value = SwarmHandoffReview.LoopCap(_saved.GrokbotReviewLoopCap);
+        _grokbotReviewFilling = false;
         _subagentOption.IsChecked = _saved.SubagentsEnabled;
         _swarmOption.IsChecked = _saved.SubagentsEnabled && _saved.SwarmEnabled;
     }
@@ -204,6 +254,8 @@ internal sealed partial class ChatConversation
         foreach (var pair in _subagentRows.ToArray())
             if (SubagentActive(pair.Value))
             {
+                if (SwarmHandoffReview.KeepSwarmHelper(outcome, _holdSwarmHelpersForReview, IsSwarmHelper(pair.Key)))
+                    continue;
                 var previous = pair.Value;
                 var child = previous with { State = outcome == "stopped" ? "stop requested" : "disconnected",
                     CompletedAt = previous.CompletedAt ?? (outcome == "restored" ? previous.UpdatedAt ?? previous.StartedAt : DateTimeOffset.UtcNow) };
@@ -215,7 +267,11 @@ internal sealed partial class ChatConversation
         if (outcome != "stopped")
             foreach (var pair in _subagentRows)
                 if (pair.Value.State is "disconnected" or "interrupted" or "unconfirmed")
+                {
+                    if (SwarmHandoffReview.KeepSwarmHelper(outcome, _holdSwarmHelpersForReview, IsSwarmHelper(pair.Key)))
+                        continue;
                     ApplySwarmInterrupt(pair.Value);
+                }
         UpdateSubagentCounts();
     }
 
@@ -263,6 +319,7 @@ internal sealed partial class ChatConversation
         }
         try { BindSwarmBoard(board); }
         catch (Exception) { }
+        UpdateSubagentCounts();
     }
 
     private string? SessionForTask(SwarmBoard board, string taskId)
@@ -307,11 +364,22 @@ internal sealed partial class ChatConversation
             var count = listed.Count(child => !SubagentActive(child) && Outcome(child) == outcome);
             if (count > 0) summary.Add($"{label} · {count}");
         }
-        _subagentsToggle.Content = active > 0 ? $"Subagents · {active} working" : $"Subagents · {listed.Count}";
+        _subagentsToggle.Content = $"Subagents · {SubagentBadgeCount()}";
         _subagentSummary.Text = string.Join("   ", summary);
         UpdateClosedAgentCount();
         AutomationName(_subagentsToggle, "Show or hide subagents panel. " + string.Join(", ", summary) + $", {listed.Count} retained helpers.");
         RefreshChatHeaderTabs();
+    }
+
+    private int SubagentBadgeCount()
+    {
+        SwarmBoard? board = null;
+        try { board = SwarmSection.TryLoad(_saved.Id); }
+        catch (Exception) { }
+        return HeaderBadges.Subagents(_subagentRows.Values.Select(child =>
+            new HeaderBadges.SubagentRow(
+                SwarmSection.IsSwarmWorker(child.SessionId, child.Name, child.Task, board),
+                IsSubagentCardClosed(child.SessionId))));
     }
 
     private List<CursorSubagent> ListedHelpers()

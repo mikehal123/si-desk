@@ -109,6 +109,8 @@ internal sealed partial class ChatConversation
                 : "Main agent · stop requested. This also stops its helpers. Pending messages stay here until you press Resume main agent.";
         }
         _chatCancellation?.Cancel();
+        try { _handoffReview?.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 
     internal bool StopFromPhone()
@@ -195,6 +197,8 @@ internal sealed partial class ChatConversation
                     _chatStatus.Text = "Main agent · working. Enter queues a correction for the main agent. Stop stops the main agent and its helpers. A message is not resent on its own.";
                     void Delta(string text) { content.Append(text); turn.Append(text); _partialReply.Enqueue(text); }
                     ApplySkillGuidance(restoredPrompt);
+                    if (batch.Any(item => ReviewSendMatches(item.Text)))
+                        NoteReviewSendStarted(batch.First(item => ReviewSendMatches(item.Text)).Text);
                     _cursorPromptTask = SendActiveAgentAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images);
                     StartCursorSteering();
                     var result = await _cursorPromptTask;
@@ -235,11 +239,19 @@ internal sealed partial class ChatConversation
                 finally
                 {
                     if (_cursorSteeringTask is not null) await _cursorSteeringTask;
-                    if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
-                    _steeringQueue.CompleteBatch(batch, outcome is "completed" or "redirected");
-                    FinishSubagents(outcome); _activeChatTurn = null;
+                    var reply = content.ToString();
+                    var review = ArmHandoffReview(reply, outcome);
+                    try
+                    {
+                        if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(reply, outcome, turn, failureReason); }
+                        _steeringQueue.CompleteBatch(batch, outcome is "completed" or "redirected");
+                        FinishSubagents(outcome);
+                    }
+                    finally { ReleaseHandoffReviewHold(); }
+                    _activeChatTurn = null;
                     _cursorPromptTask = null; _cursorSteeringTask = null;
                     _chatCancellation.Dispose(); _chatCancellation = null;
+                    if (review) await AwaitHandoffReviewAsync(reply);
                     RefreshPendingInstructions(); Save();
                 }
                 if (outcome is not ("completed" or "redirected")) break;
@@ -249,6 +261,7 @@ internal sealed partial class ChatConversation
         {
             _cursorSendLoop = false;
             SetChatBusy(false); RefreshPendingInstructions(); Save();
+            TryStartQueuedReview();
         }
     }
 
@@ -497,6 +510,8 @@ internal sealed partial class ChatConversation
                     _chatStatus.Text = "Main agent · working. Enter queues a correction for the main agent. Stop stops the main agent and its helpers. A message is not resent on its own.";
                     void Delta(string text) { content.Append(text); turn.Append(text); _partialReply.Enqueue(text); }
                     ApplySkillGuidance(restoredPrompt);
+                    if (batch.Any(item => ReviewSendMatches(item.Text)))
+                        NoteReviewSendStarted(batch.First(item => ReviewSendMatches(item.Text)).Text);
                     await _codexChat!.SendAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images);
                     outcome = "completed";
                     _needsContext = false;
@@ -521,10 +536,18 @@ internal sealed partial class ChatConversation
                     var correction = _codexCorrectionTask;
                     if (correction is not null) await correction;
                     RememberAcceptedCorrections(outcome is "completed");
-                    if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
-                    _steeringQueue.CompleteBatch(batch, outcome is "completed");
-                    FinishSubagents(outcome); _activeChatTurn = null;
+                    var reply = content.ToString();
+                    var review = ArmHandoffReview(reply, outcome);
+                    try
+                    {
+                        if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(reply, outcome, turn, failureReason); }
+                        _steeringQueue.CompleteBatch(batch, outcome is "completed");
+                        FinishSubagents(outcome);
+                    }
+                    finally { ReleaseHandoffReviewHold(); }
+                    _activeChatTurn = null;
                     _chatCancellation.Dispose(); _chatCancellation = null;
+                    if (review) await AwaitHandoffReviewAsync(reply);
                     RefreshPendingInstructions(); Save();
                 }
                 if (outcome is not "completed") break;
@@ -534,6 +557,7 @@ internal sealed partial class ChatConversation
         {
             _codexSendLoop = false;
             SetChatBusy(false); RefreshPendingInstructions(); Save();
+            TryStartQueuedReview();
         }
     }
 

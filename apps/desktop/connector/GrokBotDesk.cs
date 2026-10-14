@@ -299,4 +299,8 @@ public interface IGrokBotDesk
     void RecordGrokbotTool(string tool, string args, string result);
     string ReadSwarmBoard(string? swarmId, string? runId = null);
     string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null);
+    bool GrokbotReviewsHandoffs(string conversationId);
+    bool ConversationOpen(string conversationId);
+    void DeliverSwarmReview(string conversationId, string text, bool resume);
+    string? SwarmBoardRoot();
 }

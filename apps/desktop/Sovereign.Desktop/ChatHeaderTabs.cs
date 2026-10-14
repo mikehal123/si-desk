@@ -16,9 +16,8 @@ internal sealed partial class ChatConversation
         if (_chatConnectionButton is null || _chatHeadingActions is null) return;
         var width = _chatHeading?.ActualWidth ?? _chatPage.ActualWidth;
         _compactHeaderTabs = width > 0 && width < 520;
-        HeaderTab(_subagentsToggle, "\uE716", "Subagents", _subagentRows.Count, 116);
-        var count = _changeReportedCounts.Values.Sum(entry => entry.Count);
-        HeaderTab(_changesToggle, "\uE8A5", "Changes", count, 108);
+        HeaderTab(_subagentsToggle, "\uE716", "Subagents", SubagentBadgeCount(), 116);
+        HeaderTab(_changesToggle, "\uE8A5", "Changes", ChangesBadgeCount(), 108);
         HeaderTab(_chatConnectionButton, "\uE713", "Connection", null, 128);
         _teamOption.Visibility = Visibility.Collapsed;
     }

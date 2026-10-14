@@ -62,6 +62,18 @@ public sealed partial class MainWindow
     private readonly GrokbotAppToaster _grokbotToaster = new();
     private readonly Image _grokbotPendingView = new() { MaxWidth = 160, MaxHeight = 96, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private byte[]? _grokbotImage;
+    private ScrollViewer? _grokbotScroll;
+    private Button? _grokbotJump;
+    private Border? _grokbotJumpBadge;
+    private TextBlock? _grokbotJumpCount;
+    private GrokbotTranscript.Jump _grokbotJumpState = GrokbotTranscript.Jump.Following;
+    private int _grokbotSeenEntries = -1;
+    private bool _grokbotHoldScroll;
+    private int _grokbotHoldGeneration;
+    private bool _grokbotJumpAnimating;
+    private bool _grokbotPainting;
+    private string? _grokbotHoverCopyId;
+    private EventHandler<object>? _grokbotScrollRetry;
 
     internal GrokbotMailbox GrokbotMail => _grokbotMail;
 
@@ -109,18 +121,31 @@ public sealed partial class MainWindow
         _grokbotPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _grokbotPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var prefs = _grokbotMail.PreferencesCopy();
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space12 };
+        var header = new Grid { ColumnSpacing = DeskTheme.Space12 };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var leading = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space12 };
         var headerMark = GrokbotAvatar.Mark(prefs.AvatarColor, prefs.AvatarShape, 36);
         headerMark.VerticalAlignment = VerticalAlignment.Center;
-        header.Children.Add(headerMark);
+        leading.Children.Add(headerMark);
         var titles = new StackPanel { Spacing = DeskTheme.Space4 };
         titles.Children.Add(Head("Grok Bot"));
         titles.Children.Add(_grokbotLink);
-        header.Children.Add(titles);
+        leading.Children.Add(titles);
+        header.Children.Add(leading);
+        var menu = GrokbotHeaderMenu();
+        menu.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(menu, 1);
+        header.Children.Add(menu);
         _grokbotPage.Children.Add(header);
-        var scroll = new ScrollViewer { Content = _grokbotMessages, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        Grid.SetRow(scroll, 1);
-        _grokbotPage.Children.Add(scroll);
+        var list = new Grid();
+        _grokbotScroll = new ScrollViewer { Content = _grokbotMessages, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        _grokbotScroll.ViewChanged += OnGrokbotViewChanged;
+        _grokbotScroll.SizeChanged += (_, _) => FollowGrokbotIfStuck();
+        list.Children.Add(_grokbotScroll);
+        list.Children.Add(GrokbotJumpButton());
+        Grid.SetRow(list, 1);
+        _grokbotPage.Children.Add(list);
         var audit = new Expander
         {
             Header = new TextBlock { Text = "Grokbot audit", FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption, Foreground = DeskTheme.Muted },
@@ -349,68 +374,86 @@ public sealed partial class MainWindow
 
     private void PaintGrokbot()
     {
-        StopGrokbotDotMotion();
-        _grokbotMessages.Children.Clear();
-        var messages = _grokbotMail.Messages;
-        if (messages.Count == 0)
-            _grokbotMessages.Children.Add(Note("No messages yet. Send one here. Grokbot picks it up through the connector."));
-        var prefs = _grokbotMail.PreferencesCopy();
-        var now = DateTimeOffset.UtcNow;
-        foreach (var mail in messages)
+        _grokbotPainting = true;
+        _grokbotHoldScroll = true;
+        try
         {
-            var status = mail.Status switch
+            StopGrokbotDotMotion();
+            _grokbotMessages.Children.Clear();
+            var messages = _grokbotMail.Messages;
+            var entries = GrokbotTranscript.EntryCount(messages);
+            var arrived = _grokbotSeenEntries < 0 ? 0 : Math.Max(0, entries - _grokbotSeenEntries);
+            _grokbotSeenEntries = entries;
+            if (messages.Count == 0)
+                _grokbotMessages.Children.Add(Note("No messages yet. Send one here. Grokbot picks it up through the connector."));
+            var prefs = _grokbotMail.PreferencesCopy();
+            var now = DateTimeOffset.UtcNow;
+            foreach (var mail in messages)
             {
-                GrokbotMailStatus.Queued => "Queued",
-                GrokbotMailStatus.PickedUp => "Picked up",
-                _ => "Answered"
+                var status = mail.Status switch
+                {
+                    GrokbotMailStatus.Queued => "Queued",
+                    GrokbotMailStatus.PickedUp => "Picked up",
+                    _ => "Answered"
+                };
+                var bar = GrokTuiPresentation.UserBar(mail.Text, mail.Created.ToLocalTime());
+                var footer = bar.Time + " · " + status + (mail.AskToAct ? " · Act on" : "");
+                _grokbotMessages.Children.Add(GrokbotMine(mail, bar.Text, footer));
+                if (!string.IsNullOrWhiteSpace(mail.Reply))
+                {
+                    var when = mail.AnsweredAt?.ToLocalTime() ?? mail.Created.ToLocalTime();
+                    var reply = GrokTuiPresentation.UserBar(mail.Reply, when);
+                    _grokbotMessages.Children.Add(GrokbotReply(mail, reply.Text, reply.Time + " · Answered", prefs.AvatarColor, prefs.AvatarShape));
+                }
+                else
+                {
+                    var label = GrokbotThinking.Label(mail.Status, mail.Reply, prefs.Stopped, mail.Created, mail.PickedUpAt, now);
+                    if (!prefs.Stopped && label.Length > 0)
+                        _grokbotMessages.Children.Add(GrokbotThinkingBubble(label, prefs.AvatarColor, prefs.AvatarShape));
+                }
+            }
+            _grokbotAudit.Children.Clear();
+            var audit = _grokbotMail.Audit;
+            if (audit.Count == 0) _grokbotAudit.Children.Add(Note("No tool calls yet."));
+            foreach (var line in audit.TakeLast(40))
+                _grokbotAudit.Children.Add(Note(line.At.ToLocalTime().ToString("HH:mm:ss") + "  " + line.Tool + "  " + line.Args + "  " + line.Result));
+            var listening = _connectorHost is { IsBound: true };
+            var link = _grokbotMail.Link(listening);
+            _grokbotLink.Text = link.State switch
+            {
+                GrokbotLinkState.Connected => "Connected · last poll " + PollText(link.LastPoll),
+                GrokbotLinkState.Waiting => "Waiting · last poll " + PollText(link.LastPoll),
+                _ => "Off"
             };
-            var bar = GrokTuiPresentation.UserBar(mail.Text, mail.Created.ToLocalTime());
-            var footer = bar.Time + " · " + status + (mail.AskToAct ? " · Act on" : "");
-            _grokbotMessages.Children.Add(GrokbotMine(bar.Text, footer, mail.WakeNote, mail.Image));
-            if (!string.IsNullOrWhiteSpace(mail.Reply))
+            if (_grokbotStop is not null)
             {
-                var when = mail.AnsweredAt?.ToLocalTime() ?? mail.Created.ToLocalTime();
-                var reply = GrokTuiPresentation.UserBar(mail.Reply, when);
-                _grokbotMessages.Children.Add(GrokbotReply(mail, reply.Text, reply.Time + " · Answered", prefs.AvatarColor, prefs.AvatarShape));
+                _grokbotStop.Content = prefs.Stopped ? "Resume Grokbot" : "Stop Grokbot";
+                AutomationName(_grokbotStop, prefs.Stopped ? "Resume Grokbot" : "Stop Grokbot");
             }
-            else
+            if (_grokbotMail.Controlling) _grokbotControlBanner.Visibility = Visibility.Visible;
+            PlaceGrokbotScroll(arrived);
+        }
+        finally
+        {
+            _grokbotPainting = false;
+            var generation = ++_grokbotHoldGeneration;
+            if (!DispatcherQueue.TryEnqueue(() =>
             {
-                var label = GrokbotThinking.Label(mail.Status, mail.Reply, prefs.Stopped, mail.Created, mail.PickedUpAt, now);
-                if (!prefs.Stopped && label.Length > 0)
-                    _grokbotMessages.Children.Add(GrokbotThinkingBubble(label, prefs.AvatarColor, prefs.AvatarShape));
-            }
+                if (generation == _grokbotHoldGeneration) _grokbotHoldScroll = false;
+            })) _grokbotHoldScroll = false;
         }
-        _grokbotAudit.Children.Clear();
-        var audit = _grokbotMail.Audit;
-        if (audit.Count == 0) _grokbotAudit.Children.Add(Note("No tool calls yet."));
-        foreach (var line in audit.TakeLast(40))
-            _grokbotAudit.Children.Add(Note(line.At.ToLocalTime().ToString("HH:mm:ss") + "  " + line.Tool + "  " + line.Args + "  " + line.Result));
-        var listening = _connectorHost is { IsBound: true };
-        var link = _grokbotMail.Link(listening);
-        _grokbotLink.Text = link.State switch
-        {
-            GrokbotLinkState.Connected => "Connected · last poll " + PollText(link.LastPoll),
-            GrokbotLinkState.Waiting => "Waiting · last poll " + PollText(link.LastPoll),
-            _ => "Off"
-        };
-        if (_grokbotStop is not null)
-        {
-            _grokbotStop.Content = prefs.Stopped ? "Resume Grokbot" : "Stop Grokbot";
-            AutomationName(_grokbotStop, prefs.Stopped ? "Resume Grokbot" : "Stop Grokbot");
-        }
-        if (_grokbotMail.Controlling) _grokbotControlBanner.Visibility = Visibility.Visible;
     }
 
     private const double GrokbotBubbleMaxWidth = 520;
 
-    private static UIElement GrokbotMine(string text, string footer, string? note, byte[]? image)
+    private UIElement GrokbotMine(GrokbotMail mail, string text, string footer)
     {
-        var column = GrokbotBubbleColumn(text, footer, true, image);
-        if (!string.IsNullOrWhiteSpace(note))
+        var column = GrokbotBubbleColumn(text, footer, true, "you:" + mail.Id, mail.Image);
+        if (!string.IsNullOrWhiteSpace(mail.WakeNote))
         {
             column.Children.Add(new TextBlock
             {
-                Text = note,
+                Text = mail.WakeNote,
                 TextWrapping = TextWrapping.Wrap,
                 IsTextSelectionEnabled = true,
                 FontSize = DeskTheme.SizeCaption,
@@ -427,7 +470,7 @@ public sealed partial class MainWindow
     {
         var mark = GrokbotAvatar.Mark(color, shape, 28);
         mark.VerticalAlignment = VerticalAlignment.Top;
-        var column = GrokbotBubbleColumn(text, footer, false);
+        var column = GrokbotBubbleColumn(text, footer, false, "bot:" + mail.Id);
         column.Children.Insert(1, GrokbotReplyActions(mail));
         return new StackPanel
         {
@@ -531,12 +574,7 @@ public sealed partial class MainWindow
 
     private StackPanel GrokbotReplyActions(GrokbotMail mail)
     {
-        var copied = _grokbotCopiedId == mail.Id && DateTimeOffset.UtcNow < _grokbotCopiedUntil;
-        var copy = GrokbotActionButton(copied ? "Copied" : "Copy", false);
-        var reply = mail.Reply ?? "";
         var id = mail.Id;
-        copy.Click += (_, _) => CopyGrokbotReply(reply, id);
-        AutomationName(copy, "Copy Grokbot reply");
         var like = GrokbotActionButton(mail.Liked ? "Liked" : "Like", mail.Liked);
         var liked = mail.Liked;
         like.Click += (_, _) =>
@@ -550,7 +588,7 @@ public sealed partial class MainWindow
             Orientation = Orientation.Horizontal,
             Spacing = DeskTheme.Space8,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Children = { copy, like }
+            Children = { like }
         };
     }
 
@@ -574,7 +612,7 @@ public sealed partial class MainWindow
         FocusVisualSecondaryBrush = DeskTheme.Background
     };
 
-    private void CopyGrokbotReply(string reply, string id)
+    private void CopyGrokbotText(string reply, string id)
     {
         var queue = DispatcherQueue;
         _ = FinishGrokbotCopyAsync(queue, reply, id);
@@ -607,7 +645,7 @@ public sealed partial class MainWindow
         });
     }
 
-    private static StackPanel GrokbotBubbleColumn(string text, string footer, bool mine, byte[]? image = null)
+    private StackPanel GrokbotBubbleColumn(string text, string footer, bool mine, string copyId, byte[]? image = null)
     {
         var align = mine ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         var body = new TextBlock
@@ -638,6 +676,18 @@ public sealed partial class MainWindow
             MaxWidth = GrokbotBubbleMaxWidth,
             Child = bubbleChild
         };
+        var copy = GrokbotCopyIcon(text, copyId);
+        var overlay = new Canvas { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
+        overlay.Children.Add(copy);
+        overlay.SizeChanged += (_, _) =>
+        {
+            Canvas.SetLeft(copy, Math.Max(0, overlay.ActualWidth - copy.Width - DeskTheme.Space4));
+            Canvas.SetTop(copy, DeskTheme.Space4);
+        };
+        var bubbleHost = new Grid { HorizontalAlignment = align };
+        bubbleHost.Children.Add(bubble);
+        bubbleHost.Children.Add(overlay);
+        AttachGrokbotCopyHover(bubbleHost, bubble, copy);
         var meta = new TextBlock
         {
             Text = footer,
@@ -653,8 +703,299 @@ public sealed partial class MainWindow
             Spacing = DeskTheme.Space4,
             HorizontalAlignment = align,
             MaxWidth = GrokbotBubbleMaxWidth,
-            Children = { bubble, meta }
+            Children = { bubbleHost, meta }
         };
+    }
+
+    private Button GrokbotCopyIcon(string text, string id)
+    {
+        var copied = GrokbotCopyShown(id);
+        var shown = copied || _grokbotHoverCopyId == id;
+        var button = new Button
+        {
+            Tag = id,
+            Content = new FontIcon
+            {
+                Glyph = copied ? "\uE73E" : "\uE8C8",
+                FontFamily = DeskTheme.IconFont,
+                FontSize = DeskTheme.SizeCaption,
+                Foreground = DeskTheme.Text,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            },
+            Width = 28,
+            Height = 28,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            CornerRadius = new CornerRadius(DeskTheme.Radius6),
+            Background = DeskTheme.Raised,
+            BorderBrush = DeskTheme.Divider,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Opacity = shown ? 1 : 0,
+            IsHitTestVisible = shown,
+            UseSystemFocusVisuals = true,
+            FocusVisualPrimaryBrush = DeskTheme.Accent,
+            FocusVisualSecondaryBrush = DeskTheme.Background
+        };
+        ToolTipService.SetToolTip(button, copied ? "Copied" : "Copy");
+        AutomationName(button, copied ? "Copied" : "Copy message");
+        button.Click += (_, _) => CopyGrokbotText(text, id);
+        return button;
+    }
+
+    private bool GrokbotCopyShown(string id) =>
+        _grokbotCopiedId == id && DateTimeOffset.UtcNow < _grokbotCopiedUntil;
+
+    private void AttachGrokbotCopyHover(FrameworkElement host, FrameworkElement bubble, Button copy)
+    {
+        if (copy.Tag is not string id) return;
+        void Show()
+        {
+            _grokbotHoverCopyId = id;
+            copy.Opacity = 1;
+            copy.IsHitTestVisible = true;
+        }
+        void Hide()
+        {
+            if (_grokbotPainting || GrokbotCopyShown(id) || copy.FocusState != FocusState.Unfocused) return;
+            if (_grokbotHoverCopyId == id) _grokbotHoverCopyId = null;
+            copy.Opacity = 0;
+            copy.IsHitTestVisible = false;
+        }
+        void Exit(object sender, PointerRoutedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(host).Position;
+            if (point.X >= 0 && point.Y >= 0 && point.X <= host.ActualWidth && point.Y <= host.ActualHeight) return;
+            Hide();
+        }
+        host.PointerEntered += (_, _) => Show();
+        host.PointerExited += Exit;
+        bubble.PointerEntered += (_, _) => Show();
+        bubble.PointerExited += Exit;
+        copy.PointerEntered += (_, _) => Show();
+        copy.PointerExited += Exit;
+        copy.GotFocus += (_, _) => Show();
+        copy.LostFocus += (_, _) => Hide();
+    }
+
+    private Button GrokbotHeaderMenu()
+    {
+        var menu = new MenuFlyout();
+        var copy = new MenuFlyoutItem { Text = "Copy conversation" };
+        copy.Click += (_, _) => CopyGrokbotConversation();
+        menu.Items.Add(copy);
+        var button = new Button
+        {
+            Content = new FontIcon
+            {
+                Glyph = "\uE712",
+                FontFamily = DeskTheme.IconFont,
+                FontSize = DeskTheme.SizeBody,
+                Foreground = DeskTheme.Muted,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            },
+            Width = 36,
+            Height = 36,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            Background = DeskTheme.Transparent,
+            BorderBrush = DeskTheme.Transparent,
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(DeskTheme.Radius6),
+            Flyout = menu,
+            UseSystemFocusVisuals = true,
+            FocusVisualPrimaryBrush = DeskTheme.Accent,
+            FocusVisualSecondaryBrush = DeskTheme.Background
+        };
+        AutomationName(button, "Grokbot menu");
+        ToolTipService.SetToolTip(button, "Grokbot menu");
+        AutomationName(copy, "Copy conversation");
+        return button;
+    }
+
+    private void CopyGrokbotConversation() => _ = CopyGrokbotConversationAsync();
+
+    private async Task CopyGrokbotConversationAsync()
+    {
+        try { await ChatClipboard.CopyAsync(DispatcherQueue, GrokbotTranscript.Format(_grokbotMail.Messages)); }
+        catch { }
+    }
+
+    private Button GrokbotJumpButton()
+    {
+        var count = new TextBlock
+        {
+            FontFamily = DeskTheme.UiFont,
+            FontSize = 10,
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var badge = new Border
+        {
+            MinWidth = 16,
+            Height = 16,
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(255, 196, 32, 38)),
+            Padding = new Thickness(4, 0, 4, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Visibility = Visibility.Collapsed,
+            Child = count
+        };
+        var face = new Grid
+        {
+            Width = 40,
+            Height = 40,
+            Children =
+            {
+                new FontIcon
+                {
+                    Glyph = "\uE74B",
+                    FontFamily = DeskTheme.IconFont,
+                    FontSize = DeskTheme.SizeBody,
+                    Foreground = DeskTheme.Text,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                },
+                badge
+            }
+        };
+        var jump = new Button
+        {
+            Content = face,
+            Width = 40,
+            Height = 40,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            CornerRadius = new CornerRadius(20),
+            Background = DeskTheme.Raised,
+            BorderBrush = DeskTheme.Divider,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, DeskTheme.Space16, DeskTheme.Space16),
+            Visibility = Visibility.Collapsed,
+            UseSystemFocusVisuals = true,
+            FocusVisualPrimaryBrush = DeskTheme.Accent,
+            FocusVisualSecondaryBrush = DeskTheme.Background
+        };
+        AutomationName(jump, "Jump to latest");
+        ToolTipService.SetToolTip(jump, "Jump to latest");
+        jump.Click += (_, _) => JumpGrokbotToLatest();
+        _grokbotJump = jump;
+        _grokbotJumpBadge = badge;
+        _grokbotJumpCount = count;
+        return jump;
+    }
+
+    private void OnGrokbotViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scroll || _grokbotHoldScroll || _grokbotPainting) return;
+        if (_grokbotJumpAnimating)
+        {
+            if (e.IsIntermediate) return;
+            _grokbotJumpAnimating = false;
+        }
+        _grokbotJumpState = GrokbotTranscript.OnScroll(_grokbotJumpState, scroll.ExtentHeight, scroll.ViewportHeight, scroll.VerticalOffset);
+        ApplyGrokbotJumpChrome(scroll.ExtentHeight, scroll.ViewportHeight);
+    }
+
+    private void FollowGrokbotIfStuck()
+    {
+        if (_grokbotPainting || _grokbotJumpAnimating || _grokbotScroll is null || !_grokbotJumpState.StickToEnd) return;
+        var scroll = _grokbotScroll;
+        var latest = GrokbotTranscript.LatestOffset(scroll.ExtentHeight, scroll.ViewportHeight);
+        if (Math.Abs(scroll.VerticalOffset - latest) <= 1) return;
+        _grokbotJumpState = _grokbotJumpState with { Offset = latest, Unread = 0 };
+        MoveGrokbotScroll(latest, false);
+        ApplyGrokbotJumpChrome(scroll.ExtentHeight, scroll.ViewportHeight);
+    }
+
+    private void PlaceGrokbotScroll(int arrived)
+    {
+        var scroll = _grokbotScroll;
+        if (scroll is null) return;
+        scroll.UpdateLayout();
+        _grokbotJumpState = GrokbotTranscript.OnArrivals(_grokbotJumpState, arrived, scroll.ExtentHeight, scroll.ViewportHeight);
+        MoveGrokbotScroll(_grokbotJumpState.Offset, _grokbotJumpAnimating && arrived == 0);
+        ApplyGrokbotJumpChrome(scroll.ExtentHeight, scroll.ViewportHeight);
+    }
+
+    private void JumpGrokbotToLatest()
+    {
+        var scroll = _grokbotScroll;
+        if (scroll is null) return;
+        scroll.UpdateLayout();
+        _grokbotJumpState = GrokbotTranscript.OnJump(_grokbotJumpState, scroll.ExtentHeight, scroll.ViewportHeight);
+        ApplyGrokbotJumpChrome(scroll.ExtentHeight, scroll.ViewportHeight);
+        MoveGrokbotScroll(_grokbotJumpState.Offset, true);
+    }
+
+    private void ApplyGrokbotJumpChrome(double extent, double viewport)
+    {
+        if (_grokbotJump is null) return;
+        var visible = GrokbotTranscript.ButtonVisible(_grokbotJumpState, extent, viewport);
+        _grokbotJump.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        var unread = _grokbotJumpState.Unread;
+        if (_grokbotJumpCount is not null)
+            _grokbotJumpCount.Text = unread.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (_grokbotJumpBadge is not null)
+            _grokbotJumpBadge.Visibility = visible && unread > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AutomationName(_grokbotJump, unread > 0
+            ? "Jump to latest, " + unread.ToString(System.Globalization.CultureInfo.InvariantCulture) + " unread"
+            : "Jump to latest");
+    }
+
+    private void MoveGrokbotScroll(double offset, bool animate)
+    {
+        var scroll = _grokbotScroll;
+        if (scroll is null) return;
+        DisarmGrokbotScrollRetry();
+        if (animate)
+        {
+            _grokbotJumpAnimating = true;
+            scroll.ChangeView(null, offset, null, false);
+            return;
+        }
+        _grokbotJumpAnimating = false;
+        var target = scroll.ScrollableHeight > 0 ? Math.Min(offset, scroll.ScrollableHeight) : offset;
+        if (scroll.ScrollableHeight > 0 && Math.Abs(scroll.VerticalOffset - target) <= 1) return;
+        scroll.ChangeView(null, target, null, true);
+        if (target > 1 && (scroll.ScrollableHeight <= 0 || Math.Abs(scroll.VerticalOffset - target) > 1))
+            ArmGrokbotScrollRetry(target);
+    }
+
+    private void DisarmGrokbotScrollRetry()
+    {
+        if (_grokbotScrollRetry is null || _grokbotScroll is null) return;
+        _grokbotScroll.LayoutUpdated -= _grokbotScrollRetry;
+        _grokbotScrollRetry = null;
+    }
+
+    private void ArmGrokbotScrollRetry(double offset)
+    {
+        var scroll = _grokbotScroll;
+        if (scroll is null) return;
+        DisarmGrokbotScrollRetry();
+        EventHandler<object> retry = (_, _) => { };
+        retry = (_, _) =>
+        {
+            if (scroll.ScrollableHeight <= 0 && offset > 1) return;
+            scroll.LayoutUpdated -= retry;
+            if (_grokbotScrollRetry == retry) _grokbotScrollRetry = null;
+            var apply = Math.Min(offset, Math.Max(0, scroll.ScrollableHeight));
+            if (Math.Abs(scroll.VerticalOffset - apply) <= 1) return;
+            scroll.ChangeView(null, apply, null, true);
+        };
+        _grokbotScrollRetry = retry;
+        scroll.LayoutUpdated += retry;
     }
 
     private static string PollText(DateTimeOffset? at) =>

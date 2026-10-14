@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Sovereign.Desktop.Client;
+using Sovereign.Desktop.Connector;
 using static Sovereign.Desktop.MainWindow;
 
 namespace Sovereign.Desktop;
@@ -163,11 +164,13 @@ internal sealed partial class ChatConversation
         if (!_changeSnapshots.ContainsKey(turn)) _changeTurns.Add(turn);
         _changeSnapshots[turn] = changes;
         _changeReportedCounts[turn] = reported;
-        var count = _changeReportedCounts.Values.Sum(item => item.Count);
-        _changesToggle.Content = $"Changes · {count}";
+        _changesToggle.Content = $"Changes · {ChangesBadgeCount()}";
         RefreshChatHeaderTabs();
         RenderChangeFiles();
     }
+
+    private int ChangesBadgeCount() =>
+        HeaderBadges.Changes(_changeSnapshots.Values.Select(items => items.Length));
 
     private void RenderChangeFiles()
     {

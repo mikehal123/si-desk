@@ -115,10 +115,12 @@ internal sealed partial class ChatConversation : IDisposable
         _restoring = false;
         _chatPage.Loaded += (_, _) => RefreshTeamBoard();
         _chatInput.TextChanged += (_, _) => { _savePending = true; RefreshComposerAction(); };
+        AttachComposerCancelsHandoffWatch();
         _chatModel.SelectionChanged += (_, _) => { if (!_restoring && _chatReady) _savePending = true; RefreshAttachmentStatus(); DescribeSelectedModel(); };
         _chatModel.RegisterPropertyChangedCallback(ComboBox.TextProperty, (_, _) => RefreshAttachmentStatus());
         _saveTimer.Tick += (_, _) => { DrainSavedTurn(); RefreshSubagentElapsed(); if (_savePending) Save(); };
         _saveTimer.Start();
+        DrainGrokbotReviewQueue();
     }
     internal bool ClassicChat => _classicChat;
     private static Border UserBubble(string text) => new() { Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space8, DeskTheme.Space12, DeskTheme.Space8), Margin = new Thickness(0, DeskTheme.Space8, 0, DeskTheme.Space4), CornerRadius = new CornerRadius(DeskTheme.Radius6),
