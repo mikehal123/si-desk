@@ -29,6 +29,19 @@ internal sealed partial class ChatConversation
     private readonly StackPanel _subagentOptionRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
     private readonly Button _subagentsToggle = new() { Content = "Subagents · 0" };
     private readonly StackPanel _subagentList = new() { Spacing = DeskTheme.Space8, Visibility = Visibility.Collapsed };
+    private readonly StackPanel _oldSubagentRows = new() { Spacing = DeskTheme.Space8 };
+    private readonly TextBlock _oldSubagentsHeader = new()
+    {
+        Text = "Old", FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption, Foreground = DeskTheme.Muted
+    };
+    private readonly Expander _oldSubagents = new()
+    {
+        IsExpanded = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Stretch,
+        HorizontalContentAlignment = HorizontalAlignment.Stretch, BorderThickness = new Thickness(1),
+        Padding = new Thickness(DeskTheme.Space8, DeskTheme.Space4, DeskTheme.Space8, DeskTheme.Space4),
+        BorderBrush = DeskTheme.Divider, CornerRadius = new CornerRadius(DeskTheme.Radius10),
+        Background = DeskTheme.Surface, Foreground = DeskTheme.Text, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption
+    };
     private readonly TextBlock _subagentSummary = SubagentCaption("Active · 0");
     private readonly TextBlock _subagentEmpty = SubagentCaption("No helpers yet.");
     private readonly Dictionary<string, CursorSubagent> _subagentRows = [];
@@ -191,8 +204,10 @@ internal sealed partial class ChatConversation
             if (_openSubagentPanels.ContainsKey(retired.Key)) CloseSubagentPanel(retired.Key);
             _subagentViews.Remove(retired.Key);
             _subagentRows.Remove(retired.Key);
+            UpdateOldSection();
         }
         var launched = !_subagentRows.TryGetValue(child.SessionId, out var previous) || !SubagentActive(previous) && SubagentActive(child);
+        child = SubagentChatPanels.FreezeClock(child, previous);
         var panelOpen = _openSubagentPanels.ContainsKey(child.SessionId);
         _subagentRows[child.SessionId] = child;
         var swarmWorker = SwarmSection.IsSwarmWorker(child.SessionId, child.Name, child.Task, SwarmSection.TryLoad(_saved.Id));
@@ -201,19 +216,14 @@ internal sealed partial class ChatConversation
             view = new SubagentRowView(_subagentViews.Count, () => OpenSubagentPanel(child.SessionId), () => CloseSubagentCard(child.SessionId));
             view.SetOpensPanel(_saved.SubagentChatPanelsEnabled);
             _subagentViews.Add(child.SessionId, view);
-            if (!swarmWorker) _subagentList.Children.Insert(SubagentCardInsertIndex, view.Root);
         }
         else if (swarmWorker) Detach(view.Root);
-        else if (view.Root.Parent != _subagentList)
-        {
-            Detach(view.Root);
-            _subagentList.Children.Insert(Math.Min(SubagentCardInsertIndex, _subagentList.Children.Count), view.Root);
-        }
         view.BindRespawn(() => RespawnSwarmHelper(child.SessionId));
         view.SetSwarmCard(swarmWorker);
         view.Update(child);
         var closed = IsSubagentCardClosed(child.SessionId);
         view.SetClosed(closed);
+        if (!swarmWorker) PlaceHelperCard(view, child);
         if (!_restoring && launched && SubagentActive(child))
             _skillCaptions[child.SessionId] = _turnSkillCaption;
         var skillCaption = _skillCaptions.GetValueOrDefault(child.SessionId) ?? "";
@@ -261,6 +271,7 @@ internal sealed partial class ChatConversation
                     CompletedAt = previous.CompletedAt ?? (outcome == "restored" ? previous.UpdatedAt ?? previous.StartedAt : DateTimeOffset.UtcNow) };
                 _subagentRows[pair.Key] = child;
                 _subagentViews[pair.Key].Update(child);
+                if (!IsSwarmHelper(pair.Key)) PlaceHelperCard(_subagentViews[pair.Key], child);
                 StreamOpenSubagentPanel(previous, child);
             }
         SyncTeamTerminal();
@@ -392,7 +403,48 @@ internal sealed partial class ChatConversation
     {
         RefreshOpenSubagentPanels();
         if (!_changesOpen || !_showAgents) return;
-        foreach (var pair in _subagentRows) _subagentViews[pair.Key].UpdateElapsed(pair.Value);
+        foreach (var pair in _subagentRows)
+        {
+            if (!SubagentChatPanels.Running(pair.Value.State)) continue;
+            if (_subagentViews.TryGetValue(pair.Key, out var view)) view.UpdateElapsed(pair.Value);
+        }
+    }
+
+    private void PlaceHelperCard(SubagentRowView view, CursorSubagent child)
+    {
+        var old = SubagentChatPanels.ShowsInOldSection(child.State);
+        view.SetStaysInline(old);
+        Panel parent = old ? _oldSubagentRows : _subagentList;
+        if (ReferenceEquals(view.Root.Parent, parent))
+        {
+            UpdateOldSection();
+            return;
+        }
+        try
+        {
+            Detach(view.Root);
+            if (view.Root.Parent is not null)
+            {
+                UpdateOldSection();
+                return;
+            }
+            if (old) _oldSubagentRows.Children.Insert(0, view.Root);
+            else _subagentList.Children.Insert(Math.Min(SubagentCardInsertIndex, _subagentList.Children.Count), view.Root);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+        }
+        UpdateOldSection();
+    }
+
+    private void UpdateOldSection()
+    {
+        var visible = 0;
+        foreach (var child in _oldSubagentRows.Children)
+            if (child is UIElement element && element.Visibility == Visibility.Visible) visible++;
+        _oldSubagentsHeader.Text = "Old · " + visible.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _oldSubagents.Visibility = visible > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AutomationName(_oldSubagents, "Old subagents, " + visible.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private static Border SubagentHeaderChrome(UIElement header)
@@ -545,6 +597,7 @@ internal sealed partial class ChatConversation
         private readonly Action _openPanel;
         private Action? _respawn;
         private bool _opensPanel;
+        private bool _staysInline;
         private string _lifeState = "idle";
         internal readonly Button CloseCard = new() { Content = "Hide", MinWidth = 64, MinHeight = 32, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Padding = new Thickness(DeskTheme.Space8, DeskTheme.Space4, DeskTheme.Space8, DeskTheme.Space4),
@@ -578,6 +631,8 @@ internal sealed partial class ChatConversation
             ToolTipService.SetToolTip(Respawn, "Stops only this helper and restarts its task once with a narrower scope. A second use fails this task. The main agent and other workers keep running.");
             CloseCard.Click += (_, _) => closeCard();
             Respawn.Click += (_, _) => _respawn?.Invoke();
+            CloseCard.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, e) => e.Handled = true), true);
+            Respawn.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler((_, e) => e.Handled = true), true);
             var chrome = SubagentHeaderChrome(header);
             _diagnosticsPanel = new ChatDisclosure("Diagnostics", _diagnostics) { Visibility = Visibility.Collapsed };
             _logPanel = new ChatDisclosure("Log", new StackPanel { Spacing = DeskTheme.Space8, Children = { Details, _toolLabel, _tool, _diagnosticsPanel } });
@@ -596,14 +651,16 @@ internal sealed partial class ChatConversation
                 for (var element = e.OriginalSource as DependencyObject; element is not null && element != Root;
                     element = VisualTreeHelper.GetParent(element))
                     if (ReferenceEquals(element, CloseCard) || ReferenceEquals(element, Respawn)) return;
-                if (_opensPanel) _openPanel();
+                if (_opensPanel && !_staysInline) _openPanel();
             }), true);
-            Root.Expanding += (_, _) => { if (_opensPanel) _openPanel(); };
+            Root.Expanding += (_, _) => { if (_opensPanel && !_staysInline) _openPanel(); };
             Skills.Visibility = Visibility.Collapsed;
             Root.Loaded += (_, _) => _face.SetLife(_lifeState);
         }
 
         internal void SetOpensPanel(bool opens) => _opensPanel = opens;
+
+        internal void SetStaysInline(bool inline) => _staysInline = inline;
 
         internal void BindRespawn(Action respawn) => _respawn = respawn;
 
@@ -677,15 +734,7 @@ internal sealed partial class ChatConversation
         internal void UpdateElapsed(CursorSubagent child)
         {
             var started = child.StartedAt;
-            var end = child.CompletedAt ?? (SubagentActive(child) ? DateTimeOffset.UtcNow : child.UpdatedAt);
-            if (started is null || end is null) Elapsed.Text = "Not recorded";
-            else
-            {
-                var duration = end.Value - started.Value;
-                if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;
-                Elapsed.Text = duration.TotalHours >= 1 ? $"{(int)duration.TotalHours}h {duration.Minutes}m"
-                    : duration.TotalMinutes >= 1 ? $"{(int)duration.TotalMinutes}m {duration.Seconds}s" : $"{duration.Seconds}s";
-            }
+            Elapsed.Text = SubagentChatPanels.Elapsed(child);
             var startText = started?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", System.Globalization.CultureInfo.InvariantCulture) ?? "Not recorded";
             Details.Text = SubagentCardText.DetailBlock(child, Elapsed.Text, startText) + "\nStatus: " + SubagentCardText.LifecycleLine(child);
             State.Text = SubagentStatusLabel(child.State) + " · " + Elapsed.Text;

@@ -97,6 +97,11 @@ internal sealed partial class ChatConversation
         pane.SizeChanged += (_, _) => SyncHelperHost();
         _subagentList.Children.Add(BuildSubagentHeader());
         _subagentList.Children.Add(_subagentEmpty);
+        _oldSubagents.Header = _oldSubagentsHeader;
+        _oldSubagents.Content = _oldSubagentRows;
+        ToolTipService.SetToolTip(_oldSubagents, "Ended and disconnected helpers. Their timers are stopped.");
+        AutomationName(_oldSubagents, "Old subagents");
+        _subagentList.Children.Add(_oldSubagents);
         RestoreSubagents();
         AttachSwarmWatch();
         _changesPanel.Child = pane;
