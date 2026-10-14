@@ -119,7 +119,7 @@ public sealed partial class MainWindow
         brand.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         brand.ColumnDefinitions.Add(new ColumnDefinition());
         brand.Children.Add(DeskLogo(DeskTheme.Space24 + DeskTheme.Space8));
-        var brandName = new TextBlock { Text = XaiDeskIdentity.AppName, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var brandName = new TextBlock { Text = "Super Intelligence Desk", TextWrapping = TextWrapping.WrapWholeWords, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = DeskTheme.Space16 + DeskTheme.Space4, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(brandName, 1);
         brand.Children.Add(brandName);
         var navPanel = new StackPanel { Spacing = DeskTheme.Space4, Padding = new Thickness(DeskTheme.Space12, 0, DeskTheme.Space12, DeskTheme.Space8) };
