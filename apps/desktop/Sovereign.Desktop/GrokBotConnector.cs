@@ -571,9 +571,11 @@ public sealed partial class MainWindow
 
         public void NoteGrokbotPoll() => window.GrokbotMail.NotePoll();
 
-        public IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since)
+        public IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since) => ListGrokbotInbox(since, false);
+
+        public IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since, bool includeImages)
         {
-            var rows = window.GrokbotMail.ListSince(since);
+            var rows = window.GrokbotMail.ListSince(since, includeImages);
             window.DispatcherQueue.TryEnqueue(window.RefreshGrokbot);
             return rows;
         }

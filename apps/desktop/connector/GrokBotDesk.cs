@@ -233,6 +233,17 @@ public static class ConnectorToken
         var right = Encoding.UTF8.GetBytes(presented);
         return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right);
     }
+
+    /// <summary>Why a request is refused, or null when it may pass. Returns a reason name only, never header or token text.</summary>
+    public static string? RejectReason(string? saved, string? authorization)
+    {
+        if (string.IsNullOrEmpty(saved)) return "no-token-set";
+        if (string.IsNullOrWhiteSpace(authorization)) return "missing-header";
+        if (!authorization.StartsWith("Bearer ", StringComparison.Ordinal)) return "not-bearer";
+        var presented = authorization["Bearer ".Length..].Trim();
+        if (presented.Length == 0) return "empty-token";
+        return Matches(saved, presented) ? null : "wrong-token";
+    }
 }
 
 public sealed class ConnectorAudit
@@ -303,6 +314,8 @@ public interface IGrokBotDesk
     GrokBotSubagent? ReadSubagent(string id);
     void NoteGrokbotPoll();
     IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since);
+    /// <summary>Like <see cref="ListGrokbotInbox(string?)"/>; <paramref name="includeImages"/> resends images an earlier list delivered.</summary>
+    IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since, bool includeImages) => ListGrokbotInbox(since);
     GrokbotMail ReplyGrokbotInbox(string messageId, string text);
     GrokbotPng CaptureGrokbotScreenshot();
     string GrokbotUiTree();

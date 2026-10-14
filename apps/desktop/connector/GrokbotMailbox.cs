@@ -16,7 +16,13 @@ public sealed record GrokbotMail(
     string? WakeNote = null,
     DateTimeOffset? PickedUpAt = null,
     bool Liked = false,
-    byte[]? Image = null);
+    byte[]? Image = null,
+    DateTimeOffset? ImageSentAt = null)
+{
+    /// <summary>The message had an image that an earlier list already delivered, and this copy omits the bytes.</summary>
+    [JsonIgnore]
+    public bool ImageWithheld => Image is null && ImageSentAt is not null;
+}
 
 public enum GrokbotLinkState { Off, Waiting, Connected }
 
@@ -103,11 +109,16 @@ public sealed class GrokbotMailbox
         }
     }
 
+    /// <summary>The poll time is kept in memory on every call and written to disk at most this often.</summary>
+    public static readonly TimeSpan PollSaveInterval = TimeSpan.FromMinutes(1);
+    private DateTimeOffset? _savedPoll;
+
     public void NotePoll(DateTimeOffset? at = null)
     {
         lock (_gate)
         {
             _lastPoll = at ?? DateTimeOffset.UtcNow;
+            if (_savedPoll is DateTimeOffset saved && _lastPoll >= saved && _lastPoll - saved < PollSaveInterval) return;
             SaveState();
         }
     }
@@ -123,7 +134,11 @@ public sealed class GrokbotMailbox
         }
     }
 
-    public IReadOnlyList<GrokbotMail> ListSince(string? since)
+    /// <summary>
+    /// Unanswered messages. An image is returned the first time it is listed; later lists omit the bytes
+    /// unless <paramref name="includeImages"/> is true. Disk is written only when a message changes.
+    /// </summary>
+    public IReadOnlyList<GrokbotMail> ListSince(string? since, bool includeImages = false)
     {
         DateTimeOffset? cutoff = null;
         if (!string.IsNullOrWhiteSpace(since))
@@ -135,17 +150,28 @@ public sealed class GrokbotMailbox
         lock (_gate)
         {
             var picked = new List<GrokbotMail>();
+            var changed = false;
+            var now = DateTimeOffset.UtcNow;
             for (var i = 0; i < _messages.Count; i++)
             {
                 var mail = _messages[i];
                 if (mail.Status == GrokbotMailStatus.Answered) continue;
                 if (cutoff is DateTimeOffset from && mail.Created <= from) continue;
+                var alreadySent = mail.ImageSentAt is not null;
                 if (mail.Status == GrokbotMailStatus.Queued)
-                    mail = mail with { Status = GrokbotMailStatus.PickedUp, PickedUpAt = mail.PickedUpAt ?? DateTimeOffset.UtcNow };
+                {
+                    mail = mail with { Status = GrokbotMailStatus.PickedUp, PickedUpAt = mail.PickedUpAt ?? now };
+                    changed = true;
+                }
+                if (mail.Image is not null && !alreadySent)
+                {
+                    mail = mail with { ImageSentAt = now };
+                    changed = true;
+                }
                 _messages[i] = mail;
-                picked.Add(mail);
+                picked.Add(alreadySent && !includeImages && mail.Image is not null ? mail with { Image = null } : mail);
             }
-            SaveMessages();
+            if (changed) SaveMessages();
             return picked;
         }
     }
@@ -255,7 +281,7 @@ public sealed class GrokbotMailbox
             var saved = JsonSerializer.Deserialize<MailFile>(line, Json);
             if (saved is null || string.IsNullOrWhiteSpace(saved.Id)) return;
             var image = saved.Image is { Length: > 0 } png ? png : null;
-            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked, image));
+            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked, image, image is null ? null : saved.ImageSentAt));
         });
         while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         LoadLines(Path.Combine(_directory, "audit.jsonl"), line =>
@@ -282,6 +308,7 @@ public sealed class GrokbotMailbox
             if (saved.AvatarColor is string color) _preferences.AvatarColor = GrokbotAvatarChoice.NormalizeColor(color);
             if (saved.AvatarShape is string shape) _preferences.AvatarShape = GrokbotAvatarChoice.NormalizeShape(shape);
             _lastPoll = saved.LastPoll;
+            _savedPoll = saved.LastPoll;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -323,6 +350,7 @@ public sealed class GrokbotMailbox
             LastPoll = _lastPoll
         };
         WriteAtomic(Path.Combine(_directory, "state.json"), JsonSerializer.Serialize(state, Json));
+        _savedPoll = _lastPoll;
     }
 
     private void SaveLines(string name, IEnumerable<string> lines)
@@ -384,5 +412,6 @@ public sealed class GrokbotMailbox
         public DateTimeOffset? PickedUpAt { get; set; }
         public bool Liked { get; set; }
         public byte[]? Image { get; set; }
+        public DateTimeOffset? ImageSentAt { get; set; }
     }
 }
