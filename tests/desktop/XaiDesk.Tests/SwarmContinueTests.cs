@@ -25,6 +25,8 @@ public sealed class SwarmContinueTests
             Assert.Equal("continue", fx.Desk.Composer);
             Assert.Equal(1, fx.Desk.SendCount);
             var saved = SwarmBoard.Read(fx.Board.BoardPath);
+            Assert.Equal("Reviewed (continue)", saved.ReviewStatus);
+            Assert.Equal("continue", saved.ReviewVerdict);
             Assert.Equal(1, saved.ReviewHandled);
             Assert.Equal(1, saved.ReviewLoops);
             Assert.False(File.Exists(Queue(fx)));
@@ -51,6 +53,8 @@ public sealed class SwarmContinueTests
             var saved = SwarmBoard.Read(fx.Board.BoardPath);
             Assert.Equal(SwarmStatus.Todo, saved.TaskById("task-1").Status);
             Assert.Equal(SwarmStatus.Done, saved.TaskById("task-2").Status);
+            Assert.Equal("Reviewed (fix)", saved.ReviewStatus);
+            Assert.Equal("fix", saved.ReviewVerdict);
             Assert.Equal(1, saved.ReviewHandled);
             var again = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "fix", "The proof is thin.", fx.Data);
             Assert.Equal("ignored", again.Outcome);
@@ -76,7 +80,10 @@ public sealed class SwarmContinueTests
             Assert.Equal("Grok Bot", Assert.Single(fx.Desk.Authors));
             Assert.Equal(0, fx.Desk.SendCount);
             Assert.Null(fx.Desk.Composer);
-            Assert.Equal(1, SwarmBoard.Read(fx.Board.BoardPath).ReviewHandled);
+            var saved = SwarmBoard.Read(fx.Board.BoardPath);
+            Assert.Equal("Reviewed (done)", saved.ReviewStatus);
+            Assert.Equal("done", saved.ReviewVerdict);
+            Assert.Equal(1, saved.ReviewHandled);
             AssertCurrent(fx);
         }
         finally { Delete(fx); }
@@ -108,13 +115,19 @@ public sealed class SwarmContinueTests
         var fx = Open(SwarmStatus.Doing);
         try
         {
-            var first = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener.", fx.Data);
-            var second = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener again.", fx.Data);
+            var stamp = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+            var first = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener.", fx.Data, stamp);
+            var afterFirst = SwarmBoard.Read(fx.Board.BoardPath);
+            var second = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener again.", fx.Data, stamp);
             Assert.Equal("posted", first.Outcome);
             Assert.Equal("ignored", second.Outcome);
             Assert.Equal("Grokbot review: continue. Ship the listener.", Assert.Single(fx.Desk.Messages));
             Assert.Equal(1, fx.Desk.SendCount);
-            Assert.Equal(1, SwarmBoard.Read(fx.Board.BoardPath).ReviewHandled);
+            var saved = SwarmBoard.Read(fx.Board.BoardPath);
+            Assert.Equal(1, saved.ReviewHandled);
+            Assert.Equal("Reviewed (continue)", saved.ReviewStatus);
+            Assert.Equal(afterFirst.ReviewNote, saved.ReviewNote);
+            Assert.Equal(afterFirst.ReviewStatus, saved.ReviewStatus);
             AssertCurrent(fx);
         }
         finally { Delete(fx); }
@@ -197,7 +210,11 @@ public sealed class SwarmContinueTests
             Assert.Equal("Grokbot review: fix. The proof is thin.", result.Text);
             var saved = SwarmBoard.Read(fx.Board.BoardPath);
             Assert.Equal("Reviewed (fix)", saved.ReviewStatus);
+            Assert.Equal("fix", saved.ReviewVerdict);
+            Assert.Equal("The proof is thin.", saved.ReviewIssues);
+            Assert.Equal("Add the check.", saved.ReviewNext);
             Assert.Contains("The proof is thin.", saved.ReviewNote, StringComparison.Ordinal);
+            Assert.Contains("Add the check.", saved.ReviewNote, StringComparison.Ordinal);
             Assert.Contains("2026-03-04T05:06:07Z", saved.ReviewNote, StringComparison.Ordinal);
             Assert.Contains("Reopened task-1", saved.ReviewNote, StringComparison.Ordinal);
             Assert.Equal(SwarmStatus.Todo, saved.TaskById("task-1").Status);
@@ -205,6 +222,103 @@ public sealed class SwarmContinueTests
             AssertCurrent(fx);
         }
         finally { Delete(fx); }
+    }
+
+    [Fact]
+    public void Done_writes_reviewed_status_verdict_note_and_stamp()
+    {
+        var fx = Open(SwarmStatus.Doing);
+        try
+        {
+            var stamp = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+            var result = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "done", "Ship is finished.", fx.Data, stamp);
+            Assert.Equal("posted", result.Outcome);
+            Assert.False(result.Resume);
+            var saved = SwarmBoard.Read(fx.Board.BoardPath);
+            Assert.Equal("Reviewed (done)", saved.ReviewStatus);
+            Assert.Equal("done", saved.ReviewVerdict);
+            Assert.Contains("Ship is finished.", saved.ReviewNote, StringComparison.Ordinal);
+            Assert.Contains("2026-03-04T05:06:07Z", saved.ReviewNote, StringComparison.Ordinal);
+            Assert.Equal("Ship is finished.", saved.ReviewIssues);
+            Assert.Equal(1, saved.ReviewHandled);
+            Assert.Equal(1, saved.ReviewLoops);
+            AssertCurrent(fx);
+        }
+        finally { Delete(fx); }
+    }
+
+    [Fact]
+    public void Stuck_review_repairs_without_raising_handled()
+    {
+        foreach (var waiting in new[] { "Waiting for Grokbot", "Waiting for review" })
+        {
+            var fx = Open(SwarmStatus.Doing);
+            try
+            {
+                var stamp = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+                Assert.False(SwarmContinue.Repair(fx.Desk, fx.SwarmId, fx.RunId, "done", "Catch up.", stamp));
+                var openReview = SwarmBoard.Read(fx.Board.BoardPath);
+                Assert.Equal("Waiting for review", openReview.ReviewStatus);
+                Assert.Equal("", openReview.ReviewVerdict);
+                Assert.Equal(0, openReview.ReviewHandled);
+                Assert.False(File.Exists(fx.Board.BoardPath + ".bak"));
+
+                openReview.ReviewStatus = waiting;
+                openReview.ReviewVerdict = "";
+                openReview.ReviewHandled = openReview.ReviewLoops;
+                openReview.Save();
+                var handled = openReview.ReviewHandled;
+                Assert.True(SwarmContinue.Repair(fx.Desk, fx.SwarmId, fx.RunId, "done", "Catch up.", stamp));
+                var saved = SwarmBoard.Read(fx.Board.BoardPath);
+                Assert.Equal("Reviewed (done)", saved.ReviewStatus);
+                Assert.Equal("done", saved.ReviewVerdict);
+                Assert.Contains("Catch up.", saved.ReviewNote, StringComparison.Ordinal);
+                Assert.Contains("2026-03-04T05:06:07Z", saved.ReviewNote, StringComparison.Ordinal);
+                Assert.Equal(handled, saved.ReviewHandled);
+                Assert.Equal(1, saved.ReviewHandled);
+                Assert.Empty(fx.Desk.Messages);
+                Assert.Equal(0, fx.Desk.SendCount);
+
+                var note = saved.ReviewNote;
+                Assert.False(SwarmContinue.Repair(fx.Desk, fx.SwarmId, fx.RunId, "done", "Do not rewrite.", stamp));
+                var after = SwarmBoard.Read(fx.Board.BoardPath);
+                Assert.Equal(note, after.ReviewNote);
+                Assert.Equal("Reviewed (done)", after.ReviewStatus);
+                Assert.Equal("done", after.ReviewVerdict);
+                Assert.Equal(handled, after.ReviewHandled);
+                AssertCurrent(fx);
+            }
+            finally { Delete(fx); }
+        }
+    }
+
+    [Fact]
+    public void Posted_or_queued_refreshes_the_panel_and_ignored_does_not()
+    {
+        var fx = Open(SwarmStatus.Doing);
+        try
+        {
+            var posted = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener.", fx.Data);
+            Assert.Equal("posted", posted.Outcome);
+            Assert.True(SwarmContinue.RefreshesPanel(posted));
+            var ignored = SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "continue", "Ship the listener again.", fx.Data);
+            Assert.Equal("ignored", ignored.Outcome);
+            Assert.False(SwarmContinue.RefreshesPanel(ignored));
+            AssertCurrent(fx);
+        }
+        finally { Delete(fx); }
+
+        var closed = Open(SwarmStatus.Doing, open: false);
+        try
+        {
+            var queued = SwarmContinue.Apply(closed.Desk, closed.SwarmId, closed.RunId, "done", "Closed.", closed.Data);
+            Assert.Equal("queued", queued.Outcome);
+            Assert.False(queued.Resume);
+            Assert.True(SwarmContinue.RefreshesPanel(queued));
+            Assert.Equal("Reviewed (done)", SwarmBoard.Read(closed.Board.BoardPath).ReviewStatus);
+            AssertCurrent(closed);
+        }
+        finally { Delete(closed); }
     }
 
     [Fact]

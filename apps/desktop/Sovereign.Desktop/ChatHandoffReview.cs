@@ -17,6 +17,8 @@ internal sealed partial class ChatConversation
     internal void AcceptGrokbotReview(string text, bool resume)
     {
         AcceptGrokBotMessage(text);
+        try { ReloadSwarmSection(); }
+        catch (Exception) { }
         if (!resume) return;
         _chatInput.Text = "continue";
         _ = SendSwarmContinueAsync();

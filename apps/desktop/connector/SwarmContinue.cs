@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.Connector;
@@ -22,6 +23,9 @@ public sealed record SwarmReviewDelivery(
 public static class SwarmContinue
 {
     private static readonly object Gate = new();
+    private static readonly Regex UtcStamp = new(
+        "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly JsonSerializerOptions QueueJson = new()
     {
         PropertyNamingPolicy = null,
@@ -29,7 +33,7 @@ public static class SwarmContinue
         WriteIndented = true
     };
 
-    public static SwarmContinueResult Apply(IGrokBotDesk desk, string? swarmId, string? runId, string? verdict, string? notes, string? dataDirectory = null)
+    public static SwarmContinueResult Apply(IGrokBotDesk desk, string? swarmId, string? runId, string? verdict, string? notes, string? dataDirectory = null, DateTimeOffset? reviewedAt = null)
     {
         ArgumentNullException.ThrowIfNull(desk);
         var canonical = Canonical(verdict) ?? throw new ArgumentException("Verdict must be continue, fix, or done.");
@@ -54,24 +58,26 @@ public static class SwarmContinue
             resume = canonical is "continue" or "fix";
             if (!open)
                 _ = ReadQueue(QueuePath(swarm, dataDirectory));
+            string[] reopened = [];
             if (canonical == "fix")
             {
-                var ids = board.Tasks
+                reopened = board.Tasks
                     .Where(task => task is not null && SwarmSection.StatusLabel(task.Status) == SwarmStatus.Review)
                     .Select(task => task.Id)
                     .ToArray();
-                if (ids.Length == 0)
+                if (reopened.Length == 0)
                     throw new InvalidOperationException("No task is in review.");
-                board.ReviewHandled = board.ReviewLoops;
-                board.ReviewNote = NoteWithReopened(board.ReviewNote, ids);
-                foreach (var id in ids)
+            }
+            WriteVerdict(board, canonical, notes, reviewedAt);
+            board.ReviewHandled = board.ReviewLoops;
+            if (canonical == "fix")
+            {
+                board.ReviewNote = NoteWithReopened(board.ReviewNote, reopened);
+                foreach (var id in reopened)
                     board.Respawn(id, message);
             }
             else
-            {
-                board.ReviewHandled = board.ReviewLoops;
                 board.Save();
-            }
             if (!open)
             {
                 var queuePath = QueuePath(swarm, dataDirectory);
@@ -83,6 +89,38 @@ public static class SwarmContinue
         }
         desk.DeliverSwarmReview(swarm, message, resume);
         return new SwarmContinueResult("posted", message, resume);
+    }
+
+    public static bool Repair(IGrokBotDesk desk, string? swarmId, string? runId, string? verdict, string? notes, DateTimeOffset? reviewedAt = null)
+    {
+        ArgumentNullException.ThrowIfNull(desk);
+        var canonical = Canonical(verdict) ?? throw new ArgumentException("Verdict must be continue, fix, or done.");
+        if (string.IsNullOrWhiteSpace(swarmId)) throw new ArgumentException("Swarm id is required.");
+        if (string.IsNullOrWhiteSpace(runId)) throw new ArgumentException("Run id is required.");
+        _ = Message(canonical, notes);
+        var path = SwarmBoard.RunBoardPath(swarmId.Trim(), runId, desk.SwarmBoardRoot());
+        if (!File.Exists(path)) throw new KeyNotFoundException("That swarm board is not on disk.");
+        lock (Gate)
+        {
+            var board = SwarmBoard.Read(path);
+            if (IsReviewed(board.ReviewStatus)) return false;
+            if (!IsWaiting(board.ReviewStatus)
+                || !string.IsNullOrWhiteSpace(board.ReviewVerdict)
+                || board.ReviewLoops < 1
+                || board.ReviewHandled != board.ReviewLoops)
+                return false;
+            var handled = board.ReviewHandled;
+            WriteVerdict(board, canonical, notes, reviewedAt);
+            board.ReviewHandled = handled;
+            board.Save();
+            return true;
+        }
+    }
+
+    public static bool RefreshesPanel(SwarmContinueResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Outcome is "posted" or "queued";
     }
 
     public static string Status(IGrokBotDesk desk, string? swarmId, string? runId)
@@ -136,6 +174,33 @@ public static class SwarmContinue
             return items;
         }
     }
+
+    private static void WriteVerdict(SwarmBoard board, string canonical, string? notes, DateTimeOffset? reviewedAt)
+    {
+        var trimmed = (notes ?? "").Trim();
+        board.ReviewVerdict = canonical;
+        board.ReviewStatus = SwarmHandoffReview.StatusFor(canonical);
+        if (string.IsNullOrWhiteSpace(board.ReviewIssues))
+            board.ReviewIssues = trimmed;
+        if (!HasUtcStamp(board.ReviewNote))
+            board.ReviewNote = StampedNote(trimmed, reviewedAt ?? DateTimeOffset.UtcNow);
+    }
+
+    private static string StampedNote(string notes, DateTimeOffset utc)
+    {
+        var stamp = utc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+        return notes.Length == 0 ? stamp : notes + "\n" + stamp;
+    }
+
+    private static bool HasUtcStamp(string? note) =>
+        !string.IsNullOrEmpty(note) && UtcStamp.IsMatch(note);
+
+    private static bool IsReviewed(string? status) =>
+        status is SwarmHandoffReview.ReviewedContinue or SwarmHandoffReview.ReviewedFix or SwarmHandoffReview.ReviewedDone;
+
+    private static bool IsWaiting(string? status) =>
+        string.Equals(status, SwarmHandoffReview.WaitingStatus, StringComparison.Ordinal)
+        || string.Equals(status, "Waiting for review", StringComparison.Ordinal);
 
     private static string NoteWithReopened(string? note, string[] ids)
     {
