@@ -179,6 +179,14 @@ public sealed class CursorInstallTests
         Assert.Contains("CursorInstall.ButtonLabel", text);
         Assert.Contains("CursorInstall.Plan", text);
         Assert.Contains("Connect / refresh models", text);
+        var scroll = text.IndexOf("HorizontalScrollMode = ScrollMode.Disabled", StringComparison.Ordinal);
+        Assert.True(scroll > flyout);
+        Assert.Contains("MaxWidth = ConnectionFlyoutWidth", text);
+        Assert.Contains("VerticalScrollBarVisibility = ScrollBarVisibility.Auto", text);
+        var swarm = File.ReadAllText(Path.Combine(FindSourceRoot(), "apps", "desktop", "Sovereign.Desktop", "ChatSubagents.cs"));
+        Assert.Contains("_swarmHireRow = new() { Orientation = Orientation.Vertical", swarm);
+        Assert.Contains("_subagentOptionRow = new() { Orientation = Orientation.Vertical", swarm);
+        Assert.Contains("FlyoutLabel(\"Grokbot reviews handoffs\")", swarm);
     }
 
     private static string FindSourceRoot()

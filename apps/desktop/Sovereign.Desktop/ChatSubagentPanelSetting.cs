@@ -6,7 +6,7 @@ namespace Sovereign.Desktop;
 
 internal sealed partial class ChatConversation
 {
-    private readonly CheckBox _subagentPanelsOption = new() { Content = "Open subagents as chat panels" };
+    private readonly CheckBox _subagentPanelsOption = new() { Content = FlyoutLabel("Open subagents as chat panels"), HorizontalAlignment = HorizontalAlignment.Stretch };
 
     private UIElement BuildSubagentPanelsOption()
     {

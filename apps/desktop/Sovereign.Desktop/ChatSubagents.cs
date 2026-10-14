@@ -12,21 +12,21 @@ namespace Sovereign.Desktop;
 
 internal sealed partial class ChatConversation
 {
-    private readonly CheckBox _subagentOption = new() { Content = "Allow subagents" };
-    private readonly CheckBox _swarmOption = new() { Content = "Plan big goals as a swarm (uses subagents)" };
-    private readonly ComboBox _swarmHire = new() { MinWidth = 150 };
+    private readonly CheckBox _subagentOption = new() { Content = FlyoutLabel("Allow subagents"), HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly CheckBox _swarmOption = new() { Content = FlyoutLabel("Plan big goals as a swarm (uses subagents)"), HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly ComboBox _swarmHire = new() { MinWidth = 0, MaxWidth = 300, MaxDropDownHeight = 240, HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly TextBlock _swarmHireLabel = SubagentCaption("Swarm mode");
-    private readonly CheckBox _grokbotReview = new() { Content = "Grokbot reviews handoffs" };
+    private readonly CheckBox _grokbotReview = new() { Content = FlyoutLabel("Grokbot reviews handoffs"), HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly TextBlock _grokbotReviewCapLabel = SubagentCaption("Review loop cap");
     private readonly NumberBox _grokbotReviewCap = new()
     {
         Minimum = 1, Maximum = 99, Value = SwarmHandoffReview.DefaultCap, SmallChange = 1, Width = 88,
         SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
     };
-    private readonly StackPanel _swarmHireRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
+    private readonly StackPanel _swarmHireRow = new() { Orientation = Orientation.Vertical, Spacing = DeskTheme.Space8 };
     private bool _swarmHireFilling;
     private bool _grokbotReviewFilling;
-    private readonly StackPanel _subagentOptionRow = new() { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8 };
+    private readonly StackPanel _subagentOptionRow = new() { Orientation = Orientation.Vertical, Spacing = DeskTheme.Space8 };
     private readonly Button _subagentsToggle = new() { Content = "Subagents · 0" };
     private readonly StackPanel _subagentList = new() { Spacing = DeskTheme.Space8, Visibility = Visibility.Collapsed };
     private readonly StackPanel _oldSubagentRows = new() { Spacing = DeskTheme.Space8 };
@@ -122,8 +122,12 @@ internal sealed partial class ChatConversation
         _swarmHireRow.Children.Add(_swarmHireLabel);
         _swarmHireRow.Children.Add(_swarmHire);
         _swarmHireRow.Children.Add(_grokbotReview);
-        _swarmHireRow.Children.Add(_grokbotReviewCapLabel);
-        _swarmHireRow.Children.Add(_grokbotReviewCap);
+        _swarmHireRow.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = DeskTheme.Space8,
+            Children = { _grokbotReviewCapLabel, _grokbotReviewCap }
+        });
         var swarmBlock = new StackPanel { Spacing = DeskTheme.Space4 };
         swarmBlock.Children.Add(_swarmOption);
         swarmBlock.Children.Add(_swarmHireRow);
@@ -459,6 +463,12 @@ internal sealed partial class ChatConversation
         chrome.PointerExited += (_, _) => chrome.Background = DeskTheme.Transparent;
         return chrome;
     }
+
+    private static TextBlock FlyoutLabel(string text) => new()
+    {
+        Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 300,
+        FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody
+    };
 
     private static TextBlock SubagentCaption(string text) => new()
     {
