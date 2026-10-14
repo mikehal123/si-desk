@@ -507,35 +507,6 @@ public sealed partial class MainWindow
         await host.DisposeAsync();
     }
 
-    private sealed class VaultConnectorSecrets : IConnectorSecrets
-    {
-        public string? Current()
-        {
-            try
-            {
-                return DeskVault.ReadPassword(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            }
-            catch { return null; }
-        }
-
-        public string Generate()
-        {
-            var token = ConnectorToken.Create();
-            DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            new PasswordVault().Add(new PasswordCredential(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount, token));
-            return token;
-        }
-
-        public void Revoke()
-        {
-            try
-            {
-                DeskVault.Remove(XaiDeskIdentity.GrokBotCredentialResource, XaiDeskIdentity.GrokBotCredentialAccount);
-            }
-            catch { /* Already revoked. */ }
-        }
-    }
-
     private sealed class DeskBridge(MainWindow window) : IGrokBotDesk
     {
         public GrokBotStatus Status() => OnWindow(() =>
