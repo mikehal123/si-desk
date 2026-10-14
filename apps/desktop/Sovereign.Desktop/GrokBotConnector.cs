@@ -22,7 +22,9 @@ public sealed partial class MainWindow
     private readonly ToggleSwitch _grokbotAllow = new() { OnContent = "On", OffContent = "Off" };
     private readonly ToggleSwitch _grokbotShots = new() { OnContent = "On", OffContent = "Off" };
     private readonly TextBox _wakeUrl = new() { Header = "Wake webhook URL", IsSpellCheckEnabled = false };
-    private readonly PasswordBox _wakeKey = new() { Header = "Webhook sender key" };
+    private readonly PasswordBox _wakeKey = new() { Header = "Webhook sender key", PasswordRevealMode = PasswordRevealMode.Hidden };
+    private readonly TextBlock _wakeStatus = Note("");
+    private Button? _wakeKeyReveal;
     private readonly SemaphoreSlim _connectorGate = new(1, 1);
     private readonly List<Button> _grokbotAvatarButtons = [];
     private bool _connectorUi;
@@ -48,6 +50,7 @@ public sealed partial class MainWindow
         _connectorEnabled.Toggled += async (_, _) => await ApplyConnectorSettingsAsync();
         _connectorBind.SelectionChanged += async (_, _) => { if (_connectorBind.SelectedIndex >= 0) await ApplyConnectorSettingsAsync(); };
         Closed += async (_, _) => await StopConnectorAsync();
+        _wakeKey.PasswordChanged += (_, _) => SyncWakeKeyReveal();
         var avatarPicker = BuildGrokbotAvatarPicker();
         LoadConnectorControls();
         var copy = Button("Copy", CopyConnectorToken);
@@ -73,6 +76,20 @@ public sealed partial class MainWindow
         AutomationName(testWake, "Test wake");
         var clearWake = Button("Clear wake key", ClearGrokbotWakeKey);
         AutomationName(clearWake, "Clear wake key");
+        var revealWakeKey = DeskButton("");
+        revealWakeKey.Content = new FontIcon { Glyph = "\uE7B3", FontFamily = DeskTheme.IconFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text };
+        revealWakeKey.VerticalAlignment = VerticalAlignment.Bottom;
+        revealWakeKey.Click += (_, _) => ToggleWakeKeyReveal();
+        _wakeKeyReveal = revealWakeKey;
+        SyncWakeKeyReveal();
+        _wakeStatus.Visibility = Visibility.Collapsed;
+        AutomationName(_wakeStatus, "Wake status");
+        var wakeKeyRow = new Grid { ColumnSpacing = DeskTheme.Space8 };
+        wakeKeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        wakeKeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(revealWakeKey, 1);
+        wakeKeyRow.Children.Add(_wakeKey);
+        wakeKeyRow.Children.Add(revealWakeKey);
         return new StackPanel { Spacing = DeskTheme.Space8, Children = {
             Head("Grok Bot connector"),
             Note("Lets Grok Bot read and post in this app, and pick up the Grokbot tab. Off until you turn it on. This PC only binds 127.0.0.1:8790. Tailscale only runs tailscale ip -4 and binds that address on 8790. It never listens on a public address."),
@@ -91,8 +108,10 @@ public sealed partial class MainWindow
             Note("Grokbot avatar"),
             avatarPicker,
             _wakeUrl,
-            _wakeKey,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { saveWake, testWake, clearWake } } } };
+            wakeKeyRow,
+            new StackPanel { Spacing = DeskTheme.Space8, Children = {
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { saveWake, testWake, clearWake } },
+                _wakeStatus } } } };
     }
 
     private void LoadConnectorControls()
@@ -357,16 +376,16 @@ public sealed partial class MainWindow
         if (key.Length == 0)
         {
             ShowWakeKeyMask();
-            _connectorStatus.Text = "Wake URL saved";
+            ShowWakeStatus(WakeSettingsStatus.Saved);
             return;
         }
         try
         {
             GrokbotWakeKey.Save(key);
             ShowWakeKeyMask();
-            _connectorStatus.Text = "Wake key saved";
+            ShowWakeStatus(WakeSettingsStatus.Saved);
         }
-        catch { _connectorStatus.Text = "Wake key could not be saved."; }
+        catch { ShowWakeStatus(WakeSettingsStatus.SaveFailed); }
     }
 
     private void ClearGrokbotWakeKey()
@@ -374,13 +393,48 @@ public sealed partial class MainWindow
         try { GrokbotWakeKey.Clear(); }
         catch { /* Read below reports whether the stored key is still there. */ }
         ShowWakeKeyMask();
-        _connectorStatus.Text = GrokbotWakeKey.Read() is null ? "Key not set" : "Wake key could not be cleared.";
+        ShowWakeStatus(GrokbotWakeKey.Read() is null ? "Key not set" : "Wake key could not be cleared.");
     }
 
     private void ShowWakeKeyMask()
     {
+        _wakeKey.PasswordRevealMode = PasswordRevealMode.Hidden;
         _wakeKey.Password = "";
         _wakeKey.PlaceholderText = GrokbotWakeKey.Read() is null ? "" : "••••••••";
+        SyncWakeKeyReveal();
+    }
+
+    private void SyncWakeKeyReveal()
+    {
+        if (_wakeKeyReveal is null) return;
+        if ((_wakeKey.Password ?? "").Length == 0)
+        {
+            _wakeKey.PasswordRevealMode = PasswordRevealMode.Hidden;
+            _wakeKeyReveal.IsEnabled = false;
+            AutomationName(_wakeKeyReveal, "Show webhook sender key");
+            ToolTipService.SetToolTip(_wakeKeyReveal, "Type a new key to show it");
+            return;
+        }
+
+        _wakeKeyReveal.IsEnabled = true;
+        var visible = _wakeKey.PasswordRevealMode == PasswordRevealMode.Visible;
+        var name = visible ? "Hide webhook sender key" : "Show webhook sender key";
+        AutomationName(_wakeKeyReveal, name);
+        ToolTipService.SetToolTip(_wakeKeyReveal, name);
+    }
+
+    private void ToggleWakeKeyReveal()
+    {
+        if ((_wakeKey.Password ?? "").Length == 0) return;
+        var show = _wakeKey.PasswordRevealMode != PasswordRevealMode.Visible;
+        _wakeKey.PasswordRevealMode = show ? PasswordRevealMode.Visible : PasswordRevealMode.Hidden;
+        SyncWakeKeyReveal();
+    }
+
+    private void ShowWakeStatus(string text)
+    {
+        _wakeStatus.Text = text;
+        _wakeStatus.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private static string? CurrentGrokbotWakeKey() => GrokbotWakeKey.Read();
@@ -390,14 +444,14 @@ public sealed partial class MainWindow
         var url = (_wakeUrl.Text ?? "").Trim();
         if (url.Length == 0)
         {
-            _connectorStatus.Text = "Wake webhook URL is not set.";
+            ShowWakeStatus("Wake webhook URL is not set.");
             return;
         }
         var typed = (_wakeKey.Password ?? "").Trim();
         var key = typed.Length > 0 ? typed : CurrentGrokbotWakeKey();
         if (string.IsNullOrEmpty(key))
         {
-            _connectorStatus.Text = "Webhook sender key is not set.";
+            ShowWakeStatus("Webhook sender key is not set.");
             return;
         }
         string status;
@@ -405,11 +459,11 @@ public sealed partial class MainWindow
         {
             using var handler = new HttpClientHandler { AllowAutoRedirect = false };
             var receipt = await GrokbotWake.DeliverAsync(handler, url, key, "test", false, "test wake", CancellationToken.None);
-            status = receipt.StatusCode is int code ? "HTTP " + code : receipt.Note;
+            status = WakeSettingsStatus.Test(receipt);
         }
         catch { status = "Wake failed."; }
         if (status.Contains(key, StringComparison.Ordinal)) status = "Wake failed.";
-        _connectorStatus.Text = status;
+        ShowWakeStatus(status);
     }
 
     private async Task StopConnectorAsync()

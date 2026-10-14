@@ -212,6 +212,19 @@ public sealed class GrokbotWakeDebounce
 
 public sealed record GrokbotWakeReceipt(string Note, int? StatusCode);
 
+public static class WakeSettingsStatus
+{
+    public const string Saved = "Wake saved";
+    public const string SaveFailed = "Wake key could not be saved.";
+
+    public static string Test(GrokbotWakeReceipt receipt)
+    {
+        if (receipt.StatusCode is int code && string.Equals(receipt.Note, "Grokbot pinged", StringComparison.Ordinal))
+            return "Test sent: HTTP " + code;
+        return string.IsNullOrWhiteSpace(receipt.Note) ? "Wake failed." : receipt.Note;
+    }
+}
+
 /// <summary>Webhook sender key in Windows Credential Manager. A missing key returns null and does not throw.</summary>
 public static class GrokbotWakeKey
 {
