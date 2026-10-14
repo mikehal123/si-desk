@@ -89,7 +89,7 @@ What the script does:
 - It does not change PATH, and it does not sign you in.
 - If that version folder already exists, it stops and does not overwrite it.
 
-When it finishes, it prints **Cursor connection installed**. That sentence still says "Open Sovereign". The app name is SI Desk. Continue with the steps below.
+When it finishes, it prints **Cursor connection installed. Open SI Desk, New chat, Cursor, then Sign in with Cursor. Uses your own Cursor account and limits. No PATH changes.** Continue with the steps below.
 
 The app looks for `node.exe` and `index.js` in this order, and uses the first folder that has both files:
 

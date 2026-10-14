@@ -21,4 +21,4 @@ $allowed=[IO.Path]::GetFullPath($root).TrimEnd('\')+'\'
 foreach($path in @($extract,$target)) { if(![IO.Path]::GetFullPath($path).StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime path escapes tools directory.' } }
 Move-Item -LiteralPath $extract -Destination $target
 @{ version=$version; source="https://downloads.cursor.com/lab/$version/windows/x64/agent-cli-package.zip"; archive_sha256=$hash } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $target 'installation.json') -Encoding UTF8
-Write-Host 'Cursor connection installed. Open Sovereign, New chat, Cursor, then Sign in with Cursor. Uses your own Cursor account and limits. No PATH changes.'
+Write-Host 'Cursor connection installed. Open SI Desk, New chat, Cursor, then Sign in with Cursor. Uses your own Cursor account and limits. No PATH changes.'
