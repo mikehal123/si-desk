@@ -226,7 +226,7 @@ internal sealed partial class ChatConversation
 
     private void ReturnRowToList(FrameworkElement row)
     {
-        if (_restoring || row.Parent == _subagentList) return;
+        if (_restoring || row.Parent == _subagentList || row.Parent == _oldSubagentRows) return;
         try
         {
             Detach(row);
