@@ -243,6 +243,10 @@ public sealed class GrokbotWakeTests
         Assert.Contains("Glyph = \"\\uE7B3\"", text, StringComparison.Ordinal);
         Assert.Contains("Show webhook sender key", text, StringComparison.Ordinal);
         Assert.Contains("Hide webhook sender key", text, StringComparison.Ordinal);
+        Assert.Contains("Type a new key to show it", text, StringComparison.Ordinal);
+        Assert.Contains("_wakeKey.PasswordChanged", text, StringComparison.Ordinal);
+        Assert.Contains("_wakeKeyReveal.IsEnabled = false", text, StringComparison.Ordinal);
+        Assert.Contains("if ((_wakeKey.Password ?? \"\").Length == 0) return;", text, StringComparison.Ordinal);
         Assert.Contains("_wakeKey.Password = \"\"", text, StringComparison.Ordinal);
         Assert.Contains("WakeSettingsStatus.Saved", text, StringComparison.Ordinal);
         Assert.Contains("WakeSettingsStatus.Test(receipt)", text, StringComparison.Ordinal);

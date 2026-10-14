@@ -50,6 +50,7 @@ public sealed partial class MainWindow
         _connectorEnabled.Toggled += async (_, _) => await ApplyConnectorSettingsAsync();
         _connectorBind.SelectionChanged += async (_, _) => { if (_connectorBind.SelectedIndex >= 0) await ApplyConnectorSettingsAsync(); };
         Closed += async (_, _) => await StopConnectorAsync();
+        _wakeKey.PasswordChanged += (_, _) => SyncWakeKeyReveal();
         var avatarPicker = BuildGrokbotAvatarPicker();
         LoadConnectorControls();
         var copy = Button("Copy", CopyConnectorToken);
@@ -78,9 +79,9 @@ public sealed partial class MainWindow
         var revealWakeKey = DeskButton("");
         revealWakeKey.Content = new FontIcon { Glyph = "\uE7B3", FontFamily = DeskTheme.IconFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text };
         revealWakeKey.VerticalAlignment = VerticalAlignment.Bottom;
-        AutomationName(revealWakeKey, "Show webhook sender key");
         revealWakeKey.Click += (_, _) => ToggleWakeKeyReveal();
         _wakeKeyReveal = revealWakeKey;
+        SyncWakeKeyReveal();
         _wakeStatus.Visibility = Visibility.Collapsed;
         AutomationName(_wakeStatus, "Wake status");
         var wakeKeyRow = new Grid { ColumnSpacing = DeskTheme.Space8 };
@@ -397,17 +398,37 @@ public sealed partial class MainWindow
 
     private void ShowWakeKeyMask()
     {
-        _wakeKey.Password = "";
         _wakeKey.PasswordRevealMode = PasswordRevealMode.Hidden;
+        _wakeKey.Password = "";
         _wakeKey.PlaceholderText = GrokbotWakeKey.Read() is null ? "" : "••••••••";
-        if (_wakeKeyReveal is not null) AutomationName(_wakeKeyReveal, "Show webhook sender key");
+        SyncWakeKeyReveal();
+    }
+
+    private void SyncWakeKeyReveal()
+    {
+        if (_wakeKeyReveal is null) return;
+        if ((_wakeKey.Password ?? "").Length == 0)
+        {
+            _wakeKey.PasswordRevealMode = PasswordRevealMode.Hidden;
+            _wakeKeyReveal.IsEnabled = false;
+            AutomationName(_wakeKeyReveal, "Show webhook sender key");
+            ToolTipService.SetToolTip(_wakeKeyReveal, "Type a new key to show it");
+            return;
+        }
+
+        _wakeKeyReveal.IsEnabled = true;
+        var visible = _wakeKey.PasswordRevealMode == PasswordRevealMode.Visible;
+        var name = visible ? "Hide webhook sender key" : "Show webhook sender key";
+        AutomationName(_wakeKeyReveal, name);
+        ToolTipService.SetToolTip(_wakeKeyReveal, name);
     }
 
     private void ToggleWakeKeyReveal()
     {
+        if ((_wakeKey.Password ?? "").Length == 0) return;
         var show = _wakeKey.PasswordRevealMode != PasswordRevealMode.Visible;
         _wakeKey.PasswordRevealMode = show ? PasswordRevealMode.Visible : PasswordRevealMode.Hidden;
-        if (_wakeKeyReveal is not null) AutomationName(_wakeKeyReveal, show ? "Hide webhook sender key" : "Show webhook sender key");
+        SyncWakeKeyReveal();
     }
 
     private void ShowWakeStatus(string text)
