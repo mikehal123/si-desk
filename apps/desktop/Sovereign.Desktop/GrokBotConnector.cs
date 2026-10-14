@@ -581,6 +581,42 @@ public sealed partial class MainWindow
             return task.Id + "\t" + task.Status;
         }
 
+        public bool GrokbotReviewsHandoffs(string conversationId) => OnWindow(() => ReviewsOn(conversationId));
+
+        public bool ConversationOpen(string conversationId) => OnWindow(() =>
+            !string.IsNullOrWhiteSpace(conversationId) && window._conversations.Any(item => item.Id == conversationId.Trim()));
+
+        public void DeliverSwarmReview(string conversationId, string text, bool resume) => UiDelivery.Invoke(window.DispatcherQueue.HasThreadAccess, () =>
+        {
+            var chat = window._conversations.FirstOrDefault(item => item.Id == conversationId) ?? throw new KeyNotFoundException("That chat is not open.");
+            chat.AcceptGrokbotReview(text, resume);
+        }, post =>
+        {
+            if (!window.DispatcherQueue.TryEnqueue(() => post())) throw new IOException("The desktop window is closed.");
+        }, TimeSpan.FromSeconds(2));
+
+        public string? SwarmBoardRoot() => null;
+
+        private bool ReviewsOn(string conversationId)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId)) return false;
+            var id = conversationId.Trim();
+            var open = window._conversations.FirstOrDefault(item => item.Id == id);
+            if (open is not null) return open.GrokbotReviewsHandoffs;
+            if (!Guid.TryParseExact(id, "N", out _)) return false;
+            try
+            {
+                var path = Path.Combine(window._vm.ProfileDirectory, "chats", id + ".json");
+                if (!File.Exists(path)) return false;
+                using var json = JsonDocument.Parse(File.ReadAllText(path));
+                return json.RootElement.TryGetProperty("GrokbotReviewsHandoffs", out var flag) && flag.ValueKind == JsonValueKind.True;
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
+        }
+
         private string Act(Func<string> work)
         {
             window.GrokbotMail.EnsureAction("action");

@@ -28,7 +28,7 @@ public static class SwarmRoles
         + (string.IsNullOrWhiteSpace(task.VerifierNote) ? "" : "\nVerifier note: " + task.VerifierNote)
         + "\nBoard: " + boardPath;
 
-    public static string Manager(string boardPath, string? memory = null) =>
+    public static string Manager(string boardPath, string? memory = null, bool mixedModels = false) =>
         WorkDoctrine.PromptPrefix()
         + "Swarm mode. You are the manager for this chat. The conversation swarm folder is "
         + boardPath + ". "
@@ -43,7 +43,9 @@ public static class SwarmRoles
         + boardPath + "\\current.txt. If "
         + boardPath + "\\board.json already exists, leave it untouched. Never overwrite an existing board.json. Status changes go on the new run's board only. "
         + "Each task has id, title, role, status (todo, doing, review, done, or failed), assignee, result, proof, verifier_note, files, and after. "
-        + "Spawn the existing subagents for ready tasks. When a swarm hire catalog follows this brief, pass that catalog's modelId for the role on the helper tool's model field. The verifier modelId must differ from the engineer modelId. grokbot-research and grokbot-ops stay wake roles and take no modelId from that catalog. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. Researcher returns findings with sources. grokbot-research reads the board and submits with swarm_submit_result. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
+        + "Spawn the existing subagents for ready tasks. When a swarm hire catalog follows this brief, pass that catalog's modelId for the role on the helper tool's model field. "
+        + (mixedModels ? "The verifier modelId must differ from the engineer modelId. " : "")
+        + "grokbot-research and grokbot-ops stay wake roles and take no modelId from that catalog. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. Researcher returns findings with sources. grokbot-research reads the board and submits with swarm_submit_result. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
         + "When a helper is interrupted, decide once. Reset that task to todo and respawn it once with a narrower scope. Do not debate the decision. If that helper is interrupted or fails again, mark the task failed with the reason and move on to other ready tasks. "
         + "Builder means engineer. Reviewer means verifier. Use investigator when the goal is to trace a problem. "
         + "Nothing is done without proof. Each task needs verifier proof before done. "

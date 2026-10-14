@@ -56,6 +56,13 @@ public sealed class SwarmBoard
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("goal")] public string Goal { get; set; } = "";
     [JsonPropertyName("tasks")] public List<SwarmTask> Tasks { get; set; } = [];
+    [JsonPropertyName("review_loops")] public int ReviewLoops { get; set; }
+    [JsonPropertyName("review_handled")] public int ReviewHandled { get; set; }
+    [JsonPropertyName("review_status")] public string ReviewStatus { get; set; } = "";
+    [JsonPropertyName("review_verdict")] public string ReviewVerdict { get; set; } = "";
+    [JsonPropertyName("review_issues")] public string ReviewIssues { get; set; } = "";
+    [JsonPropertyName("review_next")] public string ReviewNext { get; set; } = "";
+    [JsonPropertyName("review_note")] public string ReviewNote { get; set; } = "";
 
     [JsonIgnore] public string Root { get; set; } = DefaultRoot();
     [JsonIgnore] public string BoardPath => Path.Combine(Root, Id, "board.json");
@@ -342,7 +349,10 @@ public sealed class SwarmBoard
     {
         var path = BoardPath;
         if (File.Exists(path))
+        {
             SwarmSchedule.EnsureSameRun(Read(path), this);
+            File.Copy(path, path + ".bak", true);
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(this, Json));

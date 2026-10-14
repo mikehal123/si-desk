@@ -14,7 +14,7 @@ public sealed class CursorProjectOptions
     };
     public bool EnableSubagents { get; init; } = true;
     public string? SwarmBrief { get; init; }
-    /// <summary>Null keeps the legacy hire list. False uses the chat model for every worker. True uses role rankings.</summary>
+    /// <summary>Null and false use the selected model for every role. True uses role rankings.</summary>
     public bool? SwarmMixedModels { get; init; }
     public string? SwarmRoleModelsDirectory { get; init; }
     internal bool SubagentsAllowed => EnableSubagents;

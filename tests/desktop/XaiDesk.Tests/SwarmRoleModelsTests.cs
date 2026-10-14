@@ -289,20 +289,70 @@ public sealed class SwarmRoleModelsTests
         var catalog = SwarmRoleModels.SingleCatalog(models, "composer-2.5");
         foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
             Assert.Contains(role + " modelId: composer-2.5", catalog);
-        Assert.Contains("Every worker uses the chat's selected model.", catalog);
-        Assert.Contains("grokbot-research and grokbot-ops take no modelId.", catalog);
+        Assert.Contains("- composer-2.5 | Composer 2.5", catalog);
+        Assert.Contains("grokbot-research and grokbot-ops take no modelId", catalog);
         Assert.DoesNotContain("override ", catalog);
         Assert.DoesNotContain("must differ", catalog);
-        Assert.Contains("- grok-4.7 | Grok 4.7", catalog);
+        Assert.DoesNotContain("fall back to the parent", catalog);
+        Assert.DoesNotContain("grok-4.7", catalog);
+        Assert.DoesNotContain("claude-fable", catalog);
     }
 
     [Fact]
     public void Single_catalog_prints_none_when_the_chat_has_no_model()
     {
-        var catalog = SwarmRoleModels.SingleCatalog([], null);
-        Assert.Contains("engineer modelId: (none)", catalog);
-        Assert.Contains("verifier modelId: (none)", catalog);
-        Assert.Contains("(no advertised models)", catalog);
+        var error = Assert.Throws<IOException>(() => SwarmRoleModels.SingleCatalog([], null));
+        Assert.Contains("No swarm model is selected", error.Message);
+        Assert.Contains("will not fall back", error.Message);
+    }
+
+    [Fact]
+    public void Single_catalog_with_grok_never_emits_openai()
+    {
+        CursorChatModel[] models =
+        [
+            M("grok-4.7", "Grok 4.7"),
+            M("gpt-5.6-sol", "GPT-5.6 Sol"),
+            M("gpt-4o", "GPT-4o"),
+            M("claude-fable-5-1", "Claude Fable 5.1")
+        ];
+        foreach (bool? mixed in new bool?[] { false, null })
+        {
+            var catalog = CursorChatClient.SwarmHireCatalog(mixed, null, models, "grok-4.7");
+            Assert.DoesNotContain("gpt-", catalog, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("openai", catalog, StringComparison.OrdinalIgnoreCase);
+            foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
+                Assert.Contains(role + " modelId: grok-4.7", catalog);
+            Assert.Contains("the verifier uses this same modelId", catalog);
+            Assert.Contains("do not substitute", catalog);
+        }
+    }
+
+    [Fact]
+    public void Single_catalog_fails_instead_of_substituting_openai()
+    {
+        var error = Assert.Throws<IOException>(() => CursorChatClient.SwarmHireCatalog(
+            false,
+            null,
+            [M("gpt-5.6-sol", "GPT-5.6 Sol")],
+            "grok-4.7"));
+        Assert.Contains("grok-4.7", error.Message);
+        Assert.DoesNotContain("gpt-", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GPT-5.6", error.Message);
+    }
+
+    [Fact]
+    public void Mixed_blank_directory_still_uses_ranked_hire()
+    {
+        CursorChatModel[] models =
+        [
+            M("grok-4.7", "Grok 4.7"),
+            M("gpt-5.6-sol", "GPT-5.6 Sol"),
+            M("gpt-4o", "GPT-4o"),
+            M("claude-fable-5-1", "Claude Fable 5.1")
+        ];
+        var catalog = CursorChatClient.SwarmHireCatalog(true, "", models, "grok-4.7");
+        Assert.Contains("engineer modelId: claude-fable-5-1", catalog);
     }
 
     [Fact]

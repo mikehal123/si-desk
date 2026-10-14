@@ -231,6 +231,8 @@ public sealed class ConnectorHost : IAsyncDisposable
                 "app_navigate" => _desk.GrokbotNavigate(Arg("page")),
                 "read_swarm_board" => _desk.ReadSwarmBoard(BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
                 "swarm_submit_result" => SubmitSwarm(Arg("task_id"), Arg("result"), Arg("proof"), BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
+                "swarm_continue" => SwarmContinue.Apply(_desk, BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id")), Arg("verdict"), Arg("notes")).ToolText(),
+                "swarm_run_status" => SwarmContinue.Status(_desk, BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
                 _ => ""
             };
             if (!KnownTool(name))
@@ -239,7 +241,7 @@ public sealed class ConnectorHost : IAsyncDisposable
                 TryRecord(name, ArgSummary(arguments), "Unknown tool.");
                 return ToolError("Unknown tool.");
             }
-            var auditTarget = name is "read_chat" or "send_to_chat" or "list_subagents" ? Arg("conversation") : name == "read_subagent" ? Arg("id") : name == "grokbot_inbox_reply" ? Arg("message_id") : name == "swarm_submit_result" ? Arg("task_id") : name == "read_swarm_board" ? Arg("swarm_id") : null;
+            var auditTarget = name is "read_chat" or "send_to_chat" or "list_subagents" ? Arg("conversation") : name == "read_subagent" ? Arg("id") : name == "grokbot_inbox_reply" ? Arg("message_id") : name == "swarm_submit_result" ? Arg("task_id") : name is "read_swarm_board" or "swarm_continue" or "swarm_run_status" ? Arg("swarm_id") : null;
             _audit.Write(name, Redact(auditTarget));
             TryRecord(name, ArgSummary(arguments), text);
             if (inboxContent is not null)
@@ -336,7 +338,7 @@ public sealed class ConnectorHost : IAsyncDisposable
         "read_chat" or "list_chats" or "send_to_chat" or "read_shared_room" or "post_shared_room" or
         "list_subagents" or "read_subagent" or "status" or "grokbot_inbox_list" or "grokbot_inbox_reply" or
         "app_ui_tree" or "app_click" or "app_type" or "app_key" or "app_navigate" or
-        "read_swarm_board" or "swarm_submit_result";
+        "read_swarm_board" or "swarm_submit_result" or "swarm_continue" or "swarm_run_status";
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -359,9 +361,16 @@ public sealed class ConnectorHost : IAsyncDisposable
 
     private string SubmitSwarm(string taskId, string result, string proof, string? swarmId, string? runId)
     {
-        if (string.IsNullOrWhiteSpace(taskId)) throw new ArgumentException("Task id is required.");
+        var review = SwarmHandoffReview.Parse(result);
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            if (review is null) throw new ArgumentException("Task id is required.");
+            return SwarmHandoffReview.Record(swarmId, runId, review, null);
+        }
         if (string.IsNullOrWhiteSpace(proof)) throw new ArgumentException("Nothing is done without proof.");
-        return _desk.SubmitSwarmResult(taskId, result, proof, swarmId, runId);
+        var line = _desk.SubmitSwarmResult(taskId, result, proof, swarmId, runId);
+        if (review is null) return line;
+        return line + "\n" + SwarmHandoffReview.Record(swarmId, runId, review, null, taskId);
     }
 
     private string ReadSubagent(string id)
@@ -404,7 +413,9 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("app_key", "Send keys to the focused control in the xAI Desk window.", "keys", true, false),
         Tool("app_navigate", "Open Chat, Shared room, Settings, or Grokbot.", "page", true, false),
         Tool("read_swarm_board", "Read a swarm board. Pass run_id to read that run even when it is not current. Omit swarm_id to list boards.", "swarm_id", false, false),
-        Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof for swarm_id and task_id. Pass run_id to write that run. Moves the task to review. Cannot mark it done.", "task_id", true, false)
+        Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof for swarm_id and task_id. Pass run_id to write that run. Moves the task to review. Cannot mark it done. A handoff review may send an empty task_id with swarm_id, run_id, and result lines verdict, issues, and next. That records the review and does not mark a task done.", "task_id", true, false),
+        Tool("swarm_continue", "After a handoff review, post the verdict into that swarm chat as Grok Bot. Verdict is continue, fix, or done. Continue and fix resume the manager. Done does not. A repeated call for the same review is ignored.", "swarm_id", true, false),
+        Tool("swarm_run_status", "Read the run id, review status, and each task status for a swarm run. Does not write the board.", "swarm_id", true, false)
     ];
 
     private static object Tool(string name, string description, string? argument, bool required, bool limit)
@@ -431,6 +442,19 @@ public sealed class ConnectorHost : IAsyncDisposable
             properties["proof"] = new { type = "string" };
             requiredNames.Add("result");
             requiredNames.Add("proof");
+        }
+        if (name == "swarm_continue")
+        {
+            properties["run_id"] = new { type = "string" };
+            properties["verdict"] = new { type = "string" };
+            properties["notes"] = new { type = "string" };
+            requiredNames.Add("run_id");
+            requiredNames.Add("verdict");
+        }
+        if (name == "swarm_run_status")
+        {
+            properties["run_id"] = new { type = "string" };
+            requiredNames.Add("run_id");
         }
         if (name == "app_click")
         {

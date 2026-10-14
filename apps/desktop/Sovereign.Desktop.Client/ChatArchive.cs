@@ -18,7 +18,9 @@ public sealed record SavedChat(string Id, string Title, int Provider, string? Mo
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string[]? ClosedSubagentIds = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SwarmMode = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? GrokBuildSessionId = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SwarmHire = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SwarmHire = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GrokbotReviewsHandoffs = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? GrokbotReviewLoopCap = null)
 {
     // Legacy chats wrote false as their default. New explicit opt-outs use preference version 1.
     public bool SubagentsEnabled => SubagentPreferenceVersion >= 1 ? EnableSubagents ?? true : true;

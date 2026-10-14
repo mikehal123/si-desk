@@ -17,26 +17,32 @@ public static class GrokbotWake
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
         TimeSpan.FromSeconds(1));
 
+    public static string Scrub(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        try { return Secrets.Replace(text, "[redacted]"); }
+        catch (RegexMatchTimeoutException) { return "[redacted]"; }
+    }
+
     public static string Preview(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
         var trimmed = text.Trim();
         if (trimmed.Length > 80) trimmed = trimmed[..80];
-        try { return Secrets.Replace(trimmed, "[redacted]"); }
-        catch (RegexMatchTimeoutException) { return "[redacted]"; }
+        return Scrub(trimmed);
     }
 
     public static async Task<string> PostAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null) =>
         (await DeliverAsync(handler, url, bearer, messageId, act, preview, ct, delay).ConfigureAwait(false)).Note;
 
-    public static async Task<GrokbotWakeReceipt> DeliverAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null, string? swarmId = null, string? taskId = null, string? title = null, string? details = null, string? runId = null)
+    public static async Task<GrokbotWakeReceipt> DeliverAsync(HttpMessageHandler handler, string url, string bearer, string messageId, bool act, string preview, CancellationToken ct, Func<int, TimeSpan>? delay = null, string? swarmId = null, string? taskId = null, string? title = null, string? details = null, string? runId = null, string? body = null)
     {
         ArgumentNullException.ThrowIfNull(handler);
         if (string.IsNullOrWhiteSpace(url)) return new GrokbotWakeReceipt("Wake webhook URL is not set.", null);
         if (string.IsNullOrEmpty(bearer)) return new GrokbotWakeReceipt("Webhook sender key is not set.", null);
         if (bearer.Any(char.IsControl)) return new GrokbotWakeReceipt("Webhook sender key is not valid.", null);
         if (!TryWakeUri(url, out var uri)) return new GrokbotWakeReceipt("Wake URL must be http or https with no user info.", null);
-        var json = JsonSerializer.Serialize(new WakePayload(
+        var json = body ?? JsonSerializer.Serialize(new WakePayload(
             messageId ?? "",
             act,
             preview ?? "",

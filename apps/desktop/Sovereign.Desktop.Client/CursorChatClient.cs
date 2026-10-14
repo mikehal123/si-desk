@@ -145,6 +145,15 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
         finally { _gate.Release(); }
     }
 
+    internal static string SwarmHireCatalog(bool? mixed, string? roleModelsDirectory, IReadOnlyList<CursorChatModel> models, string? chatModelId)
+    {
+        if (mixed == true && !string.IsNullOrWhiteSpace(roleModelsDirectory))
+            return SwarmRoleModels.Catalog(models, chatModelId, SwarmRoleModels.Load(roleModelsDirectory));
+        if (mixed == true)
+            return SwarmModelHire.Catalog(models, chatModelId);
+        return SwarmRoleModels.SingleCatalog(models, chatModelId);
+    }
+
     public async Task<CursorTurnOutcome> SendAsync(string model, string text, Action<string> delta, CancellationToken ct, IReadOnlyList<ChatImage>? images = null)
     {
         await _gate.WaitAsync(ct);
@@ -251,13 +260,7 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
         var swarmHire = "";
         if (swarmBrief is { Length: > 0 })
         {
-            var directory = project?.SwarmRoleModelsDirectory;
-            var swarmCatalog = project?.SwarmMixedModels switch
-            {
-                true when !string.IsNullOrWhiteSpace(directory) => SwarmRoleModels.Catalog(Models, model, SwarmRoleModels.Load(directory)),
-                false => SwarmRoleModels.SingleCatalog(Models, model),
-                _ => SwarmModelHire.Catalog(Models, model)
-            };
+            var swarmCatalog = CursorChatClient.SwarmHireCatalog(project?.SwarmMixedModels, project?.SwarmRoleModelsDirectory, Models, model);
             swarmHire = swarmBrief + "\n\n" + swarmCatalog + "\n\n";
         }
         var helperModelClause = swarmHire.Length > 0

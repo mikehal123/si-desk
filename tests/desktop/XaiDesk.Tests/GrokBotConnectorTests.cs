@@ -420,7 +420,7 @@ public sealed class GrokBotConnectorTests
         using var http = Client();
         var response = await http.PostAsync(host.Url, new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 2, method = "tools/list" }), Encoding.UTF8, "application/json"));
         var body = await response.Content.ReadAsStringAsync();
-        foreach (var name in new[] { "grokbot_inbox_list", "grokbot_inbox_reply", "app_screenshot", "app_ui_tree", "app_click", "app_type", "app_key", "app_navigate", "read_chat", "send_to_chat", "list_subagents" })
+        foreach (var name in new[] { "grokbot_inbox_list", "grokbot_inbox_reply", "app_screenshot", "app_ui_tree", "app_click", "app_type", "app_key", "app_navigate", "read_chat", "send_to_chat", "list_subagents", "swarm_continue", "swarm_run_status" })
             Assert.Contains("\"" + name + "\"", body, StringComparison.Ordinal);
     }
 
@@ -568,5 +568,9 @@ public sealed class GrokBotConnectorTests
             var task = board.Submit(taskId, result, proof);
             return task.Id + "\t" + task.Status;
         }
+        public bool GrokbotReviewsHandoffs(string conversationId) => false;
+        public bool ConversationOpen(string conversationId) => false;
+        public void DeliverSwarmReview(string conversationId, string text, bool resume) { }
+        public string? SwarmBoardRoot() => SwarmRoot;
     }
 }
