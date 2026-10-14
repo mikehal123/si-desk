@@ -229,8 +229,7 @@ public sealed partial class MainWindow
     {
         try
         {
-            _ = new PasswordVault().Retrieve(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount);
-            return true;
+            return DeskVault.Exists(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount);
         }
         catch { return false; }
     }
@@ -240,10 +239,8 @@ public sealed partial class MainWindow
         if (key.Length == 0) { RefreshXaiApiStatus(); return; }
         try
         {
-            var vault = new PasswordVault();
-            try { vault.Remove(vault.Retrieve(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount)); }
-            catch { /* No credential stored yet. */ }
-            vault.Add(new PasswordCredential(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount, key));
+            DeskVault.Remove(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount);
+            new PasswordVault().Add(new PasswordCredential(XaiDeskIdentity.XaiApiCredentialResource, XaiDeskIdentity.XaiApiCredentialAccount, key));
             _xaiApiKey.Password = "";
             _statusXaiApi.Text = "Key saved";
         }

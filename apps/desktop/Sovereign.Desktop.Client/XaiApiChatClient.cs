@@ -20,7 +20,7 @@ public sealed class XaiApiChatClient : IDisposable
         _http.BaseAddress = new Uri(string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl);
         _http.Timeout = Timeout.InfiniteTimeSpan;
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("xAIDesk/0.1");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("SIDesk/0.1");
     }
 
     public async Task<string[]> ModelsAsync(CancellationToken ct)

@@ -91,6 +91,8 @@ internal sealed partial class ChatConversation
     private Button? _chatSend;
     private Button? _chatStop;
     private Flyout? _connectionFlyout;
+    private const double ConnectionFlyoutWidth = 360;
+    private const double ConnectionFlyoutHeight = 480;
     private Button? _chatConnect;
     private Button? _chatLogin;
     private Button? _chatNew;
@@ -160,6 +162,18 @@ internal sealed partial class ChatConversation
         }
         RefreshAttachmentStatus();
     }
+    private void FitConnectionFlyout()
+    {
+        if (_connectionFlyout?.Content is not FrameworkElement panel || _chatConnectionButton is not { XamlRoot: { } root } button)
+            return;
+        var origin = button.TransformToVisual(null).TransformPoint(default);
+        var below = root.Size.Height - origin.Y - button.ActualHeight - DeskTheme.Space16;
+        var above = origin.Y - DeskTheme.Space16;
+        var room = Math.Max(below, above);
+        if (room < 160) room = 160;
+        panel.MaxHeight = Math.Min(ConnectionFlyoutHeight, room);
+    }
+
     private void BuildChatPage()
     {
         _chatPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -172,6 +186,7 @@ internal sealed partial class ChatConversation
         _chatConnect = Button("Connect / refresh models", ConnectChatAsync);
         _chatLogin = Button("Sign in with ChatGPT", async () => { await StartChatSignInAsync(); });
         _chatNew = Button("New conversation", () => { _connectionFlyout?.Hide(); _newChat(_chatProvider.SelectedIndex, _projectFolder); });
+        foreach (var b in new[] { _chatConnect, _chatLogin, _chatNew }) b.HorizontalAlignment = HorizontalAlignment.Stretch;
         var import = Button("Import IMIGROK key", async () =>
         {
             try {
@@ -185,10 +200,39 @@ internal sealed partial class ChatConversation
         _planControls=new StackPanel { Spacing = DeskTheme.Space8, Visibility=Visibility.Collapsed, Children={_planKey,_planEndpoint,import,Note("Select IMIGROK’s .env or auth.json. Connect stores only this key in Windows Credential Manager. Changing endpoint or key requires reconnecting.")} };
         _planKey.PasswordChanged += (_,_) => { if(PlanChat) { _chatReady=false; if(_chatSend is not null) _chatSend.IsEnabled=false; RefreshAttachmentStatus(); } };
         _planEndpoint.SelectionChanged += (_,_) => { if(PlanChat) { _chatReady=false; if(_chatSend is not null) _chatSend.IsEnabled=false; RefreshAttachmentStatus(); } };
-        _connectionFlyout = new Flyout { Content = new ScrollViewer { MaxHeight = 480, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Enabled, Content = new StackPanel { Spacing = DeskTheme.Space12, Children = {
-            Head("Connection"), _chatProvider,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin } }, BuildProjectToolbar(), _planControls
-        } } } };
+        _chatProvider.MaxDropDownHeight = 240;
+        _chatProvider.Width = double.NaN;
+        _chatProvider.MaxWidth = ConnectionFlyoutWidth;
+        _chatProvider.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _planEndpoint.MinWidth = 0;
+        _planEndpoint.MaxWidth = ConnectionFlyoutWidth;
+        _planEndpoint.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _planEndpoint.MaxDropDownHeight = 240;
+        _connectionFlyout = new Flyout
+        {
+            Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedRight,
+            Content = new ScrollViewer
+            {
+                MaxWidth = ConnectionFlyoutWidth,
+                MaxHeight = ConnectionFlyoutHeight,
+                HorizontalScrollMode = ScrollMode.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollMode = ScrollMode.Enabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = new StackPanel
+                {
+                    Spacing = DeskTheme.Space12,
+                    MaxWidth = ConnectionFlyoutWidth,
+                    Children =
+                    {
+                        Head("Connection"), _chatProvider,
+                        new StackPanel { Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin } },
+                        BuildProjectToolbar(), _planControls
+                    }
+                }
+            }
+        };
+        _connectionFlyout.Opened += (_, _) => FitConnectionFlyout();
         ((FrameworkElement)_connectionFlyout.Content).RequestedTheme = ElementTheme.Dark;
         DeskTheme.Install(((FrameworkElement)_connectionFlyout.Content).Resources);
         _chatConnectionButton = new Button { Content = "Connection", Flyout = _connectionFlyout, HorizontalAlignment = HorizontalAlignment.Right };
@@ -420,12 +464,10 @@ internal sealed partial class ChatConversation
     {
         try
         {
-            var credential = new Windows.Security.Credentials.PasswordVault().Retrieve(
+            return DeskVault.ReadPassword(
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialResource,
-                Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount);
-            credential.RetrievePassword();
-            if (string.IsNullOrWhiteSpace(credential.Password)) throw new InvalidOperationException("Save an xAI API key in Settings first.");
-            return credential.Password;
+                Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount)
+                ?? throw new InvalidOperationException("Save an xAI API key in Settings first.");
         }
         catch (InvalidOperationException) { throw; }
         catch { throw new InvalidOperationException("Save an xAI API key in Settings first."); }

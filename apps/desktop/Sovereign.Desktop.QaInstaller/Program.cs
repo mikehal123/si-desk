@@ -23,7 +23,7 @@ internal static class Program
         }
         if (args.Length != 0) return 2;
         ApplicationConfiguration.Initialize();
-        using var form = new Form { Text = "xAI Desk · isolated QA candidate", Width = 620, Height = 270, StartPosition = FormStartPosition.CenterScreen };
+        using var form = new Form { Text = "SI Desk · isolated QA candidate", Width = 620, Height = 270, StartPosition = FormStartPosition.CenterScreen };
         var status = new Label { Left = 24, Top = 24, Width = 555, Height = 110,
             Text = "Install the verified September 21 review candidate into its own QA profile.\n\nYour main app and the original guest QA installation remain unchanged.\nNo sign-in, model download or scan is performed." };
         var install = new Button { Text = "Install QA candidate", Left = 24, Top = 155, Width = 200, Height = 36 };
@@ -95,8 +95,8 @@ internal static class Program
         var profile = Path.Combine(root, "profile");
         progress.Report("Installing into the isolated QA instance…");
         var result = InstallerEngine.Run(new SetupRequest(SetupAction.Install, app, Path.Combine(extract, "payload"),
-            "SovereignAI.DesktopPreview." + Instance, "xAI Desk " + Instance, Version, profile,
-            "xAI Desk " + Instance, true, null, null));
+            "SovereignAI.DesktopPreview." + Instance, "SI Desk " + Instance, Version, profile,
+            "SI Desk " + Instance, true, null, null));
         if (!result.Ok) throw new IOException(result.Message);
         Directory.CreateDirectory(profile);
         var executable = Path.Combine(app, "SovereignAI.DesktopPreview.exe");

@@ -17,7 +17,7 @@ public sealed class UpdateTests
         Assert.Equal(binary.ProductVersion!.Split('+')[0], displayed);
         _ = UpdatePackage.ParseVersion(displayed.Split('-')[0]);
     }
-    private static UpdateRelease Release => new("0.3.19", "https://github.com/mikehal123/xai-desk/releases/download/v0.3.19/xAIDesk-Windows-0.3.19.zip", new string('a',64), 100, "Test", DateTimeOffset.UtcNow.AddDays(1));
+    private static UpdateRelease Release => new("0.3.19", "https://github.com/mikehal123/si-desk/releases/download/v0.3.19/SIDesk-Windows-0.3.19.zip", new string('a',64), 100, "Test", DateTimeOffset.UtcNow.AddDays(1));
     private static string Sign(UpdateRelease release, RSA rsa)
     {
         var data = JsonSerializer.SerializeToUtf8Bytes(release);
@@ -51,14 +51,14 @@ public sealed class UpdateTests
         finally { File.Delete(path); }
     }
     [Theory]
-    [InlineData("xAIDesk-Windows-0.3.19/../escape.txt")]
-    [InlineData("xAIDesk-Windows-0.3.19/payload/x:stream")]
+    [InlineData("SIDesk-Windows-0.3.19/../escape.txt")]
+    [InlineData("SIDesk-Windows-0.3.19/payload/x:stream")]
     [InlineData("wrong-root/file")]
     public void Unsafe_zip_is_rejected_before_extracting(string name)
     {
         var temp=Path.Combine(Path.GetTempPath(),Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temp);
         try {
-            var zip=Path.Combine(temp,"test.zip");using(var archive=ZipFile.Open(zip,ZipArchiveMode.Create)) {archive.CreateEntry(name);archive.CreateEntry("xAIDesk-Windows-0.3.19/SovereignAI.ps1");}
+            var zip=Path.Combine(temp,"test.zip");using(var archive=ZipFile.Open(zip,ZipArchiveMode.Create)) {archive.CreateEntry(name);archive.CreateEntry("SIDesk-Windows-0.3.19/SovereignAI.ps1");}
             Assert.Throws<InvalidDataException>(()=>UpdatePackage.Extract(zip,Path.Combine(temp,"output"),"0.3.19"));
             Assert.False(Directory.Exists(Path.Combine(temp,"output")));
         } finally {Directory.Delete(temp,true);}
@@ -67,7 +67,7 @@ public sealed class UpdateTests
     {
         var temp=Path.Combine(Path.GetTempPath(),Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temp);
         try {
-            var zip=Path.Combine(temp,"test.zip");using(var archive=ZipFile.Open(zip,ZipArchiveMode.Create)) {archive.CreateEntry("xAIDesk-Windows-0.3.19/SovereignAI.ps1");archive.CreateEntry("xAIDesk-Windows-0.3.19/sovereignai.ps1");}
+            var zip=Path.Combine(temp,"test.zip");using(var archive=ZipFile.Open(zip,ZipArchiveMode.Create)) {archive.CreateEntry("SIDesk-Windows-0.3.19/SovereignAI.ps1");archive.CreateEntry("SIDesk-Windows-0.3.19/sovereignai.ps1");}
             Assert.Throws<InvalidDataException>(()=>UpdatePackage.Extract(zip,Path.Combine(temp,"output"),"0.3.19"));
         } finally {Directory.Delete(temp,true);}
     }

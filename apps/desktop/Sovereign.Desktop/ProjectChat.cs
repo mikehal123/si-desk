@@ -18,7 +18,9 @@ internal sealed partial class ChatConversation
     {
         _openProject = Button("Open Folder…", OpenProjectFolderAsync);
         _closeProject = Button("Close Folder", CloseProjectFolder); _closeProject.IsEnabled = false;
-        return new StackPanel { Spacing = DeskTheme.Space8, Children = { new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { _openProject, _closeProject, _chatNew! } }, BuildSubagentOption(), BuildSubagentPanelsOption() } };
+        _openProject.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _closeProject.HorizontalAlignment = HorizontalAlignment.Stretch;
+        return new StackPanel { Spacing = DeskTheme.Space8, Children = { new StackPanel { Spacing = DeskTheme.Space8, Children = { _openProject, _closeProject, _chatNew! } }, BuildSubagentOption(), BuildSubagentPanelsOption() } };
     }
 
     private UIElement BuildProjectControls()

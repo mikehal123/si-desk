@@ -8,10 +8,10 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
-    <Product>xAI Desk</Product>
-    <Company>xAI Desk</Company>
-    <Authors>xAI Desk</Authors>
-    <Copyright>Copyright (c) xAI Desk</Copyright>
+    <Product>SI Desk</Product>
+    <Company>SI Desk</Company>
+    <Authors>SI Desk</Authors>
+    <Copyright>Copyright (c) SI Desk</Copyright>
     <Version>0.3.61</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>

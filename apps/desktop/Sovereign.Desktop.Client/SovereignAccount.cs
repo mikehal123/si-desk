@@ -66,9 +66,9 @@ public sealed class SovereignAccountClient : IDisposable
             if (context.Request.Query["state"].Count != 1 || !StateMatches(state,context.Request.Query["state"].ToString())) { context.Response.StatusCode=400; await context.Response.WriteAsync("Invalid sign-in response."); return; }
             var code=context.Request.Query["code"];
             if (code.Count != 1 || string.IsNullOrWhiteSpace(code.ToString()) || context.Request.Query.ContainsKey("error")) {
-                await context.Response.WriteAsync("Sign-in was not completed. Return to xAI Desk."); received.TrySetException(new IOException("Sign-in was denied or canceled.")); return;
+                await context.Response.WriteAsync("Sign-in was not completed. Return to SI Desk."); received.TrySetException(new IOException("Sign-in was denied or canceled.")); return;
             }
-            await context.Response.WriteAsync("Sign-in response received. Return to xAI Desk to finish verification.");
+            await context.Response.WriteAsync("Sign-in response received. Return to SI Desk to finish verification.");
             await context.Response.CompleteAsync(); received.TrySetResult(code.ToString());
         });
         SignInStage="Opening local callback listener";

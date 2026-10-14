@@ -247,7 +247,7 @@ internal sealed class CodexAppSession(TextReader reader, TextWriter writer, stri
         if (_initialized) return;
         _state.ChildSpawned = id => { _subscriptions[id] = SubscribeChildAsync(id); };
         _reading ??= ReadLoopAsync();
-        await CallAsync("initialize", new { clientInfo = new { name = "sovereign_desktop", title = "xAI Desk", version = DesktopClientVersion.Current },
+        await CallAsync("initialize", new { clientInfo = new { name = "sovereign_desktop", title = "SI Desk", version = DesktopClientVersion.Current },
             capabilities = new { experimentalApi = true } }, ct);
         await WriteAsync(new { method = "initialized" }, ct); _initialized = true;
     }
@@ -394,8 +394,8 @@ internal sealed class CodexAppSession(TextReader reader, TextWriter writer, stri
         finally { _permissions.Cancel(); _permissions.Dispose(); _permissions = null; _delta = null; _turn = null; _activeTurn = null; }
     }
     private static string Instructions(CursorProjectOptions? options) => options is null
-        ? "xAI Desk conversation: answer only using supplied information. Do not run tools, access files, connectors, accounts or spawn subagents."
-        : "xAI Desk project session: follow workspace instructions and work on the user's request. Do not commit, push, publish or act on external accounts unless explicitly asked. " +
+        ? "SI Desk conversation: answer only using supplied information. Do not run tools, access files, connectors, accounts or spawn subagents."
+        : "SI Desk project session: follow workspace instructions and work on the user's request. Do not commit, push, publish or act on external accounts unless explicitly asked. " +
             (options.Mode == CursorProjectMode.Plan ? "Stay read-only. Inspect and propose a plan; never implement or edit files. The user must choose Always ask or Always allow and send an implementation instruction first. " : "Use native tools to implement requested changes and report actual results. ") +
             (options.SubagentsAllowed ? "Delegate independent work with native subagents when useful. Use up to three direct helpers concurrently and at most sixteen identities. Use default, worker or explorer roles without model overrides. Helpers inherit this chat's sandbox, mode and permissions. Assign separate implementation tasks/files, do not spawn nested helpers, wait for their results and summarize them." : "Do not spawn subagents in this chat.");
 

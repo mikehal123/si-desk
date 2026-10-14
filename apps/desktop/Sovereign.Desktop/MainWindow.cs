@@ -248,7 +248,7 @@ public sealed partial class MainWindow : Window
 
     private IEnumerable<string> DescribeHome()
     {
-        yield return "Your xAI Desk workspace\nOne place for conversations and the tools on this PC.";
+        yield return "Your SI Desk workspace\nOne place for conversations and the tools on this PC.";
         yield return $"Conversations\n{_conversations.Count} saved chats on this PC. Open Chat or choose a recent conversation to continue.";
         yield return "Later · offline demo\nThe synthetic portfolio, orders and engine controls are grouped separately. They are not your live account.";
     }

@@ -68,7 +68,7 @@ public sealed class SwarmBoard
     [JsonIgnore] public string BoardPath => Path.Combine(Root, Id, "board.json");
 
     public static string DefaultRoot() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xai-desk", "swarm");
+        Path.Combine(Sovereign.Desktop.Core.XaiDeskIdentity.DataDirectory(), "swarm");
 
     public static string PanelState(string status) => status switch
     {

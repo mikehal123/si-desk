@@ -4,8 +4,8 @@ namespace Sovereign.Desktop.SetupLib;
 
 public static class SetupCli
 {
-    public const string ProductionProductId = "xAIDesk";
-    public const string ProductionProductName = "xAI Desk";
+    public const string ProductionProductId = "SIDesk";
+    public const string ProductionProductName = "SI Desk";
     public static string CurrentVersion
     {
         get

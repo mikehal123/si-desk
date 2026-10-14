@@ -163,7 +163,7 @@ public sealed class ConnectorHost : IAsyncDisposable
             {
                 protocolVersion = "2025-03-26",
                 capabilities = new { tools = new { } },
-                serverInfo = new { name = "xAI Desk", version = _desk.Status().Version }
+                serverInfo = new { name = "SI Desk", version = _desk.Status().Version }
             };
         if (method == "tools/list") return new { tools = ToolList() };
         if (method != "tools/call") return Error("Unknown method.");
@@ -406,11 +406,11 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("status", "App version, connection, model, and whether a turn is running.", null, false, false),
         Tool("grokbot_inbox_list", "Grokbot tab messages that are not answered yet. Listing marks Queued messages as Picked up.", "since", false, false),
         Tool("grokbot_inbox_reply", "Post a reply into the Grokbot tab and mark that message Answered.", "message_id", true, false),
-        Tool("app_screenshot", "PNG of the xAI Desk window only. Requires Screenshots and permission to act.", null, false, false),
-        Tool("app_ui_tree", "Visible controls in the xAI Desk window: id, type, label, and bounds.", null, false, false),
-        Tool("app_click", "Click a control or a point inside the xAI Desk window.", null, false, false),
-        Tool("app_type", "Type into a control in the xAI Desk window. Secret fields are blocked.", "control_id", true, false),
-        Tool("app_key", "Send keys to the focused control in the xAI Desk window.", "keys", true, false),
+        Tool("app_screenshot", "PNG of the SI Desk window only. Requires Screenshots and permission to act.", null, false, false),
+        Tool("app_ui_tree", "Visible controls in the SI Desk window: id, type, label, and bounds.", null, false, false),
+        Tool("app_click", "Click a control or a point inside the SI Desk window.", null, false, false),
+        Tool("app_type", "Type into a control in the SI Desk window. Secret fields are blocked.", "control_id", true, false),
+        Tool("app_key", "Send keys to the focused control in the SI Desk window.", "keys", true, false),
         Tool("app_navigate", "Open Chat, Shared room, Settings, or Grokbot.", "page", true, false),
         Tool("read_swarm_board", "Read a swarm board. Pass run_id to read that run even when it is not current. Omit swarm_id to list boards.", "swarm_id", false, false),
         Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof for swarm_id and task_id. Pass run_id to write that run. Moves the task to review. Cannot mark it done. A handoff review may send an empty task_id with swarm_id, run_id, and result lines verdict, issues, and next. That records the review and does not mark a task done.", "task_id", true, false),

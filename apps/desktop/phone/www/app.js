@@ -109,7 +109,7 @@
   function errorText(result, fallback) {
     if (result && result.data && typeof result.data.error === "string" && result.data.error) return redact(result.data.error);
     if (result && result.status === 429) return "Too many attempts. Wait and try again.";
-    if (result && result.status === 0) return "Can't reach xAI Desk.";
+    if (result && result.status === 0) return "Can't reach SI Desk.";
     return fallback;
   }
 
@@ -246,7 +246,7 @@
   function renderScan(message) {
     state.view = "scan";
     hideBanner();
-    setHeader([el("h1", "", "xAI Desk")]);
+    setHeader([el("h1", "", "SI Desk")]);
     clear(ui.main);
     var gate = el("section", "gate");
     gate.appendChild(el("h2", "", "Pair this phone"));
@@ -258,10 +258,10 @@
   function renderOffline(message) {
     state.view = "offline";
     hideBanner();
-    setHeader([el("h1", "", "xAI Desk")]);
+    setHeader([el("h1", "", "SI Desk")]);
     clear(ui.main);
     var gate = el("section", "gate");
-    gate.appendChild(el("p", "alert", message || "Can't reach xAI Desk."));
+    gate.appendChild(el("p", "alert", message || "Can't reach SI Desk."));
     gate.setAttribute("role", "alert");
     gate.appendChild(button("Retry", "btn", function () { enterApp(); }));
     ui.main.appendChild(gate);
@@ -273,7 +273,7 @@
     stopChatPoll();
     stopGlobalPolls();
     hideBanner();
-    setHeader([el("h1", "", "xAI Desk")]);
+    setHeader([el("h1", "", "SI Desk")]);
     clear(ui.main);
     var gate = el("section", "gate");
     var form = document.createElement("form");
@@ -359,7 +359,7 @@
     api("GET", "/api/session").then(function (result) {
       if (ticket !== state.epoch || !result || result.stale) return;
       if (!result.ok) {
-        renderOffline(errorText(result, "Can't reach xAI Desk."));
+        renderOffline(errorText(result, "Can't reach SI Desk."));
         return;
       }
       state.session = {
@@ -415,7 +415,7 @@
     state.view = "chats";
     state.openChat = null;
     hideBanner();
-    var title = el("h1", "", "xAI Desk");
+    var title = el("h1", "", "SI Desk");
     var name = state.session.name ? el("p", "device-name", state.session.name) : null;
     setHeader(name ? [title, name] : [title]);
     if (state.chats.length) renderChatList();
@@ -707,7 +707,7 @@
         block.appendChild(el("pre", "bubble you", turn.prompt));
       }
       if (turn.reply || turn.outcome || turn.model) {
-        var who = turn.model ? "xAI Desk · " + turn.model : "xAI Desk";
+        var who = turn.model ? "SI Desk · " + turn.model : "SI Desk";
         block.appendChild(el("p", "who", who));
         if (turn.reply) block.appendChild(el("pre", "bubble", turn.reply));
         if (turn.outcome) block.appendChild(el("p", "status-line", turn.outcome));
@@ -716,7 +716,7 @@
     });
     if (chat.liveReply) {
       var live = el("article", "turn");
-      live.appendChild(el("p", "who", "xAI Desk · live"));
+      live.appendChild(el("p", "who", "SI Desk · live"));
       live.appendChild(el("pre", "bubble live", chat.liveReply));
       scroller.appendChild(live);
     }
@@ -1005,9 +1005,9 @@
   }
 
   function postNotify(body) {
-    var message = { type: "notify", title: "xAI Desk", body: body };
+    var message = { type: "notify", title: "SI Desk", body: body };
     if (!("serviceWorker" in navigator)) {
-      try { new Notification("xAI Desk", { body: body }); } catch (err) { /* Permission can change. */ }
+      try { new Notification("SI Desk", { body: body }); } catch (err) { /* Permission can change. */ }
       return;
     }
     var worker = navigator.serviceWorker.controller;
@@ -1017,7 +1017,7 @@
     }
     navigator.serviceWorker.ready.then(function (registration) {
       if (registration.active) registration.active.postMessage(message);
-      else registration.showNotification("xAI Desk", { body: body, icon: "/icon-192.png" });
+      else registration.showNotification("SI Desk", { body: body, icon: "/icon-192.png" });
     }).catch(function () {});
   }
 

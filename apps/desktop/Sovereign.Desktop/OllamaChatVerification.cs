@@ -53,7 +53,7 @@ public sealed partial class MainWindow
         string VisibleReply() => _currentChat.LastReply;
         try
         {
-            Title = "xAI Desk · QA local model verification";
+            Title = "SI Desk · QA local model verification";
             OpenChat();
             _chatProvider.SelectedIndex = 1;
             using var tags = JsonDocument.Parse(await http.GetStringAsync("api/tags"));
@@ -111,8 +111,8 @@ public sealed partial class MainWindow
             // Recovery also verifies ordinary application defaults, without QA generation overrides.
             stage = "recovery-default-settings"; Record(); await Prepare();
             _ollamaQaOptions = null;
-            await SendBounded("Reply with exactly: xAI Desk local Ollama connection verified. Do not use tools.");
-            var recovery = _chatStatus.Text == "Response complete." && VisibleReply().Trim() == "xAI Desk local Ollama connection verified.";
+            await SendBounded("Reply with exactly: SI Desk local Ollama connection verified. Do not use tools.");
+            var recovery = _chatStatus.Text == "Response complete." && VisibleReply().Trim() == "SI Desk local Ollama connection verified.";
             runtime.Add(new { check = "recovery-default-settings", passed = recovery, status = _chatStatus.Text, reply = VisibleReply(), provider_receipt = _lastOllamaReceipt });
             if (recovery) await CapturePng(Path.Combine(outputDirectory, "ollama-chat-complete.png"));
             stage = "finished"; Record();

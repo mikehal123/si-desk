@@ -311,7 +311,7 @@ public sealed class GrokBotConnectorTests
         var clicked = await Call(http, host.Url!, "app_click", new { control_id = "title" });
         Assert.Equal("Clicked.", clicked);
         var outside = await Call(http, host.Url!, "app_click", new { x = 500, y = 500 });
-        Assert.Contains("outside the xAI Desk window", outside, StringComparison.Ordinal);
+        Assert.Contains("outside the SI Desk window", outside, StringComparison.Ordinal);
         prefs.Stopped = true;
         desk.Mail.SavePreferences(prefs);
         var stopped = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
@@ -345,12 +345,12 @@ public sealed class GrokBotConnectorTests
         var typed = await Call(http, host.Url!, "app_type", new { control_id = "xAI API key", text = "nope" });
         Assert.Contains("blocked", typed, StringComparison.Ordinal);
         Assert.DoesNotContain("nope", string.Join("\n", desk.Mail.Audit.Select(line => line.Args + " " + line.Result)), StringComparison.Ordinal);
-        desk.Controls.Insert(0, new GrokbotControl("xAI Desk", "Window", "xAI Desk", 0, 0, 200, 100));
+        desk.Controls.Insert(0, new GrokbotControl("SI Desk", "Window", "SI Desk", 0, 0, 200, 100));
         var point = await Call(http, host.Url!, "app_click", new { x = 20, y = 50 });
         Assert.Contains("blocked", point, StringComparison.Ordinal);
         desk.FocusInside = false;
         var leftWindow = await Call(http, host.Url!, "app_key", new { keys = "Enter" });
-        Assert.Contains("outside the xAI Desk window", leftWindow, StringComparison.Ordinal);
+        Assert.Contains("outside the SI Desk window", leftWindow, StringComparison.Ordinal);
         desk.FocusInside = true;
         desk.FocusedSecret = true;
         var keyed = await Call(http, host.Url!, "app_key", new { keys = "A" });
@@ -533,7 +533,7 @@ public sealed class GrokBotConnectorTests
             Mail.EnsureAction("app_click");
             GrokbotControl? control = null;
             if (!string.IsNullOrWhiteSpace(controlId))
-                control = Controls.FirstOrDefault(item => item.Id == controlId) ?? throw new KeyNotFoundException("That control is not in the xAI Desk window.");
+                control = Controls.FirstOrDefault(item => item.Id == controlId) ?? throw new KeyNotFoundException("That control is not in the SI Desk window.");
             var hit = x is int px && y is int py ? GrokbotWindow.SmallestHit(Controls, px, py) : null;
             GrokbotWindow.RequireClick(Bounds, control, x, y, hit);
             return "Clicked.";
@@ -541,7 +541,7 @@ public sealed class GrokBotConnectorTests
         public string GrokbotType(string controlId, string text)
         {
             Mail.EnsureAction("app_type");
-            var control = Controls.FirstOrDefault(item => item.Id == controlId) ?? throw new KeyNotFoundException("That control is not in the xAI Desk window.");
+            var control = Controls.FirstOrDefault(item => item.Id == controlId) ?? throw new KeyNotFoundException("That control is not in the SI Desk window.");
             GrokbotWindow.RequireType(control.Id, control.Type, control.Label, text, control.Password);
             GrokbotWindow.RequireInside(Bounds, control);
             return "Typed.";

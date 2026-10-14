@@ -129,7 +129,7 @@ public sealed partial class MainWindow
         headerMark.VerticalAlignment = VerticalAlignment.Center;
         leading.Children.Add(headerMark);
         var titles = new StackPanel { Spacing = DeskTheme.Space4 };
-        titles.Children.Add(Head("Grokbot"));
+        titles.Children.Add(Head("Grok Bot"));
         titles.Children.Add(_grokbotLink);
         leading.Children.Add(titles);
         header.Children.Add(leading);

@@ -239,7 +239,7 @@ public sealed class GrokBuildChatClient : IDisposable
                     terminal = false,
                     _meta = new { subagents = _project?.SubagentsAllowed == true }
                 },
-                clientInfo = new { name = "xAI Desk", version = DesktopClientVersion.Current }
+                clientInfo = new { name = "SI Desk", version = DesktopClientVersion.Current }
             }, null, ct);
             _supportsSubagents = init.TryGetProperty("agentCapabilities", out var capabilities)
                 && capabilities.TryGetProperty("sessionCapabilities", out var sessions)
@@ -703,10 +703,10 @@ public sealed class GrokBuildChatClient : IDisposable
     private string SessionPreface(string parentModelId)
     {
         if (_project is null)
-            return "xAI Desk conversation: answer using the supplied conversation. Do not call tools, access files, or act on accounts.\n\n";
+            return "SI Desk conversation: answer using the supplied conversation. Do not call tools, access files, or act on accounts.\n\n";
         var preface = _project.Mode == CursorProjectMode.Plan
-            ? "xAI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
-            : "xAI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n";
+            ? "SI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
+            : "SI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n";
         var swarmHire = SwarmSuffix(parentModelId);
         if (_project.SubagentsAllowed != true || !_supportsSubagents) return preface + swarmHire;
         var helperModelClause = swarmHire.Length > 0

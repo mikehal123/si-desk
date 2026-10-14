@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Sovereign.Desktop.Phone</RootNamespace>
     <AssemblyName>Sovereign.Desktop.Phone</AssemblyName>
-    <Description>Local phone access for xAI Desk chat. Off unless Settings enables it. Listens on port 8789 only.</Description>
+    <Description>Local phone access for SI Desk chat. Off unless Settings enables it. Listens on port 8789 only.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

@@ -16,7 +16,7 @@ public sealed partial class MainWindow
             || directory.Parent is not { } instance
             || !instance.Name.StartsWith("qa-", StringComparison.OrdinalIgnoreCase)
             || !string.Equals(instance.Parent?.FullName, root, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Codex chat verification requires an explicit xAI Desk qa-* instance profile. Main and default profiles are refused.");
+            throw new ArgumentException("Codex chat verification requires an explicit SI Desk qa-* instance profile. Main and default profiles are refused.");
     }
 
     public async Task RunCodexChatVerificationAsync(string outputDirectory)
@@ -26,7 +26,7 @@ public sealed partial class MainWindow
         var officialSignInOpened = false;
         var turnCompleted = false;
         var reply = "";
-        const string expected = "xAI Desk local Codex connection verified.";
+        const string expected = "SI Desk local Codex connection verified.";
         const string prompt = "Reply with exactly: " + expected + " Do not use tools.";
         var receiptPath = Path.Combine(outputDirectory, "codex-chat-verification.json");
         var screenshotPath = Path.Combine(outputDirectory, "codex-chat-complete.png");
@@ -47,7 +47,7 @@ public sealed partial class MainWindow
             ValidateCodexQaProfile(_vm.ProfileDirectory);
             Directory.CreateDirectory(outputDirectory);
             using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(15));
-            Title = "xAI Desk · QA local Codex verification";
+            Title = "SI Desk · QA local Codex verification";
             await Task.Delay(400, timeout.Token);
             OpenChat();
             _chatProvider.SelectedIndex = 0;

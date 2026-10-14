@@ -8,7 +8,7 @@ public static class SetupEngine
 {
     const string ManifestName = "install-manifest.txt";
     const string RecordName = "install-record.txt";
-    const string SetupFileName = "xAIDesk.Setup.exe";
+    const string SetupFileName = "SIDesk.Setup.exe";
 
     public static SetupResult Run(SetupRequest request)
     {
@@ -146,9 +146,9 @@ public static class SetupEngine
         using var key = Registry.CurrentUser.CreateSubKey(UninstallPath(request.ProductId));
         key.SetValue("DisplayName", request.ProductName);
         key.SetValue("DisplayVersion", request.Version);
-        key.SetValue("Publisher", "xAI Desk");
+        key.SetValue("Publisher", "SI Desk");
         key.SetValue("InstallLocation", installDir);
-        key.SetValue("DisplayIcon", Path.Combine(installDir, "xAIDesk.exe"));
+        key.SetValue("DisplayIcon", Path.Combine(installDir, "SIDesk.exe"));
         key.SetValue("UninstallString", "\"" + target + "\" --uninstall --install-dir \"" + installDir + "\" --product-id \"" + request.ProductId + "\"");
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
@@ -167,7 +167,7 @@ public static class SetupEngine
     {
         Directory.CreateDirectory(folder);
         var link = Path.Combine(folder, SafeFileName(name) + ".lnk");
-        var target = Path.Combine(installDir, "xAIDesk.exe");
+        var target = Path.Combine(installDir, "SIDesk.exe");
         var shellType = Type.GetTypeFromProgID("WScript.Shell")
             ?? throw new InvalidOperationException("Shortcut shell is not available.");
         var shell = Activator.CreateInstance(shellType)
@@ -273,13 +273,13 @@ public static class SetupEngine
     {
         var cleaned = name.Trim();
         if (cleaned.Length == 0)
-            cleaned = "xAI Desk";
+            cleaned = "SI Desk";
         foreach (var bad in Path.GetInvalidFileNameChars())
             cleaned = cleaned.Replace(bad, ' ');
         cleaned = cleaned.Trim();
         if (cleaned.Length > 80)
             cleaned = cleaned[..80].Trim();
-        return cleaned.Length == 0 ? "xAI Desk" : cleaned;
+        return cleaned.Length == 0 ? "SI Desk" : cleaned;
     }
 
     static bool SafeId(string id)

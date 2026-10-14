@@ -14,7 +14,7 @@ public sealed class GrokBuildChatClientTests
         using var transport = new LineTransport();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         var ct = timeout.Token;
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-protocol");
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-protocol");
         using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer);
 
         var modelsTask = client.ModelsAsync(ct);
@@ -72,7 +72,7 @@ public sealed class GrokBuildChatClientTests
         using var transport = new LineTransport();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         var ct = timeout.Token;
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-tools");
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-tools");
         using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer, new CursorProjectOptions
         {
             Mode = CursorProjectMode.Agent,
@@ -219,7 +219,7 @@ public sealed class GrokBuildChatClientTests
     [Fact(Timeout = 15000)]
     public async Task Bearer_token_is_redacted_in_the_protocol_log()
     {
-        var log = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-log-" + Guid.NewGuid().ToString("N"), "grokbuild.log");
+        var log = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-log-" + Guid.NewGuid().ToString("N"), "grokbuild.log");
         GrokBuildChatClient.SetLogFile(log);
         try
         {
@@ -449,7 +449,7 @@ public sealed class GrokBuildChatClientTests
     {
         using var transport = new LineTransport();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-load-" + Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-load-" + Guid.NewGuid().ToString("N"));
         using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer);
         client.ResumeSessionId = "old-session";
         var models = client.ModelsAsync(timeout.Token);
@@ -479,7 +479,7 @@ public sealed class GrokBuildChatClientTests
     {
         using var transport = new LineTransport();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-load-id-" + Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-load-id-" + Guid.NewGuid().ToString("N"));
         using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer);
         client.ResumeSessionId = "old-session";
         var models = client.ModelsAsync(timeout.Token);
@@ -508,7 +508,7 @@ public sealed class GrokBuildChatClientTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         var ct = timeout.Token;
         var tools = new List<string>();
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-replay-" + Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-replay-" + Guid.NewGuid().ToString("N"));
         using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer, new CursorProjectOptions
         {
             ToolActivity = tool => tools.Add(tool.Title)
@@ -643,7 +643,7 @@ public sealed class GrokBuildChatClientTests
         string sessionId = "sess-1")
     {
         var transport = new LineTransport();
-        var workspace = Path.Combine(Path.GetTempPath(), "xAIDesk", "grok-" + Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-" + Guid.NewGuid().ToString("N"));
         var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer, project, activity);
         client.ResumeSessionId = resumeSessionId;
         try

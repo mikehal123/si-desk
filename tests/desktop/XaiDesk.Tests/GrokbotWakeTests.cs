@@ -165,7 +165,7 @@ public sealed class GrokbotWakeTests
     [Fact]
     public void Wake_key_round_trips_in_credential_manager_and_a_miss_does_not_throw()
     {
-        var target = "xAIDesk.GrokbotWake/test-" + Guid.NewGuid().ToString("N");
+        var target = "SIDesk.GrokbotWake/test-" + Guid.NewGuid().ToString("N");
         try
         {
             Assert.Null(GrokbotWakeKey.Read(target));

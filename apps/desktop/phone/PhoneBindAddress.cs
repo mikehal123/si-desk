@@ -6,7 +6,7 @@ namespace Sovereign.Desktop.Phone;
 
 public enum PhoneBindMode { Loopback, Tailscale }
 
-/// <summary>Chooses the single address phone access may listen on. Port 8789 is the xAI Desk port. It starts off.</summary>
+/// <summary>Chooses the single address phone access may listen on. Port 8789 is the SI Desk port. It starts off.</summary>
 public static class PhoneBindAddress
 {
     public const int Port = 8789;

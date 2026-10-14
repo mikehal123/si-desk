@@ -30,7 +30,7 @@ public static class UpdatePackage
             throw new InvalidDataException("Update information is expired or invalid.");
         var url = new Uri(release.Url);
         if (url.Scheme != "https" || url.Host != "github.com" || !url.IsDefaultPort || url.UserInfo.Length != 0 ||
-            !url.AbsolutePath.StartsWith("/mikehal123/xai-desk/releases/download/", StringComparison.Ordinal))
+            !url.AbsolutePath.StartsWith("/mikehal123/si-desk/releases/download/", StringComparison.Ordinal))
             throw new InvalidDataException("Unexpected update download location.");
         return release;
     }
@@ -51,7 +51,7 @@ public static class UpdatePackage
         long total = 0;
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var entries = new List<(ZipArchiveEntry Entry, string Path)>();
-        var prefix = "xAIDesk-Windows-" + version + "/";
+        var prefix = "SIDesk-Windows-" + version + "/";
         foreach (var entry in zip.Entries)
         {
             var name = entry.FullName.Replace('\\', '/');

@@ -119,7 +119,7 @@ public sealed partial class MainWindow
         brand.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         brand.ColumnDefinitions.Add(new ColumnDefinition());
         brand.Children.Add(DeskLogo(DeskTheme.Space24 + DeskTheme.Space8));
-        var brandName = new TextBlock { Text = XaiDeskIdentity.AppName, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var brandName = new TextBlock { Text = "Super Intelligence Desk", TextWrapping = TextWrapping.WrapWholeWords, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = DeskTheme.Space16 + DeskTheme.Space4, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(brandName, 1);
         brand.Children.Add(brandName);
         var navPanel = new StackPanel { Spacing = DeskTheme.Space4, Padding = new Thickness(DeskTheme.Space12, 0, DeskTheme.Space12, DeskTheme.Space8) };
@@ -137,7 +137,7 @@ public sealed partial class MainWindow
         var navGrid = new Grid(); navGrid.RowDefinitions.Add(new RowDefinition()); navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         navGrid.Children.Add(new ScrollViewer { Content = navPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         var profileButton = new Button { Content = identity, Background = DeskTheme.Transparent, BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(DeskTheme.Radius6), Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space8, DeskTheme.Space12, DeskTheme.Space8), Margin = new Thickness(DeskTheme.Space8), HorizontalContentAlignment = HorizontalAlignment.Stretch, UseSystemFocusVisuals = true };
-        profileButton.Click += (_,_) => ShowAccountDialog(); AutomationName(profileButton,"Your xAI Desk account");
+        profileButton.Click += (_,_) => ShowAccountDialog(); AutomationName(profileButton,"Your SI Desk account");
         var profileRow = new Border { BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0, 1, 0, 0), Child = profileButton };
         Grid.SetRow(profileRow, 1); navGrid.Children.Add(profileRow);
         var sidebar = new Border { Background = DeskTheme.Background, BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0,0,1,0), Child = navGrid };

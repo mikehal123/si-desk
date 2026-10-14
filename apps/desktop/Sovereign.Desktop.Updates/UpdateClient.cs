@@ -6,14 +6,14 @@ namespace Sovereign.Desktop.Updates;
 
 public sealed class UpdateClient : IDisposable
 {
-    public const string RepositoryApi = "https://api.github.com/repos/mikehal123/xai-desk";
+    public const string RepositoryApi = "https://api.github.com/repos/mikehal123/si-desk";
     private readonly HttpClient _http;
     private readonly string? _token;
     public UpdateClient(string? token = null, HttpMessageHandler? handler = null)
     {
         _token = token;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(20) };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("xAI Desk-Updater/1.0");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("SI Desk-Updater/1.0");
     }
     private async Task<HttpResponseMessage> GetAsync(Uri uri, CancellationToken ct, bool binary = false)
     {
@@ -25,7 +25,7 @@ public sealed class UpdateClient : IDisposable
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
             if (uri.Host == "api.github.com")
             {
-                if (!uri.AbsolutePath.StartsWith("/repos/mikehal123/xai-desk/", StringComparison.Ordinal)) throw new IOException("Unexpected update repository.");
+                if (!uri.AbsolutePath.StartsWith("/repos/mikehal123/si-desk/", StringComparison.Ordinal)) throw new IOException("Unexpected update repository.");
                 if (!string.IsNullOrEmpty(_token)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
                 request.Headers.Accept.ParseAdd(binary ? "application/octet-stream" : "application/vnd.github+json");
                 request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -89,10 +89,10 @@ public sealed class UpdateClient : IDisposable
     private async Task DownloadAsyncRemoved(UpdateRelease release, string destination, IProgress<int>? progress, CancellationToken ct)
     {
         // The signed browser URL remains the identity; API URLs are constructed here, never trusted from metadata.
-        var expected = $"https://github.com/mikehal123/xai-desk/releases/download/v{release.Version}/xAIDesk-Windows-{release.Version}.zip";
+        var expected = $"https://github.com/mikehal123/si-desk/releases/download/v{release.Version}/SIDesk-Windows-{release.Version}.zip";
         _ = UpdatePackage.ParseVersion(release.Version);
         if (release.Url != expected) throw new IOException("Unexpected signed archive address.");
-        var asset = await FindAssetAsync("tags/v" + release.Version, $"xAIDesk-Windows-{release.Version}.zip", release.Url, release.Bytes, ct);
+        var asset = await FindAssetAsync("tags/v" + release.Version, $"SIDesk-Windows-{release.Version}.zip", release.Url, release.Bytes, ct);
         using var response = await GetAsync(asset, ct, true);
         if (response.Content.Headers.ContentLength is long length && length != release.Bytes) throw new IOException("Unexpected download size.");
         await using (var input = await response.Content.ReadAsStreamAsync(ct))

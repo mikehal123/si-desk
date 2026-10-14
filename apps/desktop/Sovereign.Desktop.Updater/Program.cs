@@ -64,9 +64,9 @@ try
     registryPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SovereignAI.DesktopPreview." + instance;
     using (var key = Registry.CurrentUser.OpenSubKey(registryPath))
         if (key is not null) foreach (var name in key.GetValueNames()) if (key.GetValue(name) is { } value) registryValues[name] = (value, key.GetValueKind(name));
-    var productName = instance == "main" ? "xAI Desk" : "xAI Desk " + instance;
+    var productName = instance == "main" ? "SI Desk" : "SI Desk " + instance;
     var menu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", productName);
-    foreach (var path in new[] { Path.Combine(menu, productName + ".lnk"), Path.Combine(menu, productName + ".cmd"), instance == "main" ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "xAI Desk.lnk") : "" })
+    foreach (var path in new[] { Path.Combine(menu, productName + ".lnk"), Path.Combine(menu, productName + ".cmd"), instance == "main" ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "SI Desk.lnk") : "" })
         if (File.Exists(path)) shortcutBackups[path] = await File.ReadAllBytesAsync(path);
     backup = Path.Combine(baseDir, "previous-" + Guid.NewGuid().ToString("N"));
     await UpdateRecovery.MoveAsync(install, backup, log); moved = true;

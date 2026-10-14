@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.Client;
 
@@ -19,14 +20,16 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     public static string RuntimeDirectory => ResolveRuntimeDirectory(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
 
     /// <summary>
-    /// Prefer a runtime copied for xAI Desk. Otherwise use the Cursor CLI already installed for xAI Desk.
+    /// Prefer a runtime copied for SI Desk. Otherwise use the Cursor CLI already installed for SI Desk.
     /// That folder is the connector, not the chat profile or saved keys.
     /// </summary>
     public static string ResolveRuntimeDirectory(string localAppData)
     {
         var versioned = Path.Combine("CursorAgent", CliVersion, "dist-package");
-        var own = Path.Combine(localAppData, "xAIDesk", "Tools", versioned);
+        var own = Path.Combine(localAppData, XaiDeskIdentity.DataFolderName, "Tools", versioned);
         if (IsRuntime(own)) return own;
+        var legacy = Path.Combine(localAppData, XaiDeskIdentity.LegacyDataFolderName, "Tools", versioned);
+        if (IsRuntime(legacy)) return legacy;
         var installed = Path.Combine(localAppData, "SovereignAI.Tools", versioned);
         if (IsRuntime(installed)) return installed;
         return own;
@@ -232,7 +235,7 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
     {
         var init = await CallAsync("initialize", new { protocolVersion = 1,
             clientCapabilities = new { fs = new { readTextFile = false, writeTextFile = false }, terminal = false, _meta = new { subagents = project?.SubagentsAllowed == true } },
-            clientInfo = new { name = "xAI Desk", version = DesktopClientVersion.Current } }, null, ct);
+            clientInfo = new { name = "SI Desk", version = DesktopClientVersion.Current } }, null, ct);
         if (init.GetProperty("protocolVersion").GetInt32() != 1) throw new IOException("Unsupported Cursor ACP protocol.");
         SupportsImages = init.TryGetProperty("agentCapabilities", out var capabilities) && capabilities.TryGetProperty("promptCapabilities", out var promptCaps) && promptCaps.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.True;
         _supportsSubagents = capabilities.ValueKind == JsonValueKind.Object && capabilities.TryGetProperty("sessionCapabilities", out var sessions) && sessions.TryGetProperty("subagents", out _);
@@ -270,10 +273,10 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
         using var drainRegistration = turn.Drain.Token.Register(() => turn.Read.Cancel());
         try { reply = await CallAsync("session/prompt", new { sessionId = _sessionId, prompt = new object[] { new {
             type = "text", text = Sovereign.Desktop.Core.WorkDoctrine.PromptPrefix() + (project is null
-                ? "xAI Desk conversation: answer using only the supplied conversation. Do not call tools, access files, or act on accounts.\n\n"
+                ? "SI Desk conversation: answer using only the supplied conversation. Do not call tools, access files, or act on accounts.\n\n"
                 : project.Mode == CursorProjectMode.Plan
-                    ? "xAI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
-            : "xAI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n") + (project?.SubagentsAllowed == true && _supportsSubagents
+                    ? "SI Desk planning session: inspect the selected workspace and propose a plan. Stay read-only; do not edit files or implement the plan. The user must leave Plan by choosing Always ask or Always allow in the composer and send a new instruction before implementation.\n\n"
+            : "SI Desk project session: work in the selected workspace. Make requested file changes using your tools and report actual results. Follow the project's instructions. Do not commit, push, publish, or act on external accounts unless the user explicitly asks.\n\n") + (project?.SubagentsAllowed == true && _supportsSubagents
             ? "Native subagents are enabled. Delegate independent work to up to three direct generalPurpose helpers concurrently, at most sixteen identities per session. " + helperModelClause + "Helpers inherit this chat's mode and permission policy and must follow the same workspace instructions; they must not spawn nested helpers or act beyond the user's request. Give implementation helpers separate files or tasks to avoid conflicting edits. Summarize their actual results. Stop response stops the entire session. Helpers load the work-doctrine skill by default. Put that skill at the top of every helper task.\n\n" +
                 (project.Mode == CursorProjectMode.Plan ? "Plan helpers must stay read-only: inspect and report, never edit files or execute commands.\n\n" :
                     project.Permissions == CursorPermissionPolicy.AlwaysAsk ? "Helpers use Always ask: request the user's approval through runtime permissions when required, just like the parent.\n\n" :

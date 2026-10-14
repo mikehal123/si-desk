@@ -10,7 +10,8 @@ namespace Sovereign.Desktop.Connector;
 
 public static class GrokbotWake
 {
-    public const string CredentialResource = "xAIDesk.GrokbotWake";
+    public const string CredentialResource = "SIDesk.GrokbotWake";
+    public const string LegacyCredentialResource = "xAIDesk.GrokbotWake";
     public const string CredentialAccount = "sender-key";
     private static readonly Regex Secrets = new(
         @"bearer\s+\S+|api_key\s*=\s*\S+|access_token\s*=\s*\S+|password\s*=\s*\S+|sk-[A-Za-z0-9._\-]+|xai-[A-Za-z0-9._\-]+",
@@ -214,12 +215,13 @@ public sealed record GrokbotWakeReceipt(string Note, int? StatusCode);
 /// <summary>Webhook sender key in Windows Credential Manager. A missing key returns null and does not throw.</summary>
 public static class GrokbotWakeKey
 {
-    public const string Target = "xAIDesk.GrokbotWake/sender-key";
+    public const string Target = "SIDesk.GrokbotWake/sender-key";
+    public const string LegacyTarget = "xAIDesk.GrokbotWake/sender-key";
     private const int CredTypeGeneric = 1;
     private const int CredPersistLocalMachine = 2;
     private const int ErrorNotFound = 1168;
 
-    public static string? Read() => Read(Target);
+    public static string? Read() => Read(Target) ?? Read(LegacyTarget);
 
     public static string? Read(string target)
     {
@@ -269,7 +271,11 @@ public static class GrokbotWakeKey
         }
     }
 
-    public static void Clear() => Clear(Target);
+    public static void Clear()
+    {
+        Clear(Target);
+        Clear(LegacyTarget);
+    }
 
     public static void Clear(string target)
     {

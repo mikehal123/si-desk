@@ -23,10 +23,10 @@ public sealed class InstallerOpenWithTests
             Assert.Contains(log, line => line.StartsWith("open-with launcher ", StringComparison.Ordinal));
             Assert.Equal("Cursor.md", store.Get(@"Software\Classes\.md", ""));
             Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", "Cursor.md"));
-            Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", "xAIDesk.md"));
-            Assert.Equal("", store.Get(@"Software\Classes\.txt\OpenWithProgids", "xAIDesk.txt"));
-            Assert.Equal("", store.Get(@"Software\Classes\.json\OpenWithProgids", "xAIDesk.json"));
-            var command = store.Get(@"Software\Classes\xAIDesk.md\shell\open\command", "");
+            Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", "SIDesk.md"));
+            Assert.Equal("", store.Get(@"Software\Classes\.txt\OpenWithProgids", "SIDesk.txt"));
+            Assert.Equal("", store.Get(@"Software\Classes\.json\OpenWithProgids", "SIDesk.json"));
+            var command = store.Get(@"Software\Classes\SIDesk.md\shell\open\command", "");
             Assert.Contains("\"%1\"", command, StringComparison.Ordinal);
             Assert.DoesNotContain("UserChoice", string.Join("\n", store.Keys), StringComparison.Ordinal);
             var launcher = OpenWithRegistration.LauncherPath(install);
@@ -39,7 +39,7 @@ public sealed class InstallerOpenWithTests
             Assert.False(File.Exists(launcher));
             Assert.Equal("Cursor.md", store.Get(@"Software\Classes\.md", ""));
             Assert.Equal("", store.Get(@"Software\Classes\.md\OpenWithProgids", "Cursor.md"));
-            Assert.Null(store.Get(@"Software\Classes\.md\OpenWithProgids", "xAIDesk.md"));
+            Assert.Null(store.Get(@"Software\Classes\.md\OpenWithProgids", "SIDesk.md"));
         }
         finally
         {
@@ -60,7 +60,7 @@ public sealed class InstallerOpenWithTests
         var launcher = Path.Combine(root, "SovereignAI.OpenWith.cmd");
         File.WriteAllText(launcher, "keep");
         var product = "SovereignAI.DesktopPreview.qa-openwith-" + Guid.NewGuid().ToString("N")[..8];
-        var start = "xAI Desk OpenWith " + product;
+        var start = "SI Desk OpenWith " + product;
         try
         {
             var installed = InstallerEngine.Run(new SetupRequest(
@@ -86,7 +86,7 @@ public sealed class InstallerOpenWithTests
     }
 
     private static SetupRequest Request(string productId, string install, string profile) =>
-        new(SetupAction.Install, install, null, productId, "xAI Desk", "0.3.53", profile, "xAI Desk", true, null, null);
+        new(SetupAction.Install, install, null, productId, "SI Desk", "0.3.53", profile, "SI Desk", true, null, null);
 
     private sealed class MemoryOpenWithStore : IOpenWithStore
     {

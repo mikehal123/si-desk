@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Sovereign.Desktop.Core;
 using Sovereign.Desktop.Updates;
 using Windows.Security.Credentials;
 
@@ -11,13 +12,27 @@ namespace Sovereign.Desktop;
 
 public sealed partial class MainWindow
 {
-    private readonly TextBlock _githubUpdateStatus = Note("Connect GitHub for private updates. Your account must have access to xai-desk.");
+    private readonly TextBlock _githubUpdateStatus = Note("Connect GitHub for private updates. Your account must have access to si-desk.");
     private readonly TextBox _githubDeviceCode = new() { IsReadOnly = true, Visibility = Visibility.Collapsed, Header = "Enter this code at github.com/login/device" };
     private CancellationTokenSource? _githubUpdateSignIn;
     private Button? _cancelGitHubButton;
     private GitHubSession? _githubUpdateSession;
     private readonly SemaphoreSlim _githubTokenLock = new(1, 1);
-    private string GitHubUpdateVault => "xAIDesk.GitHubUpdates." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(_vm.ProfileDirectory).ToUpperInvariant())))[..24];
+    private string GitHubUpdateVault => GitHubVaultNames().First();
+
+    private IEnumerable<string> GitHubVaultNames()
+    {
+        foreach (var name in VaultNames(_vm.ProfileDirectory)) yield return name;
+        var legacy = XaiDeskIdentity.LegacyDefaultProfile(_vm.ProfileDirectory);
+        if (legacy is null) yield break;
+        foreach (var name in VaultNames(legacy)) yield return name;
+    }
+
+    private static IEnumerable<string> VaultNames(string profile)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(profile).ToUpperInvariant())))[..24];
+        return XaiDeskIdentity.CredentialResourceNames("SIDesk.GitHubUpdates." + hash);
+    }
 
     private void BuildGitHubUpdates()
     {
@@ -27,10 +42,16 @@ public sealed partial class MainWindow
         _githubWait.Children.Add(_githubDeviceCode);
         _githubWait.Children.Add(_cancelGitHubButton);
         Closed += (_, _) => _githubUpdateSignIn?.Cancel();
+        string? saved = null;
+        foreach (var name in GitHubVaultNames())
+        {
+            saved = DeskVault.ReadPassword(name, "session");
+            if (saved is not null) break;
+        }
         try
         {
-            var credential = new PasswordVault().Retrieve(GitHubUpdateVault, "session"); credential.RetrievePassword();
-            using var json = JsonDocument.Parse(credential.Password);
+            if (saved is null) throw new InvalidOperationException();
+            using var json = JsonDocument.Parse(saved);
             var root = json.RootElement;
             _githubUpdateSession = new(root.GetProperty("AccessToken").GetString()!, root.GetProperty("RefreshToken").GetString()!, root.GetProperty("ExpiresAt").GetDateTimeOffset());
             _githubUpdateStatus.Text = "GitHub connected for private updates.";
@@ -71,7 +92,7 @@ public sealed partial class MainWindow
             _githubUpdateStatus.Text = "Requesting a GitHub sign-in code…";
             var code = await auth.BeginAsync(cancel.Token);
             _githubDeviceCode.Text = code.UserCode; _githubDeviceCode.Visibility = Visibility.Visible;
-            _githubUpdateStatus.Text = "Enter the code in your browser and authorize xAI Desk private updates. Waiting for GitHub…";
+            _githubUpdateStatus.Text = "Enter the code in your browser and authorize SI Desk private updates. Waiting for GitHub…";
             Process.Start(new ProcessStartInfo(GitHubSignIn.VerificationUrl) { UseShellExecute = true });
             var session = await auth.CompleteAsync(code, cancel.Token);
             cancel.Token.ThrowIfCancellationRequested();
@@ -88,7 +109,7 @@ public sealed partial class MainWindow
         if (_updateBusy) { _githubUpdateStatus.Text = "Wait for the update operation to finish before disconnecting."; return; }
         _githubUpdateSignIn?.Cancel();
         _githubUpdateSession = null;
-        try { var vault = new PasswordVault(); vault.Remove(vault.Retrieve(GitHubUpdateVault, "session")); } catch { }
+        foreach (var name in GitHubVaultNames()) DeskVault.Remove(name, "session");
         _githubUpdateStatus.Text = "GitHub disconnected on this PC. Revoke the app in GitHub Settings if you also want to remove its authorization.";
         SyncGitHubCancel();
     }

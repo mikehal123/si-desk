@@ -2,7 +2,7 @@ using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.Client;
 
-/// <summary>Chat connections offered by xAI Desk. Indexes stay inside the saved-chat range.</summary>
+/// <summary>Chat connections offered by SI Desk. Indexes stay inside the saved-chat range.</summary>
 public static class DeskChatConnections
 {
     public const int Cursor = 0;
@@ -21,7 +21,7 @@ public static class DeskChatConnections
         _ => "cursor"
     };
 
-    /// <summary>Combo position to the saved provider id. Cursor stays 4, matching xAI Desk chats.</summary>
+    /// <summary>Combo position to the saved provider id. Cursor stays 4, matching SI Desk chats.</summary>
     public static int Stored(int comboIndex) => comboIndex switch
     {
         GrokBuild => GrokBuildStored,

@@ -72,7 +72,7 @@ public sealed class SharedRoomHost : IAsyncDisposable
             try { await next(context); }
             catch (Exception ex) when (ex is JsonException or ArgumentException or BadHttpRequestException) { context.Response.StatusCode = 400; }
         });
-        app.MapGet("/", () => Results.Text("xAI Desk shared-room beta. Open the invitation inside xAI Desk. No browser chat or file access."));
+        app.MapGet("/", () => Results.Text("SI Desk shared-room beta. Open the invitation inside SI Desk. No browser chat or file access."));
         app.MapPost("/room/{id}/join", async (string id, HttpContext c) => {
             var body = await c.Request.ReadFromJsonAsync<RoomJoin>(c.RequestAborted);
             if (body is null) return Results.BadRequest();

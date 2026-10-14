@@ -45,11 +45,11 @@ namespace Sovereign.Desktop.SetupLib
 
     public static class OpenWithRegistration
     {
-        public const string MarkdownProgId = "xAIDesk.md";
-        public const string TextProgId = "xAIDesk.txt";
-        public const string JsonProgId = "xAIDesk.json";
-        public const string LauncherFileName = "xAIDesk.OpenWith.cmd";
-        private const string ExecutableFileName = "xAIDesk.exe";
+        public const string MarkdownProgId = "SIDesk.md";
+        public const string TextProgId = "SIDesk.txt";
+        public const string JsonProgId = "SIDesk.json";
+        public const string LauncherFileName = "SIDesk.OpenWith.cmd";
+        private const string ExecutableFileName = "SIDesk.exe";
         private static readonly char[] UnsafeCommandCharacters = ['"', '%', '&', '^', '|', '<', '>', '\r', '\n'];
 
         // True only for the production product id and that id + ".main".
@@ -59,7 +59,7 @@ namespace Sovereign.Desktop.SetupLib
                 || string.Equals(productId, SetupCli.ProductionProductId + ".main", StringComparison.Ordinal);
         }
 
-        // Path.GetFullPath(installDir)/xAIDesk.exe
+        // Path.GetFullPath(installDir)/SIDesk.exe
         public static string ExecutablePath(string installDir)
         {
             return Path.Combine(Path.GetFullPath(installDir), ExecutableFileName);
@@ -93,9 +93,9 @@ namespace Sovereign.Desktop.SetupLib
             }
 
             File.WriteAllText(launcher, LauncherScript(exe, profile), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            WriteExtension(store, MarkdownProgId, ".md", "xAI Desk Markdown", exe, launcher);
-            WriteExtension(store, TextProgId, ".txt", "xAI Desk Text", exe, launcher);
-            WriteExtension(store, JsonProgId, ".json", "xAI Desk JSON", exe, launcher);
+            WriteExtension(store, MarkdownProgId, ".md", "SI Desk Markdown", exe, launcher);
+            WriteExtension(store, TextProgId, ".txt", "SI Desk Text", exe, launcher);
+            WriteExtension(store, JsonProgId, ".json", "SI Desk JSON", exe, launcher);
             return launcher;
         }
 
