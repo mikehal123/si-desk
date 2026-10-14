@@ -574,7 +574,7 @@ internal sealed partial class ChatConversation
         }
         catch (OperationCanceledException) when (PhoneSendCancelled) { _chatStatus.Text = "Phone send stopped before dispatch."; }
         catch (Exception ex) { _chatStatus.Text = "Connection failed: " + ex.Message; }
-        finally { if (agentConnection) _cursorConnecting = false; RestoreModelSelection(); if (_chatReady) _reconnectOnSend = false; SetChatBusy(false); Save(); if (_chatReady) _connectionFlyout?.Hide(); }
+        finally { if (agentConnection) _cursorConnecting = false; RestoreModelSelection(); if (_chatReady) _reconnectOnSend = false; SetChatBusy(false); Save(); if (_chatReady) _connectionFlyout?.Hide(); if (_chatReady) TryStartQueuedReview(); }
     }
     internal void SetChatBusy(bool busy)
     {
@@ -746,6 +746,7 @@ internal sealed partial class ChatConversation
         _chatCancellation = (CodexChat || CursorChat || PlanChat) && _projectFolder is not null
             ? new CancellationTokenSource()
             : new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        NoteReviewSendStarted(text);
         SetChatBusy(true); _chatInput.Text = "";
         var local = LocalChat;
         _chatFollowLatest = true;
@@ -814,6 +815,7 @@ internal sealed partial class ChatConversation
             _activeChatTurn = null; _chatCancellation?.Dispose(); _chatCancellation = null;
             if (review) await AwaitHandoffReviewAsync(reply);
             SetChatBusy(false);
+            TryStartQueuedReview();
         }
     }
 

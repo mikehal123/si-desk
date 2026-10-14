@@ -22,7 +22,7 @@ public sealed class SwarmContinueTests
             Assert.Equal(fx.SwarmId, fx.Desk.DeliveredId);
             Assert.Equal("Grok Bot", Assert.Single(fx.Desk.Authors));
             Assert.Equal(result.Text, Assert.Single(fx.Desk.Messages));
-            Assert.Equal("continue", fx.Desk.Composer);
+            Assert.Equal("Grokbot review: continue. Ship the listener.", fx.Desk.Composer);
             Assert.Equal(1, fx.Desk.SendCount);
             var saved = SwarmBoard.Read(fx.Board.BoardPath);
             Assert.Equal("Reviewed (continue)", saved.ReviewStatus);
@@ -46,7 +46,7 @@ public sealed class SwarmContinueTests
             Assert.True(result.Resume);
             Assert.Equal("Grokbot review: fix. The proof is thin.", result.Text);
             Assert.Equal(1, fx.Desk.SendCount);
-            Assert.Equal("continue", fx.Desk.Composer);
+            Assert.Equal("Grokbot review: fix. The proof is thin.", fx.Desk.Composer);
             var bak = fx.Board.BoardPath + ".bak";
             Assert.True(File.Exists(bak));
             Assert.Equal(SwarmStatus.Review, SwarmBoard.Read(bak).TaskById("task-1").Status);
@@ -147,13 +147,15 @@ public sealed class SwarmContinueTests
             var queue = Queue(fx);
             Assert.True(File.Exists(queue));
             Assert.EndsWith(Path.Combine("grokbot-review-queue", fx.SwarmId + ".json"), queue, StringComparison.OrdinalIgnoreCase);
-            var delivered = SwarmContinue.Deliver(fx.SwarmId, fx.Data);
+            var delivered = SwarmContinue.Pending(fx.SwarmId, fx.Data);
             var item = Assert.Single(delivered);
             Assert.Equal("Grokbot review: continue. Ship the listener.", item.Text);
             Assert.True(item.Resume);
             Assert.Equal(1, item.ReviewId);
+            Assert.True(File.Exists(queue));
+            SwarmContinue.MarkSendStarted(fx.SwarmId, item.ReviewId, fx.Data);
             Assert.False(File.Exists(queue));
-            Assert.Empty(SwarmContinue.Deliver(fx.SwarmId, fx.Data));
+            Assert.Empty(SwarmContinue.Pending(fx.SwarmId, fx.Data));
             Assert.Equal(1, SwarmBoard.Read(fx.Board.BoardPath).ReviewHandled);
             AssertCurrent(fx);
         }
@@ -381,10 +383,80 @@ public sealed class SwarmContinueTests
             Assert.Equal(SwarmStatus.Todo, SwarmBoard.Read(fx.Board.BoardPath).TaskById("task-1").Status);
             Assert.True(File.Exists(fx.Board.BoardPath + ".bak"));
             Assert.Equal(1, fx.Desk.SendCount);
-            Assert.Equal("continue", fx.Desk.Composer);
+            Assert.Equal("Grokbot review: fix. The proof is thin.", fx.Desk.Composer);
             AssertCurrent(fx);
         }
         finally { Delete(fx); }
+    }
+
+    [Fact]
+    public void Continue_and_fix_select_the_review_text_and_done_does_not()
+    {
+        var continueText = SwarmReviewResume.SendText(true, "Grokbot review: continue. Ship the listener.");
+        var fixText = SwarmReviewResume.SendText(true, "Grokbot review: fix. The proof is thin.");
+        Assert.Equal("Grokbot review: continue. Ship the listener.", continueText);
+        Assert.Equal("Grokbot review: fix. The proof is thin.", fixText);
+        Assert.Null(SwarmReviewResume.SendText(false, "Grokbot review: done."));
+        Assert.Equal(SwarmResumeAction.Send, SwarmReviewResume.Plan(true, continueText, true, false, true, false).Action);
+        Assert.Equal(SwarmResumeAction.Send, SwarmReviewResume.Plan(true, fixText, true, false, true, false).Action);
+        Assert.Equal(continueText, SwarmReviewResume.Plan(true, continueText, true, false, true, false).Text);
+        Assert.Equal(fixText, SwarmReviewResume.Plan(true, fixText, true, false, true, false).Text);
+        Assert.Equal(SwarmResumeAction.None, SwarmReviewResume.Plan(false, "Grokbot review: done.", true, false, true, false).Action);
+    }
+
+    [Fact]
+    public void Busy_or_closed_stays_queued_until_the_send_starts()
+    {
+        var closed = Open(SwarmStatus.Doing, open: false);
+        try
+        {
+            var result = SwarmContinue.Apply(closed.Desk, closed.SwarmId, closed.RunId, "continue", "Ship the listener.", closed.Data);
+            Assert.Equal("queued", result.Outcome);
+            Assert.Equal(0, closed.Desk.SendCount);
+            Assert.True(File.Exists(Queue(closed)));
+            var pending = SwarmContinue.Pending(closed.SwarmId, closed.Data);
+            Assert.Equal(result.Text, Assert.Single(pending).Text);
+            Assert.True(File.Exists(Queue(closed)));
+            SwarmContinue.MarkSendStarted(closed.SwarmId, pending[0].ReviewId, closed.Data);
+            Assert.False(File.Exists(Queue(closed)));
+        }
+        finally { Delete(closed); }
+
+        var busy = Open(SwarmStatus.Review);
+        try
+        {
+            busy.Desk.Busy = true;
+            var result = SwarmContinue.Apply(busy.Desk, busy.SwarmId, busy.RunId, "fix", "The proof is thin.", busy.Data);
+            Assert.Equal("posted", result.Outcome);
+            Assert.Equal(result.Text, Assert.Single(busy.Desk.Messages));
+            Assert.Equal(0, busy.Desk.SendCount);
+            Assert.Null(busy.Desk.Composer);
+            Assert.Equal(SwarmResumeAction.Queue, SwarmReviewResume.Plan(true, result.Text, true, true, true, false).Action);
+            Assert.True(File.Exists(Queue(busy)));
+            Assert.NotEmpty(SwarmContinue.Pending(busy.SwarmId, busy.Data));
+            Assert.True(File.Exists(Queue(busy)));
+        }
+        finally { Delete(busy); }
+
+        var held = Open(SwarmStatus.Doing);
+        try
+        {
+            held.Desk.HandoffHolding = true;
+            SwarmContinue.Apply(held.Desk, held.SwarmId, held.RunId, "continue", "Ship the listener.", held.Data);
+            Assert.Equal(0, held.Desk.SendCount);
+            Assert.True(File.Exists(Queue(held)));
+        }
+        finally { Delete(held); }
+    }
+
+    [Fact]
+    public void Resume_notice_waits_until_sixty_seconds_and_a_started_send_skips_it()
+    {
+        var posted = new DateTimeOffset(2026, 10, 14, 3, 41, 0, TimeSpan.Zero);
+        Assert.Null(SwarmReviewResume.Notice(posted, posted.AddSeconds(59), false));
+        Assert.Equal("Grokbot review posted but agent not resumed. Click Resume", SwarmReviewResume.Notice(posted, posted.AddSeconds(60), false));
+        Assert.Null(SwarmReviewResume.Notice(posted, posted.AddSeconds(60), true));
+        Assert.Null(SwarmReviewResume.Notice(posted, posted.AddMinutes(2), true));
     }
 
     private static async Task<string> Call(HttpClient http, string url, string tool, object arguments)
@@ -433,7 +505,7 @@ public sealed class SwarmContinueTests
         var current = Path.Combine(root, swarmId, "current.txt");
         Directory.CreateDirectory(Path.GetDirectoryName(current)!);
         File.WriteAllText(current, "keep-current");
-        return new Fixture(root, data, current, File.ReadAllBytes(current), swarmId, runId, board, new ReviewDesk { Root = root, Open = open, Reviews = reviews });
+        return new Fixture(root, data, current, File.ReadAllBytes(current), swarmId, runId, board, new ReviewDesk { Root = root, Open = open, Reviews = reviews, Data = data });
     }
 
     private static void Delete(Fixture fx)
@@ -456,6 +528,10 @@ public sealed class SwarmContinueTests
         public string Root { get; init; } = "";
         public bool Open { get; set; } = true;
         public bool Reviews { get; set; } = true;
+        public bool Busy { get; set; }
+        public bool Ready { get; set; } = true;
+        public bool HandoffHolding { get; set; }
+        public string? Data { get; init; }
         public string? DeliveredId { get; private set; }
         public List<string> Messages { get; } = [];
         public List<string> Authors { get; } = [];
@@ -469,9 +545,15 @@ public sealed class SwarmContinueTests
             DeliveredId = conversationId;
             Authors.Add("Grok Bot");
             Messages.Add(text);
-            if (!resume) return;
-            Composer = "continue";
-            SendCount++;
+            var plan = SwarmReviewResume.Plan(resume, text, true, Busy, Ready, HandoffHolding);
+            if (plan.Action == SwarmResumeAction.Send && plan.Text is not null)
+            {
+                Composer = plan.Text;
+                SendCount++;
+                return;
+            }
+            if (plan.Action == SwarmResumeAction.Queue && plan.Text is not null)
+                SwarmContinue.Hold(conversationId, new SwarmReviewDelivery(plan.Text, true, 0, DateTimeOffset.UtcNow, true), Data);
         }
         public string? SwarmBoardRoot() => Root;
         public GrokBotStatus Status() => new("0.3.60", "Cursor", "grok-4.7", false);

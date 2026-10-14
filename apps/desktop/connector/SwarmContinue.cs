@@ -13,7 +13,9 @@ public sealed record SwarmContinueResult(string Outcome, string Text, bool Resum
 public sealed record SwarmReviewDelivery(
     [property: JsonPropertyName("text")] string Text,
     [property: JsonPropertyName("resume")] bool Resume,
-    [property: JsonPropertyName("review_id")] int ReviewId);
+    [property: JsonPropertyName("review_id")] int ReviewId,
+    [property: JsonPropertyName("posted_at")] DateTimeOffset? PostedAt = null,
+    [property: JsonPropertyName("posted")] bool Posted = false);
 
 /// <summary>
 /// Posts a Grokbot handoff verdict into the chat that owns the run.
@@ -82,7 +84,7 @@ public static class SwarmContinue
             {
                 var queuePath = QueuePath(swarm, dataDirectory);
                 var items = ReadQueue(queuePath);
-                items.Add(new SwarmReviewDelivery(message, resume, board.ReviewLoops));
+                items.Add(new SwarmReviewDelivery(message, resume, board.ReviewLoops, reviewedAt ?? DateTimeOffset.UtcNow, false));
                 WriteQueue(queuePath, items);
                 return new SwarmContinueResult("queued", message, resume);
             }
@@ -161,7 +163,10 @@ public static class SwarmContinue
         return text;
     }
 
-    public static IReadOnlyList<SwarmReviewDelivery> Deliver(string? swarmId, string? dataDirectory = null)
+    public static IReadOnlyList<SwarmReviewDelivery> Deliver(string? swarmId, string? dataDirectory = null) =>
+        Pending(swarmId, dataDirectory);
+
+    public static IReadOnlyList<SwarmReviewDelivery> Pending(string? swarmId, string? dataDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(swarmId) || !Guid.TryParseExact(swarmId.Trim(), "N", out _))
             throw new ArgumentException("Swarm id is required.");
@@ -169,9 +174,62 @@ public static class SwarmContinue
         lock (Gate)
         {
             if (!File.Exists(path)) return [];
+            return ReadQueue(path);
+        }
+    }
+
+    public static void Hold(string? swarmId, SwarmReviewDelivery item, string? dataDirectory = null)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (string.IsNullOrWhiteSpace(item.Text)) throw new ArgumentException("Grokbot review queue is invalid.");
+        if (string.IsNullOrWhiteSpace(swarmId) || !Guid.TryParseExact(swarmId.Trim(), "N", out _))
+            throw new ArgumentException("Swarm id is required.");
+        var path = QueuePath(swarmId.Trim(), dataDirectory);
+        lock (Gate)
+        {
             var items = ReadQueue(path);
-            File.Delete(path);
-            return items;
+            if (item.ReviewId > 0 && items.Any(existing => existing.ReviewId == item.ReviewId)) return;
+            if (item.ReviewId == 0 && items.Any(existing => existing.Text == item.Text && existing.Resume == item.Resume)) return;
+            items.Add(item);
+            WriteQueue(path, items);
+        }
+    }
+
+    public static void MarkPosted(string? swarmId, int reviewId, DateTimeOffset? postedAt = null, string? dataDirectory = null)
+    {
+        if (string.IsNullOrWhiteSpace(swarmId) || !Guid.TryParseExact(swarmId.Trim(), "N", out _))
+            throw new ArgumentException("Swarm id is required.");
+        var path = QueuePath(swarmId.Trim(), dataDirectory);
+        lock (Gate)
+        {
+            if (!File.Exists(path)) return;
+            var items = ReadQueue(path);
+            var index = items.FindIndex(item => item.ReviewId == reviewId);
+            if (index < 0) return;
+            var item = items[index];
+            items[index] = item with { Posted = true, PostedAt = item.PostedAt ?? postedAt ?? DateTimeOffset.UtcNow };
+            WriteQueue(path, items);
+        }
+    }
+
+    public static void MarkSendStarted(string? swarmId, int reviewId, string? dataDirectory = null)
+    {
+        if (string.IsNullOrWhiteSpace(swarmId) || !Guid.TryParseExact(swarmId.Trim(), "N", out _))
+            throw new ArgumentException("Swarm id is required.");
+        var path = QueuePath(swarmId.Trim(), dataDirectory);
+        lock (Gate)
+        {
+            if (!File.Exists(path)) return;
+            var items = ReadQueue(path);
+            var index = items.FindIndex(item => item.ReviewId == reviewId);
+            if (index < 0) return;
+            items.RemoveAt(index);
+            if (items.Count == 0)
+            {
+                File.Delete(path);
+                return;
+            }
+            WriteQueue(path, items);
         }
     }
 
