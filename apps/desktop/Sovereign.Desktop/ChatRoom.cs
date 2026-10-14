@@ -807,9 +807,21 @@ internal sealed partial class ChatConversation
         }
         catch (OperationCanceledException) { outcome = "stopped"; _chatStatus.Text = "Response stopped or timed out. Partial text is incomplete. File edits already made are kept. You can edit the draft and send again."; if (!local && !PlanChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _codexChat?.Dispose(); _cursorChat?.Dispose(); _codexChat = null; _cursorChat = null; } }
         catch (Exception ex) { failureReason = ProjectAgentException.Describe(ex); turn.ShowFailure(failureReason); outcome = "failed"; _chatStatus.Text = "Response failed: " + ex.Message; if (CursorChat || CodexChat) { _reconnectOnSend = true; _needsContext = true; _projectSessionEpoch++; _chatReady = false; _cursorChat?.Dispose(); _cursorChat = null; _codexChat?.Dispose(); _codexChat = null; } }
-        finally { if (outcome != "completed" && string.IsNullOrWhiteSpace(_chatInput.Text)) { _chatInput.Text = text; _draftFiles.AddRange(sentFiles); RenderDraftFiles(); }
-            try { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
-            finally { FinishSubagents(outcome); _activeChatTurn = null; _chatCancellation?.Dispose(); _chatCancellation = null; SetChatBusy(false); } }
+        finally
+        {
+            if (outcome != "completed" && string.IsNullOrWhiteSpace(_chatInput.Text)) { _chatInput.Text = text; _draftFiles.AddRange(sentFiles); RenderDraftFiles(); }
+            var reply = content.ToString();
+            var review = ArmHandoffReview(reply, outcome);
+            try
+            {
+                try { turn.Finish(outcome); FinishSavedTurn(reply, outcome, turn, failureReason); }
+                finally { FinishSubagents(outcome); }
+            }
+            finally { ReleaseHandoffReviewHold(); }
+            _activeChatTurn = null; _chatCancellation?.Dispose(); _chatCancellation = null;
+            if (review) await AwaitHandoffReviewAsync(reply);
+            SetChatBusy(false);
+        }
     }
 
     private CancellationTokenSource? _phoneSubmission;

@@ -109,6 +109,8 @@ internal sealed partial class ChatConversation
                 : "Main agent · stop requested. This also stops its helpers. Pending messages stay here until you press Resume main agent.";
         }
         _chatCancellation?.Cancel();
+        try { _handoffReview?.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 
     internal bool StopFromPhone()
@@ -235,11 +237,19 @@ internal sealed partial class ChatConversation
                 finally
                 {
                     if (_cursorSteeringTask is not null) await _cursorSteeringTask;
-                    if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
-                    _steeringQueue.CompleteBatch(batch, outcome is "completed" or "redirected");
-                    FinishSubagents(outcome); _activeChatTurn = null;
+                    var reply = content.ToString();
+                    var review = ArmHandoffReview(reply, outcome);
+                    try
+                    {
+                        if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(reply, outcome, turn, failureReason); }
+                        _steeringQueue.CompleteBatch(batch, outcome is "completed" or "redirected");
+                        FinishSubagents(outcome);
+                    }
+                    finally { ReleaseHandoffReviewHold(); }
+                    _activeChatTurn = null;
                     _cursorPromptTask = null; _cursorSteeringTask = null;
                     _chatCancellation.Dispose(); _chatCancellation = null;
+                    if (review) await AwaitHandoffReviewAsync(reply);
                     RefreshPendingInstructions(); Save();
                 }
                 if (outcome is not ("completed" or "redirected")) break;
@@ -521,10 +531,18 @@ internal sealed partial class ChatConversation
                     var correction = _codexCorrectionTask;
                     if (correction is not null) await correction;
                     RememberAcceptedCorrections(outcome is "completed");
-                    if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(content.ToString(), outcome, turn, failureReason); }
-                    _steeringQueue.CompleteBatch(batch, outcome is "completed");
-                    FinishSubagents(outcome); _activeChatTurn = null;
+                    var reply = content.ToString();
+                    var review = ArmHandoffReview(reply, outcome);
+                    try
+                    {
+                        if (turn is not null) { turn.Finish(outcome); FinishSavedTurn(reply, outcome, turn, failureReason); }
+                        _steeringQueue.CompleteBatch(batch, outcome is "completed");
+                        FinishSubagents(outcome);
+                    }
+                    finally { ReleaseHandoffReviewHold(); }
+                    _activeChatTurn = null;
                     _chatCancellation.Dispose(); _chatCancellation = null;
+                    if (review) await AwaitHandoffReviewAsync(reply);
                     RefreshPendingInstructions(); Save();
                 }
                 if (outcome is not "completed") break;

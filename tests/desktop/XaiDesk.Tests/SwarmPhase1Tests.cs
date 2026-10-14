@@ -124,6 +124,21 @@ public sealed class SwarmPhase1Tests
     }
 
     [Fact]
+    public void Single_model_manager_brief_omits_verifier_must_differ_and_mixed_keeps_it()
+    {
+        var board = Path.Combine(Path.GetTempPath(), "board");
+        const string rule = "The verifier modelId must differ from the engineer modelId";
+        var single = SwarmRoles.Manager(board, mixedModels: false);
+        var mixed = SwarmRoles.Manager(board, mixedModels: true);
+        Assert.Equal(single, SwarmRoles.Manager(board));
+        Assert.DoesNotContain(rule, single, StringComparison.Ordinal);
+        Assert.DoesNotContain("must differ", single, StringComparison.Ordinal);
+        Assert.Contains(rule, mixed, StringComparison.Ordinal);
+        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", single, StringComparison.Ordinal);
+        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", mixed, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Verifier_skill_passes_a_rerun_and_fails_weak_proof()
     {
         var root = Temp();
@@ -238,6 +253,77 @@ public sealed class SwarmPhase1Tests
         finally { Delete(root); }
     }
 
+    [Fact]
+    public async Task Empty_task_id_records_review_on_the_run_and_does_not_mark_done()
+    {
+        var swarmId = Guid.NewGuid().ToString("N");
+        var runId = Guid.NewGuid().ToString("N");
+        var swarmFolder = Path.Combine(SwarmBoard.DefaultRoot(), swarmId);
+        var deskRoot = Temp();
+        try
+        {
+            var board = SwarmBoard.Create("Review the handoff",
+            [
+                new SwarmTask
+                {
+                    Id = "task-1",
+                    Title = "Write the panel",
+                    Status = SwarmStatus.Doing,
+                    Assignee = "worker-a"
+                }
+            ], Path.Combine(SwarmBoard.DefaultRoot(), swarmId, "runs"), runId);
+            Assert.Equal(SwarmStatus.Doing, board.TaskById("task-1").Status);
+
+            var desk = new SwarmDesk(deskRoot);
+            var secrets = new MemoryConnectorSecrets();
+            var token = secrets.Generate();
+            var audit = Path.Combine(deskRoot, "audit.log");
+            await using var host = new ConnectorHost(secrets, desk, new ConnectorAudit(audit));
+            var error = await host.ListenForChecksAsync(IPAddress.Loopback, 0, ConnectorBindMode.Loopback);
+            Assert.Null(error);
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var call = JsonSerializer.Serialize(new
+            {
+                jsonrpc = "2.0",
+                id = 1,
+                method = "tools/call",
+                @params = new
+                {
+                    name = "swarm_submit_result",
+                    arguments = new
+                    {
+                        task_id = "",
+                        swarm_id = swarmId,
+                        run_id = runId,
+                        result = "verdict: continue\nissues: The port is closed.\nnext: Bind the listener.",
+                        proof = ""
+                    }
+                }
+            });
+            var response = await http.PostAsync(host.Url, new StringContent(call, Encoding.UTF8, "application/json"));
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("Reviewed (continue)", body, StringComparison.Ordinal);
+            Assert.DoesNotContain(SwarmStatus.Done, body, StringComparison.Ordinal);
+
+            var saved = SwarmBoard.Read(board.BoardPath);
+            Assert.Equal("continue", saved.ReviewVerdict);
+            Assert.Equal("The port is closed.", saved.ReviewIssues);
+            Assert.Equal("Bind the listener.", saved.ReviewNext);
+            Assert.Equal("Reviewed (continue)", saved.ReviewStatus);
+            Assert.Equal(SwarmStatus.Doing, saved.TaskById("task-1").Status);
+            Assert.Equal("", saved.TaskById("task-1").Result);
+            Assert.Equal("", saved.TaskById("task-1").Proof);
+            Assert.NotEqual(SwarmStatus.Done, saved.TaskById("task-1").Status);
+        }
+        finally
+        {
+            Delete(deskRoot);
+            if (Directory.Exists(swarmFolder)) Directory.Delete(swarmFolder, true);
+        }
+    }
+
     private static string Temp()
     {
         var path = Path.Combine(Path.GetTempPath(), "xai-desk-swarm-" + Guid.NewGuid().ToString("N"));
@@ -291,5 +377,9 @@ public sealed class SwarmPhase1Tests
         public string GrokbotKey(string keys) => "";
         public string GrokbotNavigate(string page) => "";
         public void RecordGrokbotTool(string tool, string args, string result) { }
+        public bool GrokbotReviewsHandoffs(string conversationId) => false;
+        public bool ConversationOpen(string conversationId) => false;
+        public void DeliverSwarmReview(string conversationId, string text, bool resume) { }
+        public string? SwarmBoardRoot() => root;
     }
 }

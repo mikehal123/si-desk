@@ -27,6 +27,9 @@ internal sealed partial class ChatConversation
     private ProgressBar? _swarmProgress;
     private TextBlock? _swarmCounts;
     private TextBlock? _swarmElapsed;
+    private TextBlock? _swarmReviewStatus;
+    private TextBlock? _swarmReviewNote;
+    private Button? _swarmContinueWithoutReview;
     private StackPanel? _swarmFeedLines;
     private TextBlock? _swarmActivityPreview;
     private RotateTransform? _swarmActivityChevron;
@@ -52,7 +55,7 @@ internal sealed partial class ChatConversation
         if (!_saved.SwarmEnabled || !_saved.SubagentsEnabled) return null;
         var folder = _projectFolder;
         var memory = folder is null ? null : SwarmMemory.Brief(SwarmMemory.Load(_profileDirectory, folder));
-        return SwarmRoles.Manager(SwarmSection.ConversationFolder(_saved.Id) ?? SwarmBoard.DefaultRoot(), memory);
+        return SwarmRoles.Manager(SwarmSection.ConversationFolder(_saved.Id) ?? SwarmBoard.DefaultRoot(), memory, SwarmRoleModels.IsMixed(_saved.SwarmHire));
     }
 
     private Grid BuildSwarmHost()
@@ -70,12 +73,43 @@ internal sealed partial class ChatConversation
         AutomationName(_swarmProgress, "Swarm progress 0 of 0");
         _swarmCounts = SubagentCaption("");
         _swarmElapsed = SubagentCaption("");
+        _swarmReviewStatus = SubagentCaption("");
+        _swarmReviewStatus.Foreground = DeskTheme.Text;
+        _swarmReviewStatus.Visibility = Visibility.Collapsed;
+        AutomationName(_swarmReviewStatus, "Swarm review status");
+        _swarmReviewNote = SubagentCaption("");
+        _swarmReviewNote.IsTextSelectionEnabled = true;
+        _swarmReviewNote.Visibility = Visibility.Collapsed;
+        AutomationName(_swarmReviewNote, "Swarm review note");
+        _swarmContinueWithoutReview = new Button
+        {
+            Content = "Continue without review",
+            FontFamily = DeskTheme.UiFont,
+            FontSize = DeskTheme.SizeCaption,
+            Padding = new Thickness(DeskTheme.Space8, DeskTheme.Space4, DeskTheme.Space8, DeskTheme.Space4),
+            MinHeight = DeskTheme.Space24,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = DeskTheme.Raised,
+            Foreground = DeskTheme.Text,
+            BorderBrush = DeskTheme.Divider,
+            BorderThickness = new Thickness(1),
+            Visibility = Visibility.Collapsed
+        };
+        AutomationName(_swarmContinueWithoutReview, "Continue without review");
+        _swarmContinueWithoutReview.Click += (_, _) => ContinueSwarmWithoutReview();
+        var reviewRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = DeskTheme.Space8,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { _swarmReviewStatus, _swarmContinueWithoutReview }
+        };
         var swarmNote = SubagentCaption("Tasks for this goal. Expand a task to read its subagent chat.");
         AutomationName(swarmNote, "Swarm tab note");
         var header = new StackPanel
         {
             Spacing = DeskTheme.Space4, HorizontalAlignment = HorizontalAlignment.Stretch,
-            Children = { swarmNote, _swarmGoalText, _swarmProgress, _swarmCounts, _swarmElapsed, BuildProjectMemory() }
+            Children = { swarmNote, _swarmGoalText, _swarmProgress, _swarmCounts, _swarmElapsed, reviewRow, _swarmReviewNote, BuildProjectMemory() }
         };
         var rows = new ScrollViewer
         {
@@ -269,6 +303,16 @@ internal sealed partial class ChatConversation
         }
     }
 
+    private void ContinueSwarmWithoutReview()
+    {
+        SwarmBoard? board;
+        try { board = SwarmSection.TryLoad(_saved.Id); }
+        catch (Exception) { return; }
+        if (!SwarmHandoffReview.ContinueWithoutReview(board)) return;
+        ReleaseHandoffReviewHold();
+        CancelHandoffWatch();
+    }
+
     private void HideSwarmBoard()
     {
         _swarmPanelTab.Visibility = Visibility.Collapsed;
@@ -284,7 +328,20 @@ internal sealed partial class ChatConversation
         var counts = _swarmCounts;
         var elapsed = _swarmElapsed;
         var feedLines = _swarmFeedLines;
-        if (goalText is null || progressBar is null || counts is null || elapsed is null || feedLines is null) return;
+        var reviewStatus = _swarmReviewStatus;
+        if (goalText is null || progressBar is null || counts is null || elapsed is null || feedLines is null || reviewStatus is null) return;
+        var review = (board.ReviewStatus ?? "").Trim();
+        reviewStatus.Text = review;
+        reviewStatus.Visibility = review.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (review.Length > 0) AutomationName(reviewStatus, review);
+        var noteText = (board.ReviewNote ?? "").Trim();
+        if (_swarmReviewNote is not null)
+        {
+            _swarmReviewNote.Text = noteText;
+            _swarmReviewNote.Visibility = noteText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
+        if (_swarmContinueWithoutReview is not null)
+            _swarmContinueWithoutReview.Visibility = review == SwarmHandoffReview.TimedOutStatus ? Visibility.Visible : Visibility.Collapsed;
         if (!string.Equals(_swarmBoardId, board.Id, StringComparison.Ordinal))
         {
             _swarmBoardId = board.Id;
