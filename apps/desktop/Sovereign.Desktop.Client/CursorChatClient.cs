@@ -157,15 +157,6 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
         finally { _gate.Release(); }
     }
 
-    internal static string SwarmHireCatalog(bool? mixed, string? roleModelsDirectory, IReadOnlyList<CursorChatModel> models, string? chatModelId)
-    {
-        if (mixed == true && !string.IsNullOrWhiteSpace(roleModelsDirectory))
-            return SwarmRoleModels.Catalog(models, chatModelId, SwarmRoleModels.Load(roleModelsDirectory));
-        if (mixed == true)
-            return SwarmModelHire.Catalog(models, chatModelId);
-        return SwarmRoleModels.SingleCatalog(models, chatModelId);
-    }
-
     public async Task<CursorTurnOutcome> SendAsync(string model, string text, Action<string> delta, CancellationToken ct, IReadOnlyList<ChatImage>? images = null)
     {
         await _gate.WaitAsync(ct);
