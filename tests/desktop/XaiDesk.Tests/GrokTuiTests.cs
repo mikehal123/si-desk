@@ -118,20 +118,36 @@ public sealed class GrokTuiTests
     }
 
     [Fact]
-    public void Classic_chat_defaults_off_and_roundtrips()
+    public void Classic_chat_missing_or_unreadable_file_is_enabled()
     {
         var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(profile);
         try
         {
-            Assert.False(ClassicChatPreference.Load(profile));
-            ClassicChatPreference.Save(profile, true);
+            Assert.False(File.Exists(Path.Combine(profile, "classic-chat.json")));
             Assert.True(ClassicChatPreference.Load(profile));
-            Assert.Equal("{\"enabled\":true}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+
+            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{");
+            Assert.True(ClassicChatPreference.Load(profile));
+        }
+        finally
+        {
+            if (Directory.Exists(profile)) Directory.Delete(profile, true);
+        }
+    }
+
+    [Fact]
+    public void Classic_chat_explicit_false_is_respected()
+    {
+        var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profile);
+        try
+        {
+            ClassicChatPreference.Save(profile, false);
+            Assert.Equal("{\"enabled\":false}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+            Assert.False(ClassicChatPreference.Load(profile));
 
             File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{\"Enabled\":false}");
-            Assert.False(ClassicChatPreference.Load(profile));
-            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{");
             Assert.False(ClassicChatPreference.Load(profile));
         }
         finally
@@ -141,22 +157,47 @@ public sealed class GrokTuiTests
     }
 
     [Fact]
-    public void SpaceXai_icons_are_in_place()
+    public void Classic_chat_explicit_true_is_respected()
+    {
+        var profile = Path.Combine(Path.GetTempPath(), "xai-desk-classic-chat-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(profile);
+        try
+        {
+            ClassicChatPreference.Save(profile, true);
+            Assert.Equal("{\"enabled\":true}", File.ReadAllText(Path.Combine(profile, "classic-chat.json")));
+            Assert.True(ClassicChatPreference.Load(profile));
+
+            File.WriteAllText(Path.Combine(profile, "classic-chat.json"), "{\"enabled\":true}");
+            Assert.True(ClassicChatPreference.Load(profile));
+        }
+        finally
+        {
+            if (Directory.Exists(profile)) Directory.Delete(profile, true);
+        }
+    }
+
+    [Fact]
+    public void Desk_icons_are_in_place()
     {
         var root = FindRepoRoot();
-        var logo = Path.Combine(root, "assets", "logo.png");
-        var ico = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
-        var icon192 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-192.png");
-        var icon512 = Path.Combine(root, "source", "apps", "desktop", "phone", "www", "icon-512.png");
-        var asset = Path.Combine(root, "source", "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
-        Assert.True(File.Exists(logo));
+        var ico = Path.Combine(root, "apps", "desktop", "Sovereign.Desktop", "Assets", "xAIDesk.ico");
+        var icon192 = Path.Combine(root, "apps", "desktop", "phone", "www", "icon-192.png");
+        var icon512 = Path.Combine(root, "apps", "desktop", "phone", "www", "icon-512.png");
+        var asset = Path.Combine(root, "apps", "desktop", "Sovereign.Desktop", "Assets", "logo.png");
         Assert.True(File.Exists(asset));
-        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(logo).AsSpan(0, 4).ToArray());
+        Assert.True(File.Exists(ico));
+        Assert.True(File.Exists(icon192));
+        Assert.True(File.Exists(icon512));
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(asset).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon192).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, File.ReadAllBytes(icon512).AsSpan(0, 4).ToArray());
         Assert.Equal(new byte[] { 0x00, 0x00, 0x01, 0x00 }, File.ReadAllBytes(ico).AsSpan(0, 4).ToArray());
+        Assert.Equal((512, 512), PngSize(asset));
         Assert.Equal((192, 192), PngSize(icon192));
         Assert.Equal((512, 512), PngSize(icon512));
+        var splash = File.ReadAllText(Path.Combine(root, "apps", "desktop", "phone", "www", "index.html"));
+        Assert.Contains("alt=\"SI Desk\"", splash, StringComparison.Ordinal);
+        Assert.DoesNotContain("SpaceX", splash, StringComparison.OrdinalIgnoreCase);
     }
 
     private static (int Width, int Height) PngSize(string path)
@@ -172,11 +213,12 @@ public sealed class GrokTuiTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "assets", "logo.png")) && Directory.Exists(Path.Combine(dir.FullName, "source")))
+            if (File.Exists(Path.Combine(dir.FullName, "Directory.Build.props"))
+                && Directory.Exists(Path.Combine(dir.FullName, "apps", "desktop")))
                 return dir.FullName;
             dir = dir.Parent;
         }
-        throw new DirectoryNotFoundException("xAI Desk root with assets\\logo.png was not found.");
+        throw new DirectoryNotFoundException("No Directory.Build.props above the test output contains apps\\desktop.");
     }
 
     private static GrokTuiRun[] Runs(GrokTuiBlock block) => block.Runs.ToArray();

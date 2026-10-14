@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Check tag matches Directory.Build.props version
+        run: |
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = $props.SelectSingleNode('//Version').InnerText.Trim()
+          if ('${{ github.event_name }}' -eq 'push') {
+            $tag = "${{ github.ref_name }}".TrimStart('v')
+            if ($version -ne $tag) { throw "Tag v$tag does not match Directory.Build.props Version $version." }
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Test (XaiDesk.Tests)
+        run: dotnet test tests/desktop/XaiDesk.Tests -c Release
+
+      - name: Test (Sovereign.Desktop.Tests)
+        run: dotnet test tests/desktop/Sovereign.Desktop.Tests -c Release -p:Platform=x64
+
+      # The versioned TFM is satisfied by Microsoft.Windows.SDK.BuildTools.
+      # microsoft-windows-sdk-net is not a workload id, so do not install it.
+      - name: Publish release zip
+        run: ./scripts/publish-release.ps1
+
+      - name: Upload zip to GitHub release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SIDesk-${{ env.VERSION }}-win-x64.zip
+          prerelease: true
+          fail_on_unmatched_files: true
+
+      - name: Upload zip as workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIDesk-${{ env.VERSION }}-win-x64
+          path: SIDesk-${{ env.VERSION }}-win-x64.zip
+          if-no-files-found: error

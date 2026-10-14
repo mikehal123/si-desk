@@ -74,6 +74,11 @@ if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
     throw 'Publish did not produce SIDesk.exe.'
 }
 
+$xbfPath = Join-Path $publishDir 'App.xbf'
+if (-not (Test-Path -LiteralPath $xbfPath -PathType Leaf)) {
+    throw 'Publish did not produce App.xbf. WinUI skips that copy when publish uses -o.'
+}
+
 $setupProject = Join-Path $repoRoot 'apps\desktop\Sovereign.Desktop.PreviewSetup\Sovereign.Desktop.PreviewSetup.csproj'
 $setupDir = Join-Path $repoRoot 'artifacts\publish\setup'
 if (Test-Path -LiteralPath $setupDir) {
@@ -84,9 +89,13 @@ New-Item -ItemType Directory -Path $setupDir | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw "Setup publish failed with exit code $LASTEXITCODE."
 }
-$setupExe = Join-Path $setupDir 'SIDesk.Setup.exe'
+# Publish names the exe after PreviewSetup's AssemblyName. The zip still
+# ships SIDesk.Setup.exe: SetupEngine only accepts a process path that ends
+# with that file name, and that is the installer users run.
+$setupOutputName = 'SovereignAI.DesktopPreview.Setup.exe'
+$setupExe = Join-Path $setupDir $setupOutputName
 if (-not (Test-Path -LiteralPath $setupExe -PathType Leaf)) {
-    throw 'Setup publish did not produce SIDesk.Setup.exe.'
+    throw "Setup publish did not produce $setupOutputName."
 }
 Copy-Item -LiteralPath $setupExe -Destination (Join-Path $publishDir 'SIDesk.Setup.exe') -Force
 

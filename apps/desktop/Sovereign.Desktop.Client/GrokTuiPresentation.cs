@@ -342,7 +342,7 @@ public static class GrokTuiPresentation
     }
 }
 
-/// <summary>Classic chat toggle. Missing or unreadable settings stay off.</summary>
+/// <summary>Classic chat toggle. Missing or unreadable settings stay on. An explicit enabled flag is kept.</summary>
 public static class ClassicChatPreference
 {
     public static bool Load(string profile)
@@ -350,7 +350,7 @@ public static class ClassicChatPreference
         try
         {
             var path = Path.Combine(profile, "classic-chat.json");
-            if (!File.Exists(path)) return false;
+            if (!File.Exists(path)) return true;
             using var body = JsonDocument.Parse(File.ReadAllText(path));
             if (body.RootElement.ValueKind != JsonValueKind.Object) return false;
             foreach (var name in new[] { "enabled", "Enabled" })
@@ -359,7 +359,7 @@ public static class ClassicChatPreference
             return false;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-        { return false; }
+        { return true; }
     }
 
     public static void Save(string profile, bool enabled)

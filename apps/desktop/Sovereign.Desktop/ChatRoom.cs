@@ -95,6 +95,7 @@ internal sealed partial class ChatConversation
     private const double ConnectionFlyoutHeight = 480;
     private Button? _chatConnect;
     private Button? _chatLogin;
+    private Button? _chatInstall;
     private Button? _chatNew;
     internal bool _chatReady;
     private bool _cursorConnecting;
@@ -161,6 +162,7 @@ internal sealed partial class ChatConversation
             _chatStatus.Text=PlanProvider == "moonshot" ? "Kimi Platform API · uses your platform.kimi.ai API balance, not a Kimi Code subscription. Paste your API key and connect." : "Coding-plan connection. Open Folder to enable project tools. Import your IMIGROK key or enter it here. Access and usage limits depend on the provider; no general paid-API fallback.";
         }
         RefreshAttachmentStatus();
+        RefreshCursorInstallButton();
     }
     private void FitConnectionFlyout()
     {
@@ -185,8 +187,13 @@ internal sealed partial class ChatConversation
         _chatProvider.SelectionChanged += (_, _) => ProviderChanged();
         _chatConnect = Button("Connect / refresh models", ConnectChatAsync);
         _chatLogin = Button("Sign in with ChatGPT", async () => { await StartChatSignInAsync(); });
+        _chatInstall = Button(CursorInstall.ButtonLabel, InstallCursorAsync);
+        _chatInstall.Visibility = Visibility.Collapsed;
+        ToolTipService.SetToolTip(_chatInstall, "Install the pinned Cursor connector. Then click Connect / refresh models.");
+        foreach (var button in new[] { _chatConnect, _chatLogin, _chatInstall })
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
         _chatNew = Button("New conversation", () => { _connectionFlyout?.Hide(); _newChat(_chatProvider.SelectedIndex, _projectFolder); });
-        foreach (var b in new[] { _chatConnect, _chatLogin, _chatNew }) b.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _chatNew.HorizontalAlignment = HorizontalAlignment.Stretch;
         var import = Button("Import IMIGROK key", async () =>
         {
             try {
@@ -201,9 +208,6 @@ internal sealed partial class ChatConversation
         _planKey.PasswordChanged += (_,_) => { if(PlanChat) { _chatReady=false; if(_chatSend is not null) _chatSend.IsEnabled=false; RefreshAttachmentStatus(); } };
         _planEndpoint.SelectionChanged += (_,_) => { if(PlanChat) { _chatReady=false; if(_chatSend is not null) _chatSend.IsEnabled=false; RefreshAttachmentStatus(); } };
         _chatProvider.MaxDropDownHeight = 240;
-        _chatProvider.Width = double.NaN;
-        _chatProvider.MaxWidth = ConnectionFlyoutWidth;
-        _chatProvider.HorizontalAlignment = HorizontalAlignment.Stretch;
         _planEndpoint.MinWidth = 0;
         _planEndpoint.MaxWidth = ConnectionFlyoutWidth;
         _planEndpoint.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -226,7 +230,7 @@ internal sealed partial class ChatConversation
                     Children =
                     {
                         Head("Connection"), _chatProvider,
-                        new StackPanel { Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin } },
+                        new StackPanel { Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin, _chatInstall } },
                         BuildProjectToolbar(), _planControls
                     }
                 }
@@ -456,8 +460,61 @@ internal sealed partial class ChatConversation
             _chatStatus.Text = "Cursor sign-in finished. Click Connect / refresh models.";
             return true;
         }
-        catch (Exception ex) { _chatStatus.Text = "Sign-in unavailable: " + ex.Message; return false; }
+        catch (Exception ex) { _chatStatus.Text = DeskConnectionErrors.ForConnect(ex, CurrentConnectKind()); return false; }
         finally { SetChatBusy(false); }
+    }
+
+    private async Task InstallCursorAsync()
+    {
+        if (IsWorking)
+        {
+            _chatStatus.Text = "Finish or stop the current response before installing Cursor.";
+            return;
+        }
+        var plan = CursorInstall.Plan(AppContext.BaseDirectory, CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory));
+        if (plan.Step == CursorInstallStep.AlreadyInstalled)
+        {
+            _chatStatus.Text = CursorInstall.AlreadyInstalledStatus;
+            RefreshCursorInstallButton();
+            return;
+        }
+        SetChatBusy(true);
+        try
+        {
+            if (plan.Step == CursorInstallStep.OpenPage)
+            {
+                var opened = plan.Page is not null && await Launcher.LaunchUriAsync(plan.Page);
+                _chatStatus.Text = opened ? CursorInstall.PageOpenedStatus : CursorInstall.PageFailedStatus;
+                return;
+            }
+            _chatStatus.Text = "Installing the Cursor connector…";
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            await CursorInstall.RunInstallerAsync(AppContext.BaseDirectory, timeout.Token);
+            _chatStatus.Text = CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory)
+                ? CursorInstall.InstalledStatus
+                : CursorInstall.FailedStatus;
+        }
+        catch (OperationCanceledException)
+        {
+            _chatStatus.Text = CursorInstall.CanceledStatus;
+        }
+        catch (Exception)
+        {
+            _chatStatus.Text = plan.Step == CursorInstallStep.OpenPage
+                ? CursorInstall.PageFailedStatus
+                : CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory)
+                    ? CursorInstall.InstalledStatus
+                    : CursorInstall.FailedStatus;
+        }
+        finally { SetChatBusy(false); }
+    }
+
+    private void RefreshCursorInstallButton()
+    {
+        if (_chatInstall is null) return;
+        var show = CursorInstall.Offer(CursorChat, CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory));
+        _chatInstall.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        _chatInstall.IsEnabled = show && !_chatBusy;
     }
 
     private static string ReadXaiApiKey()
@@ -467,11 +524,17 @@ internal sealed partial class ChatConversation
             return DeskVault.ReadPassword(
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialResource,
                 Sovereign.Desktop.Core.XaiDeskIdentity.XaiApiCredentialAccount)
-                ?? throw new InvalidOperationException("Save an xAI API key in Settings first.");
+                ?? throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing);
         }
         catch (InvalidOperationException) { throw; }
-        catch { throw new InvalidOperationException("Save an xAI API key in Settings first."); }
+        catch { throw new InvalidOperationException(DeskConnectionErrors.XaiKeyMissing); }
     }
+
+    private DeskConnectKind CurrentConnectKind() =>
+        XaiApiChat ? DeskConnectKind.XaiApi :
+        CursorChat ? DeskConnectKind.Cursor :
+        GrokBuildChat ? DeskConnectKind.GrokBuild :
+        DeskConnectKind.Other;
 
     internal async Task ConnectChatAsync()
     {
@@ -528,7 +591,7 @@ internal sealed partial class ChatConversation
                     if (grokModels.Length > 0) _chatModel.SelectedIndex = 0;
                     _chatReady = grokModels.Length > 0;
                     var grokStatus = _chatReady ? (_projectFolder is null ? "Grok Build connected. Open Folder to work on files."
-                        : ProjectConnectionStatus("Grok Build can edit files in this folder.")) : "Grok Build returned no Grok models. Check that the Grok CLI is signed in.";
+                        : ProjectConnectionStatus("Grok Build can edit files in this folder.")) : DeskConnectionErrors.GrokNotSignedIn;
                     if (grok.ModeWarning is { Length: > 0 } modeWarning) grokStatus += " " + modeWarning;
                     _chatStatus.Text = grokStatus;
                     return;
@@ -555,12 +618,14 @@ internal sealed partial class ChatConversation
                         RequestPermission = RequestProjectPermissionAsync
                     }, activity => { if (epoch == _projectSessionEpoch) { _activeChatTurn?.Observe(activity); _partialActivity.Enqueue(activity); } });
                 CursorChatModel[]? live = null;
+                string? cursorError = null;
                 try
                 {
                     live = await _cursorChat.ModelsAsync(timeout.Token);
                 }
-                catch (Exception) when (!PhoneSendCancelled)
+                catch (Exception ex) when (!PhoneSendCancelled)
                 {
+                    cursorError = DeskConnectionErrors.ForConnect(ex, DeskConnectKind.Cursor);
                     _cursorChat?.Dispose();
                     _cursorChat = null;
                 }
@@ -572,12 +637,13 @@ internal sealed partial class ChatConversation
                 var pick = CursorModelCatalog.SelectDefault(cursorModels, _saved.Model, null);
                 if (pick is not null) SelectChatModel(pick);
                 _chatReady = !usingCache && cursorModels.Length > 0;
+                var cursorStatus = cursorError ?? DeskConnectionErrors.CursorNotSignedIn;
                 _chatStatus.Text = _chatReady
                     ? (_projectFolder is null ? "Cursor chat connected. Open Folder to work on files."
                         : ProjectConnectionStatus("Uses your Cursor account. Tools, subagents, and file edits stay in this folder."))
                     : usingCache && cursorModels.Length > 0
-                        ? "Cursor is offline. Showing the last saved model list. Connect again to send."
-                        : "Cursor returned no models. Sign in with Cursor, then Connect again.";
+                        ? DeskConnectionErrors.WithCachedModels(cursorStatus)
+                        : cursorStatus;
                 return;
             }
             if(PlanChat)
@@ -615,7 +681,7 @@ internal sealed partial class ChatConversation
                 : "No models available. Install a local Ollama model or check your Codex account access.";
         }
         catch (OperationCanceledException) when (PhoneSendCancelled) { _chatStatus.Text = "Phone send stopped before dispatch."; }
-        catch (Exception ex) { _chatStatus.Text = "Connection failed: " + ex.Message; }
+        catch (Exception ex) { _chatStatus.Text = DeskConnectionErrors.ForConnect(ex, CurrentConnectKind()); }
         finally { if (agentConnection) _cursorConnecting = false; RestoreModelSelection(); if (_chatReady) _reconnectOnSend = false; SetChatBusy(false); Save(); if (_chatReady) _connectionFlyout?.Hide(); if (_chatReady) TryStartQueuedReview(); }
     }
     internal void SetChatBusy(bool busy)
@@ -624,6 +690,7 @@ internal sealed partial class ChatConversation
         _chatProvider.IsEnabled = !busy; _chatModel.IsEnabled = !busy;
         if (_chatConnect is not null) _chatConnect.IsEnabled = !busy;
         if (_chatLogin is not null) _chatLogin.IsEnabled = !busy && (CursorChat || GrokBuildChat);
+        RefreshCursorInstallButton();
         _planKey.IsEnabled = !busy; _planEndpoint.IsEnabled = !busy;
         if (_chatNew is not null) _chatNew.IsEnabled = true;
         if (_openProject is not null) _openProject.IsEnabled = !busy;

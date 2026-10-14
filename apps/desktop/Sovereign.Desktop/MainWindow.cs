@@ -171,7 +171,7 @@ public sealed partial class MainWindow : Window
         App.CrashLog("before Navigate chat");
         Navigate("chat");
         App.CrashLog("after Navigate chat");
-        root.Loaded += async (_,_) => { if ((Environment.GetCommandLineArgs().Contains("--chat-layout-verify") || Environment.GetCommandLineArgs().Contains("--chat-steering-verify") || Environment.GetCommandLineArgs().Contains("--desk-store-verify") || Environment.GetCommandLineArgs().Contains("--quant-desk-verify"))) return; await InitializeUpdatesAsync(); if (!_updateStartupFailed) await InitializeAccountAsync(); await StartPhoneIfEnabledAsync(); await StartConnectorIfEnabledAsync(); };
+        root.Loaded += async (_,_) => { if ((Environment.GetCommandLineArgs().Contains("--chat-layout-verify") || Environment.GetCommandLineArgs().Contains("--chat-steering-verify") || Environment.GetCommandLineArgs().Contains("--desk-store-verify") || Environment.GetCommandLineArgs().Contains("--quant-desk-verify"))) return; await InitializeUpdatesAsync(); if (!_updateStartupFailed) await InitializeAccountAsync(); await StartPhoneIfEnabledAsync(); await StartConnectorIfEnabledAsync(); await MaybeShowFirstRunSetupAsync(); };
         Closed += (_,_) => _signInCancel?.Cancel();
     }
 

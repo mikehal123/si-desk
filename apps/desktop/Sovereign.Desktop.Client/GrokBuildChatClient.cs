@@ -100,7 +100,7 @@ public sealed class GrokBuildChatClient : IDisposable
 
     private static async Task RunVisibleAuthAsync(string command, CancellationToken ct)
     {
-        var executable = FindExecutable() ?? throw new FileNotFoundException("Grok CLI was not found. Install Grok Build, then sign in again.");
+        var executable = FindExecutable() ?? throw new FileNotFoundException(DeskConnectionErrors.GrokNotInstalled);
         var info = new ProcessStartInfo
         {
             FileName = executable,
@@ -208,7 +208,7 @@ public sealed class GrokBuildChatClient : IDisposable
             if (_connected) return;
             if (!_injected)
             {
-                var executable = FindExecutable() ?? throw new FileNotFoundException("Grok CLI was not found. Install Grok Build, then connect again.");
+                var executable = FindExecutable() ?? throw new FileNotFoundException(DeskConnectionErrors.GrokNotInstalled);
                 Directory.CreateDirectory(_workspace);
                 var info = new ProcessStartInfo(executable)
                 {
@@ -343,7 +343,7 @@ public sealed class GrokBuildChatClient : IDisposable
                 catch (PromptSilenceException)
                 {
                     if (_assistantChars > 0) return EndTurnResult();
-                    throw new IOException("Grok Build response is incomplete (silence).");
+                    throw new IOException(DeskConnectionErrors.GrokSilence);
                 }
                 if (line is null) throw new IOException("Grok Build disconnected. Reconnect before sending again.");
                 _lastProtocolAt = Clock();

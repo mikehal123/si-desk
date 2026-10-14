@@ -289,70 +289,91 @@ public sealed class SwarmRoleModelsTests
         var catalog = SwarmRoleModels.SingleCatalog(models, "composer-2.5");
         foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
             Assert.Contains(role + " modelId: composer-2.5", catalog);
-        Assert.Contains("- composer-2.5 | Composer 2.5", catalog);
+        Assert.Contains("Single model mode", catalog);
+        Assert.Contains("every role uses only this modelId", catalog);
+        Assert.Contains("the verifier uses this same modelId", catalog);
         Assert.Contains("grokbot-research and grokbot-ops take no modelId", catalog);
+        Assert.Contains("do not substitute another model or provider", catalog);
+        Assert.Contains("- composer-2.5 | Composer 2.5", catalog);
+        Assert.DoesNotContain("grok-4.7", catalog);
+        Assert.DoesNotContain("claude-fable-5-1", catalog);
         Assert.DoesNotContain("override ", catalog);
         Assert.DoesNotContain("must differ", catalog);
-        Assert.DoesNotContain("fall back to the parent", catalog);
-        Assert.DoesNotContain("grok-4.7", catalog);
-        Assert.DoesNotContain("claude-fable", catalog);
+        Assert.DoesNotContain("fall back", catalog);
     }
 
     [Fact]
-    public void Single_catalog_prints_none_when_the_chat_has_no_model()
+    public void Single_catalog_rejects_a_missing_model_instead_of_another_provider()
     {
-        var error = Assert.Throws<IOException>(() => SwarmRoleModels.SingleCatalog([], null));
-        Assert.Contains("No swarm model is selected", error.Message);
-        Assert.Contains("will not fall back", error.Message);
+        var missing = Assert.Throws<IOException>(() => SwarmRoleModels.SingleCatalog([], null));
+        Assert.Contains("No swarm model is selected", missing.Message);
+        Assert.Contains("will not fall back to another provider", missing.Message);
+
+        var blank = Assert.Throws<IOException>(() => SwarmRoleModels.SingleCatalog([M("grok-4.7", "Grok 4.7")], "  "));
+        Assert.Contains("will not fall back", blank.Message);
+
+        var other = Assert.Throws<IOException>(() => SwarmRoleModels.SingleCatalog([M("grok-4.7", "Grok 4.7")], "composer-2.5"));
+        Assert.Contains("composer-2.5", other.Message);
+        Assert.Contains("is not available", other.Message);
+        Assert.Contains("will not fall back to another provider", other.Message);
+        Assert.DoesNotContain("grok-4.7", other.Message);
     }
 
     [Fact]
-    public void Single_catalog_with_grok_never_emits_openai()
+    public void Hire_catalog_uses_the_selected_model_when_mixed_models_are_off()
     {
         CursorChatModel[] models =
         [
-            M("grok-4.7", "Grok 4.7"),
-            M("gpt-5.6-sol", "GPT-5.6 Sol"),
-            M("gpt-4o", "GPT-4o"),
-            M("claude-fable-5-1", "Claude Fable 5.1")
+            M("composer-2.5", "Composer 2.5"),
+            M("grok-4.7", "Grok 4.7")
         ];
-        foreach (bool? mixed in new bool?[] { false, null })
+        foreach (bool? mixed in new bool?[] { null, false })
         {
-            var catalog = CursorChatClient.SwarmHireCatalog(mixed, null, models, "grok-4.7");
-            Assert.DoesNotContain("gpt-", catalog, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("openai", catalog, StringComparison.OrdinalIgnoreCase);
-            foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
-                Assert.Contains(role + " modelId: grok-4.7", catalog);
-            Assert.Contains("the verifier uses this same modelId", catalog);
-            Assert.Contains("do not substitute", catalog);
+            var catalog = CursorChatClient.SwarmHireCatalog(mixed, "unused-directory", models, "composer-2.5");
+            Assert.Contains("engineer modelId: composer-2.5", catalog);
+            Assert.Contains("verifier modelId: composer-2.5", catalog);
+            Assert.Contains("do not substitute another model or provider", catalog);
+            Assert.DoesNotContain("grok-4.7", catalog);
+            Assert.DoesNotContain("must differ", catalog);
         }
     }
 
     [Fact]
-    public void Single_catalog_fails_instead_of_substituting_openai()
-    {
-        var error = Assert.Throws<IOException>(() => CursorChatClient.SwarmHireCatalog(
-            false,
-            null,
-            [M("gpt-5.6-sol", "GPT-5.6 Sol")],
-            "grok-4.7"));
-        Assert.Contains("grok-4.7", error.Message);
-        Assert.DoesNotContain("gpt-", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("GPT-5.6", error.Message);
-    }
-
-    [Fact]
-    public void Mixed_blank_directory_still_uses_ranked_hire()
+    public void Hire_catalog_keeps_role_rankings_only_when_mixed_models_are_on()
     {
         CursorChatModel[] models =
         [
             M("grok-4.7", "Grok 4.7"),
-            M("gpt-5.6-sol", "GPT-5.6 Sol"),
-            M("gpt-4o", "GPT-4o"),
-            M("claude-fable-5-1", "Claude Fable 5.1")
+            M("fable-5.1", "Claude Fable 5.1"),
+            M("opus-5.5", "Claude Opus 5.5")
         ];
-        var catalog = CursorChatClient.SwarmHireCatalog(true, "", models, "grok-4.7");
-        Assert.Contains("engineer modelId: claude-fable-5-1", catalog);
+        var legacy = CursorChatClient.SwarmHireCatalog(true, " ", models, "grok-4.7");
+        Assert.Contains("engineer modelId: fable-5.1", legacy);
+        Assert.Contains("verifier modelId: opus-5.5", legacy);
+        Assert.Contains("must differ", legacy);
+        Assert.DoesNotContain("Single model mode", legacy);
+
+        var directory = NewDirectory();
+        try
+        {
+            SwarmRoleModels.EnsureDefaults(directory);
+            var ranked = CursorChatClient.SwarmHireCatalog(true, directory, models, "grok-4.7");
+            Assert.Contains("engineer modelId:", ranked);
+            Assert.DoesNotContain("Single model mode", ranked);
+            Assert.Contains("must differ", ranked);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Hire_catalog_throws_when_single_mode_has_no_advertised_model()
+    {
+        var error = Assert.Throws<IOException>(() => CursorChatClient.SwarmHireCatalog(false, null, [], null));
+        Assert.Contains("will not fall back to another provider", error.Message);
+        Assert.Throws<IOException>(() => CursorChatClient.SwarmHireCatalog(null, "dir", [M("a", "A")], "missing"));
     }
 
     [Fact]

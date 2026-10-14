@@ -120,9 +120,13 @@
     <EmbeddedResource Include="$(DocumentExtractionInventory)" LogicalName="Sovereign.DocumentExtractionInventory" />
   </ItemGroup>
   <!-- A custom OutputPath skips the WinUI copy of App.xbf. Without that file the
-       control theme never loads and the first layout dies on TabViewScrollButtonBackground. -->
+       control theme never loads and the first layout dies on TabViewScrollButtonBackground.
+       publish-release.ps1 uses dotnet publish -o, so also copy into PublishDir after Publish. -->
   <Target Name="CopyAppXamlBinary" AfterTargets="Build">
     <Copy SourceFiles="$(IntermediateOutputPath)App.xbf" DestinationFiles="$(OutDir)App.xbf" SkipUnchangedFiles="true" Condition="Exists('$(IntermediateOutputPath)App.xbf')" />
     <Copy SourceFiles="Assets\xAIDesk.ico" DestinationFiles="$(OutDir)Assets\xAIDesk.ico" SkipUnchangedFiles="true" Condition="Exists('Assets\xAIDesk.ico')" />
+  </Target>
+  <Target Name="CopyAppXamlBinaryToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="$(IntermediateOutputPath)App.xbf" DestinationFiles="$(PublishDir)App.xbf" SkipUnchangedFiles="true" Condition="Exists('$(IntermediateOutputPath)App.xbf') and '$(PublishDir)' != ''" />
   </Target>
 </Project>

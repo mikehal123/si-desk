@@ -42,6 +42,8 @@ internal sealed partial class ChatConversation
         var view = _subagentViews[id];
         view.SetClosed(false);
         view.Update(child);
+        if (!IsSwarmHelper(id)) PlaceHelperCard(view, child);
+        if (SubagentChatPanels.ShowsInOldSection(child.State)) _oldSubagents.IsExpanded = true;
         UpdateSubagentCounts();
         if (_saved.SubagentChatPanelsEnabled) OpenSubagentPanel(id);
         else { view.Root.IsExpanded = true; Save(); }
@@ -54,6 +56,7 @@ internal sealed partial class ChatConversation
         _closedAgents.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
         _subagentEmpty.Text = count > 0 ? "Reopen a card from Closed agents." : "No helpers yet.";
         _subagentEmpty.Visibility = !TeamUiActive && _subagentRows.Count == count ? Visibility.Visible : Visibility.Collapsed;
+        UpdateOldSection();
     }
 
     private void FillClosedAgentsMenu()

@@ -212,6 +212,19 @@ public sealed class GrokbotWakeDebounce
 
 public sealed record GrokbotWakeReceipt(string Note, int? StatusCode);
 
+public static class WakeSettingsStatus
+{
+    public const string Saved = "Wake saved";
+    public const string SaveFailed = "Wake key could not be saved.";
+
+    public static string Test(GrokbotWakeReceipt receipt)
+    {
+        if (receipt.StatusCode is int code && string.Equals(receipt.Note, "Grokbot pinged", StringComparison.Ordinal))
+            return "Test sent: HTTP " + code;
+        return string.IsNullOrWhiteSpace(receipt.Note) ? "Wake failed." : receipt.Note;
+    }
+}
+
 /// <summary>Webhook sender key in Windows Credential Manager. A missing key returns null and does not throw.</summary>
 public static class GrokbotWakeKey
 {
@@ -221,8 +234,7 @@ public static class GrokbotWakeKey
     private const int CredPersistLocalMachine = 2;
     private const int ErrorNotFound = 1168;
 
-    /// <summary>Only <see cref="Target"/>. The legacy key is copied once at startup by <see cref="LegacySecretMigration"/>.</summary>
-    public static string? Read() => Read(Target);
+    public static string? Read() => Read(Target) ?? Read(LegacyTarget);
 
     public static string? Read(string target)
     {
@@ -272,7 +284,11 @@ public static class GrokbotWakeKey
         }
     }
 
-    public static void Clear() => Clear(Target);
+    public static void Clear()
+    {
+        Clear(Target);
+        Clear(LegacyTarget);
+    }
 
     public static void Clear(string target)
     {

@@ -129,9 +129,23 @@ public static class SubagentChatPanels
         _ => "interrupted"
     };
 
-    public static string Elapsed(CursorSubagent child)
+    /// <summary>Ended and disconnected helpers leave the live list. Blocked and unknown rows stay, and only a running clock advances.</summary>
+    public static bool ShowsInOldSection(string? state) => state is
+        "completed" or "failed" or "cancelled" or "stopped" or "stop requested"
+        or "disconnected" or "interrupted" or "unconfirmed";
+
+    /// <summary>Keeps the first recorded end so a later snapshot cannot move a disconnected clock.</summary>
+    public static CursorSubagent FreezeClock(CursorSubagent child, CursorSubagent? previous = null)
     {
-        var end = child.CompletedAt ?? (Running(child.State) ? DateTimeOffset.UtcNow : child.UpdatedAt);
+        if (!ShowsInOldSection(child.State) || child.CompletedAt is not null) return child;
+        var end = previous is not null && ShowsInOldSection(previous.State) ? previous.CompletedAt : null;
+        end ??= child.UpdatedAt;
+        return end is null ? child : child with { CompletedAt = end };
+    }
+
+    public static string Elapsed(CursorSubagent child, DateTimeOffset? now = null)
+    {
+        var end = Running(child.State) ? now ?? DateTimeOffset.UtcNow : child.CompletedAt ?? child.UpdatedAt;
         if (child.StartedAt is not { } started || end is null) return "Not recorded";
         var duration = end.Value - started;
         if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;

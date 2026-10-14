@@ -221,6 +221,57 @@ public sealed class GrokbotWakeTests
         Assert.Equal("second", Assert.Single(seen));
     }
 
+    [Fact]
+    public void Wake_settings_status_reports_saved_and_test_sent()
+    {
+        Assert.Equal("Wake saved", WakeSettingsStatus.Saved);
+        Assert.Equal("Wake key could not be saved.", WakeSettingsStatus.SaveFailed);
+        Assert.Equal("Test sent: HTTP 204", WakeSettingsStatus.Test(new GrokbotWakeReceipt("Grokbot pinged", 204)));
+        Assert.Equal("Wake failed. HTTP 400.", WakeSettingsStatus.Test(new GrokbotWakeReceipt("Wake failed. HTTP 400.", 400)));
+        Assert.Equal("Webhook sender key is not valid.", WakeSettingsStatus.Test(new GrokbotWakeReceipt("Webhook sender key is not valid.", null)));
+        Assert.Equal("Wake failed.", WakeSettingsStatus.Test(new GrokbotWakeReceipt("", null)));
+        Assert.Equal("Wake failed.", WakeSettingsStatus.Test(new GrokbotWakeReceipt("   ", 200)));
+    }
+
+    [Fact]
+    public void Settings_wake_key_stays_masked_and_status_sits_with_the_buttons()
+    {
+        var root = FindRepoRoot();
+        var text = File.ReadAllText(Path.Combine(root, "apps", "desktop", "Sovereign.Desktop", "GrokBotConnector.cs"));
+        Assert.Contains("PasswordRevealMode = PasswordRevealMode.Hidden", text, StringComparison.Ordinal);
+        Assert.Contains("PasswordRevealMode.Visible", text, StringComparison.Ordinal);
+        Assert.Contains("Glyph = \"\\uE7B3\"", text, StringComparison.Ordinal);
+        Assert.Contains("Show webhook sender key", text, StringComparison.Ordinal);
+        Assert.Contains("Hide webhook sender key", text, StringComparison.Ordinal);
+        Assert.Contains("Type a new key to show it", text, StringComparison.Ordinal);
+        Assert.Contains("_wakeKey.PasswordChanged", text, StringComparison.Ordinal);
+        Assert.Contains("_wakeKeyReveal.IsEnabled = false", text, StringComparison.Ordinal);
+        Assert.Contains("if ((_wakeKey.Password ?? \"\").Length == 0) return;", text, StringComparison.Ordinal);
+        Assert.Contains("_wakeKey.Password = \"\"", text, StringComparison.Ordinal);
+        Assert.Contains("WakeSettingsStatus.Saved", text, StringComparison.Ordinal);
+        Assert.Contains("WakeSettingsStatus.Test(receipt)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wake key saved", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wake URL saved", text, StringComparison.Ordinal);
+        var buttons = text.IndexOf("saveWake, testWake, clearWake", StringComparison.Ordinal);
+        Assert.True(buttons > 0);
+        var status = text.IndexOf("_wakeStatus", buttons, StringComparison.Ordinal);
+        Assert.True(status > buttons && status - buttons < 220);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "Directory.Build.props"))
+                && Directory.Exists(Path.Combine(dir.FullName, "apps", "desktop")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+
+        throw new DirectoryNotFoundException("No Directory.Build.props above the test output contains apps\\desktop.");
+    }
+
     private sealed class ScriptedHandler : HttpMessageHandler
     {
         private readonly Queue<HttpStatusCode> _codes;

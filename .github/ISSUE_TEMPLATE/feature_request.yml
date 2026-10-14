@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an idea for SI Desk
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Chat
+        - Subagents
+        - Swarm
+        - Changes review
+        - Grokbot
+        - Shared room
+        - Install / setup
+        - Other
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered

@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in SI Desk isn't working
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **remove API keys, tokens, emails and personal paths** from anything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: SI Desk version
+      placeholder: "0.3.64"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2 x64"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Release zip (ran SIDesk.exe)
+        - Release zip (installed with SIDesk.Setup.exe)
+        - Built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - Cursor subscription
+        - Grok Build CLI subscription
+        - xAI API key
+        - Not relevant
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error text
+      description: Paste relevant output (secrets removed). Screenshots can go in the box below.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
