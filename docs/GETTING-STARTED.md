@@ -14,6 +14,14 @@ You need one way to talk to a model:
 
 Cursor is the connection that can edit a project folder, run subagents, and use swarm mode. Grok Build can do those too. The xAI API connection is chat only.
 
+## Which connection should I pick?
+
+| Connection | What it needs | What it can do |
+| --- | --- | --- |
+| Cursor subscription | A Cursor subscription on this PC, the connector install below, and Cursor sign-in | Chat. With a folder open: file edits, subagents, and swarm mode |
+| Grok Build | `grok.exe` from xAI's Windows installer, then `grok login` with a grok.com account. Paid plans are in [Plans](#plans) | Chat. With a folder open: file edits, subagents, and swarm mode |
+| xAI API key | A key from [console.x.ai](https://console.x.ai). Limits follow that team's API credits, not a grok.com plan. See [Plans](#plans) | Chat only |
+
 ## Download, unzip, and run
 
 1. Open the latest release on GitHub: [github.com/mikehal123/si-desk/releases](https://github.com/mikehal123/si-desk/releases).
@@ -118,20 +126,47 @@ If connect fails, the status line names the next step. The exact sentences are i
 
 ### Grok Build
 
-Grok Build is the `grok` command-line program already installed for your Windows user. SI Desk does not download it.
+Grok Build is xAI's `grok` command-line program. SI Desk does not download it.
 
-It uses the first `grok.exe` it can find:
+#### 1. Install grok.exe
+
+xAI's Windows install is one PowerShell command. It is written up in xAI's getting started guide: the [copy in the Grok Build repository](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/01-getting-started.md), and the online docs at [docs.x.ai/build/overview](https://docs.x.ai/build/overview). The same command is on [x.ai/cli](https://x.ai/cli). The script that command runs is [x.ai/cli/install.ps1](https://x.ai/cli/install.ps1) ([repository copy](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/scripts/install.ps1)).
+
+1. Open PowerShell.
+2. Run:
+
+```powershell
+irm https://x.ai/cli/install.ps1 | iex
+```
+
+3. Open a new PowerShell window and run `grok --version`. A version line means the program is installed.
+
+That installer writes `grok.exe` to `%USERPROFILE%\.grok\bin\grok.exe` and adds `%USERPROFILE%\.grok\bin` to your user PATH. xAI's getting started guide says the same thing about the PATH.
+
+SI Desk uses the first `grok.exe` it can find:
 
 1. The file named by the `XAI_DESK_GROK` environment variable, if that file exists.
 2. `%USERPROFILE%\.grok\bin\grok.exe`
 3. `grok.exe` on PATH
 
-Sign-in and the account check read `%USERPROFILE%\.grok\auth.json`. The check can show the account email and a plan word (`free`, `paid`, or `unknown`). It does not show the saved secret.
+Leave `XAI_DESK_GROK` unset. The default install is the second file in that list. The next **Check** or **Connect** reads that file from disk. If the installer was given another folder (`GROK_BIN_DIR`), it adds that folder to your user PATH, which is the third place above. A copy of SI Desk that is already open keeps the PATH it started with. Quit SI Desk and start it again when you need that new PATH, or set `XAI_DESK_GROK` to the `grok.exe` file.
 
-1. Install Grok Build so one of those `grok.exe` locations exists.
-2. Open **Settings**, **Connections**, **Grok Build**.
-3. Click **Sign in**. SI Desk runs `grok login` in a visible window. Finish that login, then the app runs a check.
-4. On the chat screen, open **Connection**, choose **Grok Build**, and click **Connect / refresh models**.
+xAI also publishes two other Windows installs:
+
+- Git Bash or MSYS2 can run `curl -fsSL https://x.ai/cli/install.sh | bash`. On Windows that script writes `grok.exe` to `$HOME/.grok/bin`, then tells you to add `%USERPROFILE%\.grok\bin` to PATH for `cmd.exe` and PowerShell. When those two folders are the same, SI Desk finds the file at the second path above.
+- npm: `npm i -g @xai-official/grok`, from the [package notes](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/npm/grok/README.md). Unless `GROK_HOME` is set, that package's installer copies `grok.exe` into `%USERPROFILE%\.grok\bin`.
+
+If you already installed with WinGet, the getting started guide says to update that copy with `winget upgrade --id xAI.GrokBuild -e`. It also says `grok update` leaves a WinGet install unchanged. The guide does not say which folder WinGet uses. If SI Desk cannot find `grok.exe`, set `XAI_DESK_GROK` to that file, or check xAI's site.
+
+A WSL install is the Linux program. SI Desk on Windows looks for `grok.exe`, so use the PowerShell installer above.
+
+#### 2. Sign in
+
+Sign-in and the account check read `%USERPROFILE%\.grok\auth.json`. The check can show the account email and a plan word (`free`, `paid`, or `unknown`). It does not show the saved secret. What that sign-in is allowed to be is in [Plans](#plans).
+
+1. Open **Settings**, **Connections**, **Grok Build**.
+2. Click **Sign in**. SI Desk runs `grok login` in a visible window. Finish that login, then the app runs a check.
+3. On the chat screen, open **Connection**, choose **Grok Build**, and click **Connect / refresh models**.
 
 **Sign in with Grok** on the Connection panel does the same `grok login`, then asks you to click **Connect**. **Sign out** in Settings runs `grok logout`. **Check** runs the account check without logging in again.
 
@@ -146,6 +181,26 @@ This sends chat to `https://api.x.ai/v1/`. With a folder open, the status line s
 3. On the chat screen, open **Connection**, choose **xAI API**, and click **Connect / refresh models**.
 
 The sign-in button is disabled for this provider. A good connect says **xAI API connected. Choose a Grok model.** Only model ids that contain "grok" are listed. Labels are prefixed with **xAI API ·**.
+
+How this key is billed is in [Plans](#plans).
+
+## Plans
+
+SI Desk does not sell a plan. Each connection uses an account you already have.
+
+### Grok Build sign-in
+
+**Sign in** runs `grok login`. xAI's authentication guide says that command opens a browser and signs in with a grok.com account, through OAuth at `auth.x.ai`. The saved session is `%USERPROFILE%\.grok\auth.json`. The guide is [Authentication](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/02-authentication.md).
+
+That guide does not tell you to sign in at the xAI console for `grok login`. The console is where an API key comes from. The guide also does not name SuperGrok, X Premium, or X Premium+ as the plan `grok login` requires.
+
+xAI's own CLI has a separate message for when free Grok Build usage runs out. It says you have reached the free Grok Build usage limit, and it tells you to get SuperGrok, at [grok.com/supergrok](https://grok.com/supergrok). A rate limit on that grok.com sign-in says to upgrade your account. Those sentences are the CLI's user-facing text in [error.rs](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/sampling/error.rs). They do not say whether X Premium, or any other named plan, is enough. Check xAI's site.
+
+### xAI API key
+
+The xAI API connection uses a key from the xAI console, [console.x.ai](https://console.x.ai). `grok login` stays the Grok Build sign-in. xAI's authentication guide says that key is a different credential from the grok.com session. The `grok` program uses the key only when no `grok login` session is stored.
+
+xAI's CLI says a personal grok.com upgrade does not raise API team limits. Higher API limits come from credits a team admin purchases, or from a higher spend-based tier. The CLI points at [docs.x.ai/developers/rate-limits](https://docs.x.ai/developers/rate-limits#rate-limit-tiers). The same file says those limits are not a personal SuperGrok plan. Whether a new console key needs a payment method before the first call: check xAI's site.
 
 ## Open a project folder
 
@@ -284,7 +339,7 @@ If Cursor had a saved list from an earlier connect, a failed refresh still shows
 | The xAI API rejected the saved key (auth failed). Open Settings, replace the key, save it, then click Connect / refresh models. | Replace the key. |
 | SI Desk could not reach the xAI API (network). Check this PC's connection, then click Connect / refresh models. | Check the network. |
 | xAI API did not advertise a Grok model. Check the account, then click Connect / refresh models. | The key worked, and the account listed no Grok model. |
-| Grok CLI / Grok Build was not found on PATH. Install Grok Build, or set XAI_DESK_GROK to the grok executable, then click Connect / refresh models. | Put `grok.exe` where the app looks, or set `XAI_DESK_GROK` to that file. |
+| Grok CLI / Grok Build was not found on PATH. Install Grok Build, or set XAI_DESK_GROK to the grok executable, then click Connect / refresh models. | Install `grok.exe` as in [Install grok.exe](#1-install-grokexe), or set `XAI_DESK_GROK` to that file. |
 | Grok Build is not signed in. Open Settings, click Sign in next to Grok Build, then click Connect / refresh models. | Sign in from Settings. |
 | Grok Build auth failed. Open Settings, sign in again next to Grok Build, then click Connect / refresh models. | Sign in again. |
 | Grok Build could not reach xAI (network). Check this PC's connection, then click Connect / refresh models. | Check the network. |
