@@ -116,16 +116,19 @@ public sealed class SwarmHandoffReviewTests
             var result = await SwarmHandoffReview.WatchAsync(true, Handoff, board, 3, (_, _) =>
             {
                 sent++;
-                var started = SwarmBoard.Read(board.BoardPath);
-                waiting = started.ReviewNote;
-                Assert.Equal("Waiting for Grokbot", started.ReviewStatus);
+                if (sent == 1)
+                {
+                    var started = SwarmBoard.Read(board.BoardPath);
+                    waiting = started.ReviewNote;
+                    Assert.Equal("Waiting for Grokbot", started.ReviewStatus);
+                }
                 return Task.FromResult(new SwarmWakeSend(true, "Grokbot pinged"));
             }, () => now, (span, _) =>
             {
                 now = now.Add(span);
                 return Task.CompletedTask;
             }, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(2));
-            Assert.Equal(1, sent);
+            Assert.Equal(4, sent);
             Assert.True(result.Started);
             Assert.Contains("Waiting for Grokbot review", waiting, StringComparison.Ordinal);
             Assert.Equal("Grokbot review timed out", result.Status);

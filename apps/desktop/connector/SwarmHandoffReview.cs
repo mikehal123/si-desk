@@ -6,9 +6,9 @@ namespace Sovereign.Desktop.Connector;
 
 public sealed record SwarmReviewDecision(string Verdict, string Issues, string Next);
 
-public readonly record struct SwarmWakeSend(bool Ok, string Note);
+public readonly record struct SwarmWakeSend(bool Ok, string Note, int? StatusCode = null);
 
-public sealed record SwarmHandoffWatchResult(bool Started, string Status, string? Note, string? Instruction);
+public sealed record SwarmHandoffWatchResult(bool Started, string Status, string? Note, string? Instruction, string? Transcript = null);
 
 public sealed record SwarmReviewTaskWake(
     [property: JsonPropertyName("id")] string Id,
@@ -141,13 +141,15 @@ public static class SwarmHandoffReview
         var handoff = Clip(HandoffText(reply) ?? "", 2000);
         var preview = GrokbotWake.Preview(handoff);
         if (preview.Length == 0) preview = GrokbotWake.Preview(board.Goal ?? "");
+        var loop = board.ReviewLoops;
         var payload = new ReviewWakePayload(
-            "review-" + (string.IsNullOrEmpty(runId) ? swarmId : runId),
+            "review-" + (string.IsNullOrEmpty(runId) ? swarmId : runId) + "-" + loop.ToString(System.Globalization.CultureInfo.InvariantCulture),
             false,
             preview,
             "review",
             swarmId,
             runId,
+            loop,
             Clip(board.Goal, 240),
             handoff,
             (board.Tasks ?? []).Select(TaskWake).ToArray(),
@@ -178,6 +180,7 @@ public static class SwarmHandoffReview
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         TimeSpan? timeout = null,
         TimeSpan? poll = null,
+        TimeSpan? repeat = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(send);
@@ -197,19 +200,16 @@ public static class SwarmHandoffReview
         live.Save();
 
         var json = WakeJson(live, reply);
-        SwarmWakeSend sent;
-        try
-        {
-            sent = await send(json, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            sent = new SwarmWakeSend(false, "Wake failed.");
-        }
+        var now = clock ?? (() => DateTimeOffset.UtcNow);
+        var wait = delay ?? ((span, token) => Task.Delay(span, token));
+        var limit = timeout ?? DefaultTimeout;
+        var interval = poll ?? DefaultPoll;
+        var repeatEvery = repeat ?? SwarmWakeRepeat.Interval;
+        if (limit < TimeSpan.Zero) limit = TimeSpan.Zero;
+        if (interval < TimeSpan.Zero) interval = TimeSpan.Zero;
+        if (repeatEvery < TimeSpan.Zero) repeatEvery = TimeSpan.Zero;
+
+        var sent = await DispatchWake(send, json, wait, cancellationToken).ConfigureAwait(false);
         if (!sent.Ok)
         {
             var failed = SwarmBoard.Read(path);
@@ -224,13 +224,8 @@ public static class SwarmHandoffReview
             return Finish(failed);
         }
 
-        var now = clock ?? (() => DateTimeOffset.UtcNow);
-        var wait = delay ?? ((span, token) => Task.Delay(span, token));
-        var limit = timeout ?? DefaultTimeout;
-        var interval = poll ?? DefaultPoll;
-        if (limit < TimeSpan.Zero) limit = TimeSpan.Zero;
-        if (interval < TimeSpan.Zero) interval = TimeSpan.Zero;
         var deadline = now().Add(limit);
+        var lastWake = now();
         var steps = 0;
         var maxSteps = interval <= TimeSpan.Zero ? 2 : (int)Math.Min(100000, limit.Ticks / Math.Max(1, interval.Ticks) + 3);
         while (true)
@@ -239,6 +234,22 @@ public static class SwarmHandoffReview
             var current = SwarmBoard.Read(path);
             if (ReadDecision(current) is not null) return Finish(current);
             if (now() >= deadline || steps >= maxSteps) break;
+            if (SwarmWakeRepeat.Due(lastWake, now(), repeatEvery)
+                && string.Equals(current.ReviewStatus, WaitingStatus, StringComparison.Ordinal))
+            {
+                var again = await DispatchWake(send, json, wait, cancellationToken).ConfigureAwait(false);
+                lastWake = now();
+                current = SwarmBoard.Read(path);
+                if (ReadDecision(current) is not null) return Finish(current);
+                if (!again.Ok)
+                {
+                    var note = WakeFailure(again.Note);
+                    current.ReviewNote = note;
+                    current.ReviewStatus = note;
+                    current.Save();
+                    return new SwarmHandoffWatchResult(true, note, note, null);
+                }
+            }
             var remaining = deadline - now();
             var step = interval < remaining ? interval : remaining;
             if (step < TimeSpan.Zero) step = TimeSpan.Zero;
@@ -251,7 +262,39 @@ public static class SwarmHandoffReview
         timed.ReviewStatus = TimedOutStatus;
         timed.ReviewNote = TimeoutNote;
         timed.Save();
-        return new SwarmHandoffWatchResult(true, TimedOutStatus, TimeoutNote, null);
+        await DispatchWake(send, json, wait, cancellationToken).ConfigureAwait(false);
+        return new SwarmHandoffWatchResult(true, TimedOutStatus, TimeoutNote, null, TimeoutNote);
+    }
+
+    private static async Task<SwarmWakeSend> DispatchWake(
+        Func<string, CancellationToken, Task<SwarmWakeSend>> send,
+        string json,
+        Func<TimeSpan, CancellationToken, Task> wait,
+        CancellationToken cancellationToken)
+    {
+        var sent = await SendWake(send, json, cancellationToken).ConfigureAwait(false);
+        if (SwarmWakeRepeat.NextAuthRetry(sent.StatusCode, false) is not { } pause) return sent;
+        await wait(pause, cancellationToken).ConfigureAwait(false);
+        return await SendWake(send, json, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<SwarmWakeSend> SendWake(
+        Func<string, CancellationToken, Task<SwarmWakeSend>> send,
+        string json,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await send(json, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return new SwarmWakeSend(false, "Wake failed.");
+        }
     }
 
     private static SwarmHandoffWatchResult Finish(SwarmBoard board)
@@ -379,6 +422,7 @@ public static class SwarmHandoffReview
         [property: JsonPropertyName("swarm_id")] string SwarmId,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [property: JsonPropertyName("run_id")] string? RunId,
+        [property: JsonPropertyName("review_loop")] int ReviewLoop,
         [property: JsonPropertyName("goal")] string Goal,
         [property: JsonPropertyName("handoff")] string Handoff,
         [property: JsonPropertyName("board")] SwarmReviewTaskWake[] Board,

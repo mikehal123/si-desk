@@ -29,6 +29,8 @@ internal sealed partial class ChatConversation
     private TextBlock? _swarmElapsed;
     private TextBlock? _swarmReviewStatus;
     private TextBlock? _swarmReviewNote;
+    private TextBlock? _swarmWakePanel;
+    private TextBlock? _swarmWakeWarning;
     private Button? _swarmContinueWithoutReview;
     private StackPanel? _swarmFeedLines;
     private TextBlock? _swarmActivityPreview;
@@ -46,6 +48,9 @@ internal sealed partial class ChatConversation
     private string? _swarmGoal;
     private string? _swarmBoardId;
     private DateTime? _swarmStartedUtc;
+    private string _swarmClockReview = "";
+    private string[] _swarmClockTasks = [];
+    private bool _swarmElapsedFrozen;
     private bool _showSwarm;
     private bool _suppressAgentReveal;
     private int _swarmMotionEpoch;
@@ -81,6 +86,14 @@ internal sealed partial class ChatConversation
         _swarmReviewNote.IsTextSelectionEnabled = true;
         _swarmReviewNote.Visibility = Visibility.Collapsed;
         AutomationName(_swarmReviewNote, "Swarm review note");
+        _swarmWakePanel = SubagentCaption("");
+        _swarmWakePanel.IsTextSelectionEnabled = true;
+        _swarmWakePanel.Visibility = Visibility.Collapsed;
+        AutomationName(_swarmWakePanel, "Grokbot wake");
+        _swarmWakeWarning = SubagentCaption("");
+        _swarmWakeWarning.Foreground = DeskTheme.Text;
+        _swarmWakeWarning.Visibility = Visibility.Collapsed;
+        AutomationName(_swarmWakeWarning, "Grokbot wake warning");
         _swarmContinueWithoutReview = new Button
         {
             Content = "Continue without review",
@@ -109,7 +122,7 @@ internal sealed partial class ChatConversation
         var header = new StackPanel
         {
             Spacing = DeskTheme.Space4, HorizontalAlignment = HorizontalAlignment.Stretch,
-            Children = { swarmNote, _swarmGoalText, _swarmProgress, _swarmCounts, _swarmElapsed, reviewRow, _swarmReviewNote, BuildProjectMemory() }
+            Children = { swarmNote, _swarmGoalText, _swarmProgress, _swarmCounts, _swarmElapsed, reviewRow, _swarmWakePanel, _swarmWakeWarning, _swarmReviewNote, BuildProjectMemory() }
         };
         var rows = new ScrollViewer
         {
@@ -352,6 +365,9 @@ internal sealed partial class ChatConversation
         {
             _swarmGoal = goal;
             _swarmStartedUtc = DateTime.UtcNow;
+            _swarmElapsedFrozen = false;
+            _swarmClockReview = "";
+            _swarmClockTasks = [];
             _swarmStatus.Clear();
             _swarmLines.Clear();
             _swarmFeed.Clear();
@@ -398,6 +414,9 @@ internal sealed partial class ChatConversation
         RenderSwarmFeed();
         CaptureSwarmMemory(board);
         RenderProjectMemory();
+        _swarmClockReview = review;
+        _swarmClockTasks = board.Tasks.Select(task => task?.Status ?? "").ToArray();
+        RefreshSwarmElapsed();
     }
 
     private Expander SwarmTaskRow(SwarmBoard board, SwarmTask task, string label, bool pop, bool shake)
@@ -708,8 +727,10 @@ internal sealed partial class ChatConversation
     {
         var started = _swarmStartedUtc;
         var elapsed = _swarmElapsed;
-        if (_disposed || started is null || elapsed is null) return;
+        if (_disposed || started is null || elapsed is null || _swarmElapsedFrozen) return;
         elapsed.Text = SwarmSection.FormatElapsed(DateTime.UtcNow - started.Value);
+        if (SwarmSection.StopRunClock(_swarmClockReview, _swarmClockTasks))
+            _swarmElapsedFrozen = true;
     }
 
     private void WarnIfSkillsMissing()
@@ -816,6 +837,7 @@ internal sealed partial class ChatConversation
     {
         _swarmReloadTimer?.Stop();
         _swarmClock?.Stop();
+        StopReviewResumeTimer();
         StopSwarmMotion();
         if (_swarmWatch is null) return;
         _swarmWatch.EnableRaisingEvents = false;

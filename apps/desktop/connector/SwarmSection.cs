@@ -191,6 +191,23 @@ public static class SwarmSection
         return StatusLabel(task.Status);
     }
 
+    public static bool StopRunClock(string? reviewStatus, IEnumerable<string?>? taskStatuses)
+    {
+        var review = (reviewStatus ?? "").Trim();
+        if (string.Equals(review, SwarmHandoffReview.ReviewedDone, StringComparison.Ordinal)) return true;
+        if (string.Equals(review, SwarmHandoffReview.WaitingStatus, StringComparison.Ordinal)
+            || string.Equals(review, "Waiting for review", StringComparison.Ordinal))
+            return false;
+        if (taskStatuses is null) return false;
+        var any = false;
+        foreach (var status in taskStatuses)
+        {
+            any = true;
+            if (StatusLabel(status) != SwarmStatus.Done) return false;
+        }
+        return any;
+    }
+
     public static string FormatElapsed(TimeSpan span)
     {
         if (span < TimeSpan.Zero) span = TimeSpan.Zero;

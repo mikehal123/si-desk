@@ -197,6 +197,8 @@ internal sealed partial class ChatConversation
                     _chatStatus.Text = "Main agent · working. Enter queues a correction for the main agent. Stop stops the main agent and its helpers. A message is not resent on its own.";
                     void Delta(string text) { content.Append(text); turn.Append(text); _partialReply.Enqueue(text); }
                     ApplySkillGuidance(restoredPrompt);
+                    if (batch.Any(item => ReviewSendMatches(item.Text)))
+                        NoteReviewSendStarted(batch.First(item => ReviewSendMatches(item.Text)).Text);
                     _cursorPromptTask = SendActiveAgentAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images);
                     StartCursorSteering();
                     var result = await _cursorPromptTask;
@@ -259,6 +261,7 @@ internal sealed partial class ChatConversation
         {
             _cursorSendLoop = false;
             SetChatBusy(false); RefreshPendingInstructions(); Save();
+            TryStartQueuedReview();
         }
     }
 
@@ -507,6 +510,8 @@ internal sealed partial class ChatConversation
                     _chatStatus.Text = "Main agent · working. Enter queues a correction for the main agent. Stop stops the main agent and its helpers. A message is not resent on its own.";
                     void Delta(string text) { content.Append(text); turn.Append(text); _partialReply.Enqueue(text); }
                     ApplySkillGuidance(restoredPrompt);
+                    if (batch.Any(item => ReviewSendMatches(item.Text)))
+                        NoteReviewSendStarted(batch.First(item => ReviewSendMatches(item.Text)).Text);
                     await _codexChat!.SendAsync(model, restoredPrompt, Delta, _chatCancellation.Token, images);
                     outcome = "completed";
                     _needsContext = false;
@@ -552,6 +557,7 @@ internal sealed partial class ChatConversation
         {
             _codexSendLoop = false;
             SetChatBusy(false); RefreshPendingInstructions(); Save();
+            TryStartQueuedReview();
         }
     }
 

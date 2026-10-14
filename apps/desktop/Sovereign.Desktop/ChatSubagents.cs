@@ -319,6 +319,7 @@ internal sealed partial class ChatConversation
         }
         try { BindSwarmBoard(board); }
         catch (Exception) { }
+        UpdateSubagentCounts();
     }
 
     private string? SessionForTask(SwarmBoard board, string taskId)
@@ -363,11 +364,22 @@ internal sealed partial class ChatConversation
             var count = listed.Count(child => !SubagentActive(child) && Outcome(child) == outcome);
             if (count > 0) summary.Add($"{label} · {count}");
         }
-        _subagentsToggle.Content = active > 0 ? $"Subagents · {active} working" : $"Subagents · {listed.Count}";
+        _subagentsToggle.Content = $"Subagents · {SubagentBadgeCount()}";
         _subagentSummary.Text = string.Join("   ", summary);
         UpdateClosedAgentCount();
         AutomationName(_subagentsToggle, "Show or hide subagents panel. " + string.Join(", ", summary) + $", {listed.Count} retained helpers.");
         RefreshChatHeaderTabs();
+    }
+
+    private int SubagentBadgeCount()
+    {
+        SwarmBoard? board = null;
+        try { board = SwarmSection.TryLoad(_saved.Id); }
+        catch (Exception) { }
+        return HeaderBadges.Subagents(_subagentRows.Values.Select(child =>
+            new HeaderBadges.SubagentRow(
+                SwarmSection.IsSwarmWorker(child.SessionId, child.Name, child.Task, board),
+                IsSubagentCardClosed(child.SessionId))));
     }
 
     private List<CursorSubagent> ListedHelpers()
