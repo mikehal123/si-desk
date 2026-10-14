@@ -69,7 +69,11 @@ Do these steps in order.
 
 #### 1. Install the Cursor connector
 
-The Connection panel does not have an install button. Install the connector once, from the unzipped app folder.
+On the chat screen, open **Connection** and leave the provider on **Cursor**. If the pinned connector is missing, the panel shows **Install Cursor**. Click it. That runs `setup\Install-CursorConnection.ps1` beside `SIDesk.exe`. It does not read account keys and it does not run a remote install script. **Connect / refresh models** stays in the panel. When the status line says the connector is installed, click **Sign in with Cursor**, then **Connect / refresh models**.
+
+If that script is not beside the app, **Install Cursor** opens the official Cursor CLI installation page, <https://cursor.com/docs/cli/installation>, instead. A Cursor IDE install, or a `cursor-agent` command on PATH, is still not this connector.
+
+You can also install from the unzipped folder without the button.
 
 1. Open the unzipped folder (the one that contains `SIDesk.exe`).
 2. In that folder, open PowerShell and run:
@@ -329,7 +333,7 @@ If Cursor had a saved list from an earlier connect, a failed refresh still shows
 
 | Status line | What to do |
 | --- | --- |
-| The Cursor connector is not installed. Install it, sign in with Cursor, then click Connect / refresh models. | Run `setup\Install-CursorConnection.ps1` as in [Install the Cursor connector](#1-install-the-cursor-connector). Then sign in. |
+| The Cursor connector is not installed. Click Install Cursor, sign in with Cursor, then click Connect / refresh models. | Open **Connection** and click **Install Cursor**, or run `setup\Install-CursorConnection.ps1` as in [Install the Cursor connector](#1-install-the-cursor-connector). Then sign in. |
 | Cursor is not signed in. Click Sign in with Cursor, finish in the browser, then click Connect / refresh models. | Sign in again and finish the browser step within 3 minutes. |
 | Cursor auth failed. Click Sign in with Cursor, finish in the browser, then click Connect / refresh models. | The login command exited with an error. Sign in again. |
 | Cursor could not be reached (network). Check this PC's connection, then click Connect / refresh models. | Check the network, then connect again. |
@@ -354,7 +358,7 @@ Choose a model advertised by that provider. SI Desk does not silently swap in a 
 | Cursor runtime already exists at … It was not overwritten. | That version is already on this Windows account. Do not expect the script to replace it. Sign in and connect. If Settings still says **Connector not installed**, that folder is missing `node.exe` or `index.js`. |
 | Official Cursor package does not match the pinned download. | The download was not the pinned zip. Run the script again on a stable connection. Do not point the script at a different zip. |
 | Cursor package is incomplete. | The zip did not contain `dist-package\node.exe` and `dist-package\index.js`. |
-| Connector missing. Install it or locate its executable, then check again. | This is the Connections window inside the app, which looks for `setup\Install-CursorConnection.ps1` beside `SIDesk.exe`. Keep that file next to the exe. The chat **Connection** panel does not run the script for you. |
+| Connector missing. Install it or locate its executable, then check again. | Settings looks for `setup\Install-CursorConnection.ps1` beside `SIDesk.exe`. Keep that file next to the exe. The chat **Connection** panel runs the same script when you click **Install Cursor**. |
 
 ### Port 8789 or 8790
 

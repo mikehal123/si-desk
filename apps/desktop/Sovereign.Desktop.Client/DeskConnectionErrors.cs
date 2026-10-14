@@ -21,7 +21,7 @@ public static class DeskConnectionErrors
         "Could not refresh xAI models. Save an xAI API key in Settings, check the network, then click Connect / refresh models.";
 
     public const string CursorNotInstalled =
-        "The Cursor connector is not installed. Install it, sign in with Cursor, then click Connect / refresh models.";
+        "The Cursor connector is not installed. Click Install Cursor, sign in with Cursor, then click Connect / refresh models.";
 
     public const string CursorNotSignedIn =
         "Cursor is not signed in. Click Sign in with Cursor, finish in the browser, then click Connect / refresh models.";

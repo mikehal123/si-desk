@@ -93,6 +93,7 @@ internal sealed partial class ChatConversation
     private Flyout? _connectionFlyout;
     private Button? _chatConnect;
     private Button? _chatLogin;
+    private Button? _chatInstall;
     private Button? _chatNew;
     internal bool _chatReady;
     private bool _cursorConnecting;
@@ -159,6 +160,7 @@ internal sealed partial class ChatConversation
             _chatStatus.Text=PlanProvider == "moonshot" ? "Kimi Platform API · uses your platform.kimi.ai API balance, not a Kimi Code subscription. Paste your API key and connect." : "Coding-plan connection. Open Folder to enable project tools. Import your IMIGROK key or enter it here. Access and usage limits depend on the provider; no general paid-API fallback.";
         }
         RefreshAttachmentStatus();
+        RefreshCursorInstallButton();
     }
     private void BuildChatPage()
     {
@@ -171,6 +173,9 @@ internal sealed partial class ChatConversation
         _chatProvider.SelectionChanged += (_, _) => ProviderChanged();
         _chatConnect = Button("Connect / refresh models", ConnectChatAsync);
         _chatLogin = Button("Sign in with ChatGPT", async () => { await StartChatSignInAsync(); });
+        _chatInstall = Button(CursorInstall.ButtonLabel, InstallCursorAsync);
+        _chatInstall.Visibility = Visibility.Collapsed;
+        ToolTipService.SetToolTip(_chatInstall, "Install the pinned Cursor connector. Then click Connect / refresh models.");
         _chatNew = Button("New conversation", () => { _connectionFlyout?.Hide(); _newChat(_chatProvider.SelectedIndex, _projectFolder); });
         var import = Button("Import IMIGROK key", async () =>
         {
@@ -187,7 +192,7 @@ internal sealed partial class ChatConversation
         _planEndpoint.SelectionChanged += (_,_) => { if(PlanChat) { _chatReady=false; if(_chatSend is not null) _chatSend.IsEnabled=false; RefreshAttachmentStatus(); } };
         _connectionFlyout = new Flyout { Content = new ScrollViewer { MaxHeight = 480, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Enabled, Content = new StackPanel { Spacing = DeskTheme.Space12, Children = {
             Head("Connection"), _chatProvider,
-            new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin } }, BuildProjectToolbar(), _planControls
+            new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { _chatConnect, _chatLogin, _chatInstall } }, BuildProjectToolbar(), _planControls
         } } } };
         ((FrameworkElement)_connectionFlyout.Content).RequestedTheme = ElementTheme.Dark;
         DeskTheme.Install(((FrameworkElement)_connectionFlyout.Content).Resources);
@@ -416,6 +421,59 @@ internal sealed partial class ChatConversation
         finally { SetChatBusy(false); }
     }
 
+    private async Task InstallCursorAsync()
+    {
+        if (IsWorking)
+        {
+            _chatStatus.Text = "Finish or stop the current response before installing Cursor.";
+            return;
+        }
+        var plan = CursorInstall.Plan(AppContext.BaseDirectory, CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory));
+        if (plan.Step == CursorInstallStep.AlreadyInstalled)
+        {
+            _chatStatus.Text = CursorInstall.AlreadyInstalledStatus;
+            RefreshCursorInstallButton();
+            return;
+        }
+        SetChatBusy(true);
+        try
+        {
+            if (plan.Step == CursorInstallStep.OpenPage)
+            {
+                var opened = plan.Page is not null && await Launcher.LaunchUriAsync(plan.Page);
+                _chatStatus.Text = opened ? CursorInstall.PageOpenedStatus : CursorInstall.PageFailedStatus;
+                return;
+            }
+            _chatStatus.Text = "Installing the Cursor connector…";
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            await CursorInstall.RunInstallerAsync(AppContext.BaseDirectory, timeout.Token);
+            _chatStatus.Text = CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory)
+                ? CursorInstall.InstalledStatus
+                : CursorInstall.FailedStatus;
+        }
+        catch (OperationCanceledException)
+        {
+            _chatStatus.Text = CursorInstall.CanceledStatus;
+        }
+        catch (Exception)
+        {
+            _chatStatus.Text = plan.Step == CursorInstallStep.OpenPage
+                ? CursorInstall.PageFailedStatus
+                : CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory)
+                    ? CursorInstall.InstalledStatus
+                    : CursorInstall.FailedStatus;
+        }
+        finally { SetChatBusy(false); }
+    }
+
+    private void RefreshCursorInstallButton()
+    {
+        if (_chatInstall is null) return;
+        var show = CursorInstall.Offer(CursorChat, CursorChatClient.IsRuntime(CursorChatClient.RuntimeDirectory));
+        _chatInstall.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        _chatInstall.IsEnabled = show && !_chatBusy;
+    }
+
     private static string ReadXaiApiKey()
     {
         try
@@ -589,6 +647,7 @@ internal sealed partial class ChatConversation
         _chatProvider.IsEnabled = !busy; _chatModel.IsEnabled = !busy;
         if (_chatConnect is not null) _chatConnect.IsEnabled = !busy;
         if (_chatLogin is not null) _chatLogin.IsEnabled = !busy && (CursorChat || GrokBuildChat);
+        RefreshCursorInstallButton();
         _planKey.IsEnabled = !busy; _planEndpoint.IsEnabled = !busy;
         if (_chatNew is not null) _chatNew.IsEnabled = true;
         if (_openProject is not null) _openProject.IsEnabled = !busy;

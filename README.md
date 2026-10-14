@@ -10,7 +10,7 @@ It is not affiliated with, endorsed by, or supported by xAI. xAI is a trademark 
 Windows 10 or 11, 64-bit. Full steps, screens, and troubleshooting: **[Getting started](docs/GETTING-STARTED.md)**.
 
 1. Download [`SIDesk-0.3.66-win-x64.zip`](https://github.com/mikehal123/si-desk/releases) from the latest release, unzip it, and run `SIDesk.exe`. The build is unsigned. If Windows SmartScreen warns, click **More info**, then **Run anyway**.
-2. A Cursor subscription needs a one-time connector install. The app does not find `cursor` or `cursor-agent` on PATH. In the unzipped folder run `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup\Install-CursorConnection.ps1`, then in the app click **Sign in with Cursor** and **Connect / refresh models**.
+2. A Cursor subscription needs a one-time connector install. The app does not find `cursor` or `cursor-agent` on PATH. Open **Connection** and click **Install Cursor**, or from the unzipped folder run `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup\Install-CursorConnection.ps1`. Then click **Sign in with Cursor** and **Connect / refresh models**.
 3. Grok Build uses a `grok.exe` already on the PC. An xAI API key is saved in **Settings**. Either one is enough if you are not using Cursor.
 
 Source and releases: https://github.com/mikehal123/si-desk
@@ -46,7 +46,7 @@ Source and releases: https://github.com/mikehal123/si-desk
 
 - Windows 10 or 11 (x64)
 - One connection: a Cursor subscription, the Grok Build CLI, or an API key for the xAI API
-- Cursor users run `setup\Install-CursorConnection.ps1` from the unzipped release once (the same file is `scripts\Install-CursorConnection.ps1` in a source checkout). See [Getting started](docs/GETTING-STARTED.md).
+- Cursor users click **Install Cursor** in the chat **Connection** panel, or run `setup\Install-CursorConnection.ps1` from the unzipped release once (the same file is `scripts\Install-CursorConnection.ps1` in a source checkout). See [Getting started](docs/GETTING-STARTED.md).
 - Shared room expects `room-tunnel\cloudflared.exe` beside the app and checks a pinned SHA-256. This repository does not include that file.
 - The .NET SDK is only needed to build from source
 
