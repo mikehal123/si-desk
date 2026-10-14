@@ -64,7 +64,7 @@ public sealed partial class MainWindow
         var page = new StackPanel { Spacing = DeskTheme.Space16, MaxWidth = 920, Children = {
             heading,
             SettingsCard(ConnectionsSection()), SettingsCard(DataSection()), SettingsCard(SkillLibrarySection()),
-            SettingsCard(PhoneSection()), SettingsCard(ConnectorSection()), SettingsCard(UpdatesSection()), SettingsCard(AboutSection()) } };
+            SettingsCard(PhoneSection()), SettingsCard(ConnectorSection()), SettingsCard(SiDeskUpdatesSection()), SettingsCard(AboutSection()) } };
         _settingsPage.Children.Add(PageScroll(page, minimumWidth: 620, centered: true));
         RefreshConnectionStatuses();
     }
@@ -108,8 +108,6 @@ public sealed partial class MainWindow
             SettingsDivider(),
             _settingsDataStatus } };
     }
-    private static StackPanel UpdatesSection() => new() { Spacing = DeskTheme.Space12, Children = { Head("Updates"), Note("Updates are off.") } };
-
     private static StackPanel AboutSection()
     {
         var identity = new Grid { ColumnSpacing = DeskTheme.Space12 };

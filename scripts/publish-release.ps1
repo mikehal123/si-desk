@@ -99,6 +99,23 @@ if (-not (Test-Path -LiteralPath $setupExe -PathType Leaf)) {
 }
 Copy-Item -LiteralPath $setupExe -Destination (Join-Path $publishDir 'SIDesk.Setup.exe') -Force
 
+# The in-app updater copies this helper to %TEMP% and runs it to swap the app folder.
+$helperProject = Join-Path $repoRoot 'apps\desktop\SIDesk.UpdateHelper\SIDesk.UpdateHelper.csproj'
+$helperDir = Join-Path $repoRoot 'artifacts\publish\update-helper'
+if (Test-Path -LiteralPath $helperDir) {
+    Remove-Item -LiteralPath $helperDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $helperDir | Out-Null
+& dotnet publish $helperProject -c Release -r win-x64 --self-contained true -o $helperDir
+if ($LASTEXITCODE -ne 0) {
+    throw "Update helper publish failed with exit code $LASTEXITCODE."
+}
+$helperExe = Join-Path $helperDir 'SIDesk.UpdateHelper.exe'
+if (-not (Test-Path -LiteralPath $helperExe -PathType Leaf)) {
+    throw 'Update helper publish did not produce SIDesk.UpdateHelper.exe.'
+}
+Copy-Item -LiteralPath $helperExe -Destination (Join-Path $publishDir 'SIDesk.UpdateHelper.exe') -Force
+
 $scanOutput = @(& $scanPath -Root $publishDir 2>&1)
 $scanExit = $LASTEXITCODE
 
