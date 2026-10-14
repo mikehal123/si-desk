@@ -5,9 +5,11 @@ SI Desk (SI = super intelligence) is an unofficial, community-built Windows desk
 **SI Desk is an independent project. It is not affiliated with or endorsed by SpaceXSI. Grok is their trademark.**
 It is not affiliated with, endorsed by, or supported by xAI. xAI is a trademark of its owner.
 
+**New here?** Follow **[How to use SI Desk](docs/HOW-TO-USE.md)**. It walks through install, connecting a provider, chat, subagents, swarm, Changes, Shared room, and Grok Bot.
+
 ## Quick start
 
-Windows 10 or 11, 64-bit. Full steps, screens, and troubleshooting: **[Getting started](docs/GETTING-STARTED.md)**.
+Windows 10 or 11, 64-bit. Screen-by-screen steps: **[How to use SI Desk](docs/HOW-TO-USE.md)**. Installer notes and the full status-line list: **[Getting started](docs/GETTING-STARTED.md)**.
 
 1. Download [`SIDesk-0.3.66-win-x64.zip`](https://github.com/mikehal123/si-desk/releases) from the latest release, unzip it, and run `SIDesk.exe`. The build is unsigned. If Windows SmartScreen warns, click **More info**, then **Run anyway**.
 2. A Cursor subscription needs a one-time connector install. The app does not find `cursor` or `cursor-agent` on PATH. Open **Connection** and click **Install Cursor**, or from the unzipped folder run `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup\Install-CursorConnection.ps1`. Then click **Sign in with Cursor** and **Connect / refresh models**.
@@ -30,16 +32,16 @@ Source and releases: https://github.com/mikehal123/si-desk
 
 ## Screenshots
 
-![Swarm tab](docs/screenshots/swarm.png)
+<!-- SCREENSHOT: sidebar with Super Intelligence Desk label, Swarm tab, a goal split into engineer and verifier tasks, all done -->
 *Swarm: a goal split into engineer and verifier tasks, all done.*
 
-![Subagents tab](docs/screenshots/subagents.png)
+<!-- SCREENSHOT: sidebar with Super Intelligence Desk label, Subagents panel with helper cards (model, status, run time) and the Old section -->
 *Subagents: helper cards with model, status and run time.*
 
-![Changes review](docs/screenshots/changes.png)
+<!-- SCREENSHOT: sidebar with Super Intelligence Desk label, Changes tab with a line-by-line review of an agent's file edits before anything is applied -->
 *Changes: line-by-line review of an agent's file edits before anything is applied.*
 
-![Grokbot tab](docs/screenshots/grokbot.png)
+<!-- SCREENSHOT: sidebar with Super Intelligence Desk label, Grok Bot mailbox with Ask Grokbot to act and Stop Grokbot -->
 *Grok Bot: an assistant that reads your chats and can act inside SI Desk when you allow it.*
 
 ## Requirements
