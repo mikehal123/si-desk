@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.67
+
+- The sidebar header next to the SI logo and the Settings About card now read Super Intelligence Desk. The app name, window title, and SIDesk.exe are unchanged. The sidebar label wraps to two lines when the sidebar is narrow.
+
 ## 0.3.66
 
 - The product name is SI Desk (SI = super intelligence). The program is SIDesk.exe, and setup installs to `%LOCALAPPDATA%\Programs\SI Desk`.
