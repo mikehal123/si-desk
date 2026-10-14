@@ -1,15 +1,19 @@
 # SI Desk
 
 SI Desk (SI = super intelligence) is an unofficial, community-built Windows desktop app for Grok.
-It is **not affiliated with, endorsed by, or supported by xAI.**
-SpaceXSI, xAI and Grok are trademarks of their respective owners. This project is independent and is not affiliated with or endorsed by them.
 
-## Quick install
+**SI Desk is an independent project. It is not affiliated with or endorsed by SpaceXSI. Grok is their trademark.**
+It is not affiliated with, endorsed by, or supported by xAI. xAI is a trademark of its owner.
 
-Download the zip from the latest release, unzip, run SIDesk.exe.
+## Quick start
+
+Windows 10 or 11, 64-bit. Full steps, screens, and troubleshooting: **[Getting started](docs/GETTING-STARTED.md)**.
+
+1. Download [`SIDesk-0.3.66-win-x64.zip`](https://github.com/mikehal123/si-desk/releases) from the latest release, unzip it, and run `SIDesk.exe`. The build is unsigned. If Windows SmartScreen warns, click **More info**, then **Run anyway**.
+2. A Cursor subscription needs a one-time connector install. The app does not find `cursor` or `cursor-agent` on PATH. In the unzipped folder run `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup\Install-CursorConnection.ps1`, then in the app click **Sign in with Cursor** and **Connect / refresh models**.
+3. Grok Build uses a `grok.exe` already on the PC. An xAI API key is saved in **Settings**. Either one is enough if you are not using Cursor.
+
 Source and releases: https://github.com/mikehal123/si-desk
-Windows 10 or 11 x64, nothing else to install.
-The build is unsigned, so Windows SmartScreen will warn: click More info, then Run anyway.
 
 ## Features
 
@@ -42,8 +46,8 @@ The build is unsigned, so Windows SmartScreen will warn: click More info, then R
 
 - Windows 10 or 11 (x64)
 - One connection: a Cursor subscription, the Grok Build CLI, or an API key for the xAI API
-- Cursor users run `scripts\Install-CursorConnection.ps1` once
-- Shared Room downloads cloudflared on first use
+- Cursor users run `setup\Install-CursorConnection.ps1` from the unzipped release once (the same file is `scripts\Install-CursorConnection.ps1` in a source checkout). See [Getting started](docs/GETTING-STARTED.md).
+- Shared room expects `room-tunnel\cloudflared.exe` beside the app and checks a pinned SHA-256. This repository does not include that file.
 - The .NET SDK is only needed to build from source
 
 ## Build
