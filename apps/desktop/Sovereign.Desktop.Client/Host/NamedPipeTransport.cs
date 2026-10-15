@@ -12,7 +12,7 @@ public sealed class NamedPipeTransport : IDisposable, IAsyncDisposable
     public async Task ConnectAsync(string pipeName, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var name = NormalizePipeName(pipeName);
-        _pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+        _pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, Sovereign.Desktop.Client.LocalPipeAccess.Client);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linked.CancelAfter(timeout);
         try
