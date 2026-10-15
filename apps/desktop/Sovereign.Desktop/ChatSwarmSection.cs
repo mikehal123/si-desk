@@ -47,10 +47,12 @@ internal sealed partial class ChatConversation
     private DispatcherQueueTimer? _swarmReloadTimer;
     private string? _swarmGoal;
     private string? _swarmBoardId;
-    private DateTime? _swarmStartedUtc;
-    private string _swarmClockReview = "";
-    private string[] _swarmClockTasks = [];
-    private bool _swarmElapsedFrozen;
+    private readonly SwarmRunProgress _swarmRunProgress = new();
+    private StackPanel? _swarmOtherRuns;
+    private SwarmBoard? _swarmClockBoard;
+    private DateTime _swarmClockStarted;
+    private DateTime _swarmClockWrite;
+    private DateTime _swarmClockProgress;
     private bool _showSwarm;
     private bool _suppressAgentReveal;
     private int _swarmMotionEpoch;
@@ -78,6 +80,10 @@ internal sealed partial class ChatConversation
         AutomationName(_swarmProgress, "Swarm progress 0 of 0");
         _swarmCounts = SubagentCaption("");
         _swarmElapsed = SubagentCaption("");
+        _swarmElapsed.Foreground = DeskTheme.Text;
+        AutomationName(_swarmElapsed, "Swarm run state");
+        _swarmOtherRuns = new StackPanel { Spacing = 0, Visibility = Visibility.Collapsed };
+        AutomationName(_swarmOtherRuns, "Other swarm runs");
         _swarmReviewStatus = SubagentCaption("");
         _swarmReviewStatus.Foreground = DeskTheme.Text;
         _swarmReviewStatus.Visibility = Visibility.Collapsed;
@@ -119,10 +125,32 @@ internal sealed partial class ChatConversation
         };
         var swarmNote = SubagentCaption("Tasks for this goal. Expand a task to read its subagent chat.");
         AutomationName(swarmNote, "Swarm tab note");
+        var clearSwarm = new Button
+        {
+            Content = "Clear swarm",
+            FontFamily = DeskTheme.UiFont,
+            FontSize = DeskTheme.SizeCaption,
+            Padding = new Thickness(DeskTheme.Space8, DeskTheme.Space4, DeskTheme.Space8, DeskTheme.Space4),
+            MinHeight = DeskTheme.Space24,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Background = DeskTheme.Raised,
+            Foreground = DeskTheme.Text,
+            BorderBrush = DeskTheme.Divider,
+            BorderThickness = new Thickness(1)
+        };
+        AutomationName(clearSwarm, "Clear swarm");
+        clearSwarm.Click += ClearSwarmClick;
+        var headerBar = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
+        headerBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerBar.Children.Add(swarmNote);
+        Grid.SetColumn(clearSwarm, 1);
+        headerBar.Children.Add(clearSwarm);
         var header = new StackPanel
         {
             Spacing = DeskTheme.Space4, HorizontalAlignment = HorizontalAlignment.Stretch,
-            Children = { swarmNote, _swarmGoalText, _swarmProgress, _swarmCounts, _swarmElapsed, reviewRow, _swarmWakePanel, _swarmWakeWarning, _swarmReviewNote, BuildProjectMemory() }
+            Children = { headerBar, _swarmGoalText, _swarmElapsed, _swarmProgress, _swarmCounts, reviewRow, _swarmWakePanel, _swarmWakeWarning, _swarmReviewNote, _swarmOtherRuns, BuildProjectMemory() }
         };
         var rows = new ScrollViewer
         {
@@ -242,7 +270,7 @@ internal sealed partial class ChatConversation
             _swarmClock = _swarmQueue.CreateTimer();
             _swarmClock.Interval = TimeSpan.FromSeconds(1);
             _swarmClock.IsRepeating = true;
-            _swarmClock.Tick += (_, _) => RefreshSwarmElapsed();
+            _swarmClock.Tick += (_, _) => { RefreshSwarmElapsed(); FlushRunWakes(); };
             _swarmClock.Start();
             _swarmReloadTimer = _swarmQueue.CreateTimer();
             _swarmReloadTimer.Interval = TimeSpan.FromMilliseconds(180);
@@ -295,7 +323,7 @@ internal sealed partial class ChatConversation
         try
         {
             var board = SwarmSection.TryLoad(_saved.Id);
-            if (board is null)
+            if (board is null || (!_saved.SwarmEnabled && !SwarmRunActive(board)))
             {
                 HideSwarmBoard();
                 return;
@@ -328,6 +356,7 @@ internal sealed partial class ChatConversation
 
     private void HideSwarmBoard()
     {
+        _swarmClockBoard = null;
         _swarmPanelTab.Visibility = Visibility.Collapsed;
         StopSwarmMotion();
         _swarmRows.Children.Clear();
@@ -343,6 +372,7 @@ internal sealed partial class ChatConversation
         var feedLines = _swarmFeedLines;
         var reviewStatus = _swarmReviewStatus;
         if (goalText is null || progressBar is null || counts is null || elapsed is null || feedLines is null || reviewStatus is null) return;
+        NoteSwarmBoard(board);
         var review = (board.ReviewStatus ?? "").Trim();
         reviewStatus.Text = review;
         reviewStatus.Visibility = review.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -364,16 +394,14 @@ internal sealed partial class ChatConversation
         if (!string.Equals(_swarmGoal, goal, StringComparison.Ordinal))
         {
             _swarmGoal = goal;
-            _swarmStartedUtc = DateTime.UtcNow;
-            _swarmElapsedFrozen = false;
-            _swarmClockReview = "";
-            _swarmClockTasks = [];
             _swarmStatus.Clear();
             _swarmLines.Clear();
             _swarmFeed.Clear();
-            RefreshSwarmElapsed();
         }
         goalText.Text = goal;
+        var runState = RememberSwarmClock(board, DateTime.UtcNow);
+        var finished = runState.Finished;
+        elapsed.Text = runState.Label;
         var progress = SwarmSection.Measure(board.Tasks);
         progressBar.Minimum = 0;
         progressBar.Maximum = 1;
@@ -401,7 +429,7 @@ internal sealed partial class ChatConversation
             }
             _swarmStatus[id] = label;
             _swarmLines[id] = line;
-            _swarmRows.Children.Add(SwarmTaskRow(board, task, label, transition && label == "done", transition && label == "failed"));
+            _swarmRows.Children.Add(SwarmTaskRow(board, task, label, finished, transition && label == "done", transition && label == "failed"));
             try
             {
                 _suppressAgentReveal = true;
@@ -414,12 +442,9 @@ internal sealed partial class ChatConversation
         RenderSwarmFeed();
         CaptureSwarmMemory(board);
         RenderProjectMemory();
-        _swarmClockReview = review;
-        _swarmClockTasks = board.Tasks.Select(task => task?.Status ?? "").ToArray();
-        RefreshSwarmElapsed();
     }
 
-    private Expander SwarmTaskRow(SwarmBoard board, SwarmTask task, string label, bool pop, bool shake)
+    private Expander SwarmTaskRow(SwarmBoard board, SwarmTask task, string label, bool finished, bool pop, bool shake)
     {
         var titleText = string.IsNullOrWhiteSpace(task.Title) ? task.Id : task.Title.Trim();
         var roleText = string.IsNullOrWhiteSpace(task.Role) ? "worker" : task.Role.Trim();
@@ -448,9 +473,10 @@ internal sealed partial class ChatConversation
             Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space4, VerticalAlignment = VerticalAlignment.Center,
             Children = { faceBox, role }
         };
+        var chip = SwarmRunView.TaskLabel(label, finished);
         var state = new TextBlock
         {
-            Text = label == "done" ? "\u2713 " + label : label, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption,
+            Text = label == "done" ? "\u2713 " + chip : chip, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeCaption,
             Foreground = DeskTheme.StatusForeground(SwarmSection.PillState(label)), MaxLines = 1, TextWrapping = TextWrapping.NoWrap
         };
         var pill = SubagentStatusChip(state);
@@ -520,15 +546,11 @@ internal sealed partial class ChatConversation
         string? overrideId = null;
         if (!string.IsNullOrWhiteSpace(_saved.Id) && !string.IsNullOrWhiteSpace(task.Id))
             loaded.Overrides.TryGetValue(_saved.Id + "/" + task.Id, out overrideId);
-        var wake = IsCursorWakeRole(task.Role);
-        var picked = wake ? null : SwarmRoleModels.ForRole(advertised, loaded.Roles, task.Role, chatModelId, overrideId);
-        string hireLabel;
-        if (wake) hireLabel = "Wake role";
-        else if (string.IsNullOrWhiteSpace(picked)) hireLabel = "No model hire";
-        else hireLabel = ChatModelLabel.Display(picked, AdvertisedName(advertised, picked));
+        var picked = SwarmRoleModels.ForRole(advertised, loaded.Roles, task.Role, chatModelId, overrideId);
+        var hireLabel = string.IsNullOrWhiteSpace(picked) ? "No model hire" : ChatModelLabel.Display(picked, AdvertisedName(advertised, picked));
         var caption = SubagentCaption("Model: " + hireLabel);
         notes.Children.Insert(0, caption);
-        if (wake || advertised.Length == 0) return;
+        if (advertised.Length == 0) return;
 
         var combo = new ComboBox
         {
@@ -567,10 +589,6 @@ internal sealed partial class ChatConversation
         if (live is { Length: > 0 }) return live;
         return CursorModelCatalog.Load(_profileDirectory);
     }
-
-    private static bool IsCursorWakeRole(string? role) =>
-        string.Equals(role, "grokbot-research", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(role, "grokbot-ops", StringComparison.OrdinalIgnoreCase);
 
     private static string? AdvertisedName(IReadOnlyList<CursorChatModel> advertised, string id)
     {
@@ -723,14 +741,59 @@ internal sealed partial class ChatConversation
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return false; }
     }
 
+    private bool SwarmRunActive(SwarmBoard board)
+    {
+        var phase = RememberSwarmClock(board, DateTime.UtcNow).Phase;
+        return phase is SwarmRunPhase.Running or SwarmRunPhase.Stalled;
+    }
+
+    private SwarmRunState RememberSwarmClock(SwarmBoard board, DateTime now)
+    {
+        _swarmClockBoard = board;
+        var path = File.Exists(board.BoardPath) ? board.BoardPath : SwarmSection.ActiveBoardFile(_saved.Id);
+        if (!string.IsNullOrEmpty(path))
+        {
+            _swarmClockStarted = SwarmRunView.StartedUtc(path);
+            _swarmClockWrite = File.GetLastWriteTimeUtc(path);
+            _swarmClockProgress = _swarmRunProgress.Observe(board.Id, SwarmRunView.ProgressKey(board), _swarmClockWrite);
+        }
+        else
+        {
+            _swarmClockStarted = now;
+            _swarmClockWrite = now;
+            _swarmClockProgress = now;
+        }
+        return SwarmRunView.Describe(board, _swarmClockStarted, _swarmClockProgress, _swarmClockWrite, now);
+    }
+
+    private async void ClearSwarmClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.XamlRoot is null) return;
+        var dialog = new ContentDialog
+        {
+            Title = "Clear swarm?",
+            Content = "Stop helpers still running for this run, then move this run's files into archived. Nothing is deleted.",
+            PrimaryButtonText = "Clear swarm",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = button.XamlRoot
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (_disposed) return;
+        var loaded = SwarmSection.TryLoad(_saved.Id);
+        var runId = loaded is not null && !string.IsNullOrWhiteSpace(loaded.Id) ? loaded.Id : _swarmBoardId;
+        var folder = SwarmSection.ConversationFolder(_saved.Id);
+        FinishSubagents("stopped");
+        if (string.IsNullOrWhiteSpace(folder) || string.IsNullOrWhiteSpace(runId)) return;
+        if (SwarmRunArchive.Move(folder, runId).Moved) ReloadSwarmSection();
+    }
+
     private void RefreshSwarmElapsed()
     {
-        var started = _swarmStartedUtc;
         var elapsed = _swarmElapsed;
-        if (_disposed || started is null || elapsed is null || _swarmElapsedFrozen) return;
-        elapsed.Text = SwarmSection.FormatElapsed(DateTime.UtcNow - started.Value);
-        if (SwarmSection.StopRunClock(_swarmClockReview, _swarmClockTasks))
-            _swarmElapsedFrozen = true;
+        var board = _swarmClockBoard;
+        if (_disposed || board is null || elapsed is null) return;
+        elapsed.Text = SwarmRunView.Describe(board, _swarmClockStarted, _swarmClockProgress, _swarmClockWrite, DateTime.UtcNow).Label;
     }
 
     private void WarnIfSkillsMissing()

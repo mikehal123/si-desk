@@ -333,7 +333,7 @@ public static class SwarmHandoffReview
         throw new ArgumentException("Swarm id is required.");
     }
 
-    internal static void Identity(SwarmBoard board, out string swarmId, out string? runId)
+    public static void Identity(SwarmBoard board, out string swarmId, out string? runId)
     {
         swarmId = board.Id ?? "";
         runId = null;

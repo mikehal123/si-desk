@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Sovereign.Desktop.Connector;
 
@@ -91,21 +89,6 @@ public static class SwarmLoop
             "pass because findstr matched the current proof file"));
     }
 
-    public static string WakeJson(SwarmBoard board, SwarmTask task)
-    {
-        var swarmId = board.Id;
-        string? runId = null;
-        var root = (board.Root ?? "").TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (Path.GetFileName(root).Equals("runs", StringComparison.OrdinalIgnoreCase))
-        {
-            runId = board.Id;
-            var swarm = Path.GetFileName(Path.GetDirectoryName(root) ?? "");
-            if (!string.IsNullOrEmpty(swarm)) swarmId = swarm;
-        }
-        var payload = new SwarmWakePayload(task.Id, false, GrokbotWake.Preview(task.Title), swarmId, task.Id, task.Title, task.Details ?? "", runId);
-        return JsonSerializer.Serialize(payload);
-    }
-
     public static async Task<(int ExitCode, string Text)> CommandAsync(string file, string arguments)
     {
         using var process = new Process();
@@ -123,15 +106,4 @@ public static class SwarmLoop
         var text = stdout + stderr;
         return (process.ExitCode, text);
     }
-
-    private sealed record SwarmWakePayload(
-        [property: JsonPropertyName("message_id")] string MessageId,
-        [property: JsonPropertyName("act")] bool Act,
-        [property: JsonPropertyName("preview")] string Preview,
-        [property: JsonPropertyName("swarm_id")] string SwarmId,
-        [property: JsonPropertyName("task_id")] string TaskId,
-        [property: JsonPropertyName("title")] string Title,
-        [property: JsonPropertyName("details")] string Details,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [property: JsonPropertyName("run_id")] string? RunId = null);
 }

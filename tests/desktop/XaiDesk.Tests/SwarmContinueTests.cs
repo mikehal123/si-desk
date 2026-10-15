@@ -575,6 +575,5 @@ public sealed class SwarmContinueTests
         public string GrokbotNavigate(string page) => "";
         public void RecordGrokbotTool(string tool, string args, string result) { }
         public string ReadSwarmBoard(string? swarmId, string? runId = null) => "";
-        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null) => "";
     }
 }

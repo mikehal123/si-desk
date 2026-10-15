@@ -18,7 +18,7 @@ public static class GrokbotTranscript
         var builder = new StringBuilder();
         foreach (var mail in messages)
         {
-            Append(builder, "You: ", mail.Text, mail.Created);
+            if (!mail.IsPost) Append(builder, "You: ", mail.Text, mail.Created);
             if (string.IsNullOrWhiteSpace(mail.Reply)) continue;
             Append(builder, "Grokbot: ", mail.Reply, mail.AnsweredAt ?? mail.Created);
         }
@@ -33,7 +33,7 @@ public static class GrokbotTranscript
         var count = 0;
         foreach (var mail in messages)
         {
-            count++;
+            if (!mail.IsPost) count++;
             if (!string.IsNullOrWhiteSpace(mail.Reply)) count++;
         }
         return count;

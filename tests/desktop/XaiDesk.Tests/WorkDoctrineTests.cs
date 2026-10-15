@@ -17,14 +17,15 @@ public sealed class WorkDoctrineTests
         Assert.Contains("REVERSIBLE", skill, StringComparison.Ordinal);
         Assert.Contains("nothing is done without proof per the verify-result skill", skill, StringComparison.Ordinal);
         var index = File.ReadAllText(Path.Combine(Directory.GetParent(path)!.Parent!.FullName, "index.json"));
-        foreach (var role in new[] { "main", "subagent", "engineer", "researcher", "verifier", "grokbot-research", "grokbot-ops", "manager" })
+        foreach (var role in new[] { "main", "subagent", "engineer", "researcher", "scout", "verifier", "manager" })
             Assert.Contains("\"" + role + "\"", index, StringComparison.Ordinal);
+        Assert.DoesNotContain("grokbot", index, StringComparison.OrdinalIgnoreCase);
 
         var prefix = WorkDoctrine.PromptPrefix();
         Assert.Contains("main agent loads it by default", prefix, StringComparison.Ordinal);
         Assert.Contains("put the Work Doctrine text below at the top of that helper's task", prefix, StringComparison.Ordinal);
 
-        foreach (var role in new[] { SwarmRole.Engineer, SwarmRole.Researcher, SwarmRole.Verifier, SwarmRole.GrokbotResearch, SwarmRole.GrokbotOps, "worker" })
+        foreach (var role in new[] { SwarmRole.Engineer, SwarmRole.Researcher, SwarmRole.Scout, SwarmRole.Verifier, SwarmRole.Investigator, "worker" })
         {
             var prompt = SwarmRoles.For(role);
             Assert.Contains("# Work Doctrine", prompt, StringComparison.Ordinal);

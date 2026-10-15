@@ -17,13 +17,29 @@ public static class SwarmRole
     public const string Engineer = "engineer";
     public const string Investigator = "investigator";
     public const string Researcher = "researcher";
+    /// <summary>Second, independent lookup agent. Cross-checks facts and finds sources the researcher missed.</summary>
+    public const string Scout = "scout";
     public const string Verifier = "verifier";
-    public const string GrokbotResearch = "grokbot-research";
-    public const string GrokbotOps = "grokbot-ops";
 
-    public static bool IsGrokbot(string? role) =>
-        string.Equals(role, GrokbotResearch, StringComparison.Ordinal)
-        || string.Equals(role, GrokbotOps, StringComparison.Ordinal);
+    /// <summary>
+    /// Grok Bot is the grandparent above the manager, never a swarm worker. Older boards or a
+    /// manager that ignores the brief may still write a grokbot role; those are legacy and get remapped.
+    /// </summary>
+    public static bool IsLegacyGrokbot(string? role)
+    {
+        var text = (role ?? "").Trim();
+        return text.StartsWith("grokbot", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("grok-bot", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("grok_bot", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("grok bot", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Trims the role and maps any legacy grokbot role to scout so after-links stay intact.</summary>
+    public static string Normalize(string? role)
+    {
+        var text = (role ?? "").Trim();
+        return IsLegacyGrokbot(text) ? Scout : text;
+    }
 }
 
 public sealed class SwarmTask
@@ -111,6 +127,7 @@ public sealed class SwarmBoard
         foreach (var task in board.Tasks)
         {
             if (task is null) continue;
+            task.Role = SwarmRole.Normalize(task.Role);
             task.Files ??= [];
             task.After ??= [];
         }
@@ -363,7 +380,7 @@ public sealed class SwarmBoard
     {
         Id = source.Id.Trim(),
         Title = source.Title.Trim(),
-        Role = source.Role.Trim(),
+        Role = SwarmRole.Normalize(source.Role),
         Status = string.IsNullOrWhiteSpace(source.Status) ? SwarmStatus.Todo : source.Status.Trim(),
         Assignee = source.Assignee ?? "",
         Result = source.Result ?? "",

@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Sovereign.Desktop.Connector;
 
 namespace Sovereign.Desktop;
 
@@ -33,8 +34,21 @@ public sealed partial class MainWindow
         _systemTabs.Visibility = _systemTabs.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void Navigate(string target)
+    // Set by the connector before it injects a click or key; see PageSwitch.InputWindow.
+    private long _connectorInputUntil;
+
+    internal void NoteConnectorInput() =>
+        _connectorInputUntil = Environment.TickCount64 + (long)PageSwitch.InputWindow.TotalMilliseconds;
+
+    /// <summary>
+    /// Changes the selected page. Only the user may move the view; background sources are ignored unless the page
+    /// is already shown. The connector may switch only while the Grokbot-tab act window is open.
+    /// </summary>
+    private void Navigate(string target, PageSwitchSource source = PageSwitchSource.User)
     {
+        source = PageSwitch.Resolve(source, _connectorInputUntil, Environment.TickCount64);
+        var actOn = source == PageSwitchSource.Connector && _grokbotMail.ActWindowOpen();
+        if (!PageSwitch.Allowed(source, _activeSystem, target, actOn)) return;
         CloseRoomView(); CloseChatView(); CloseSettings(); CloseGrokbot();
         switch (target)
         {

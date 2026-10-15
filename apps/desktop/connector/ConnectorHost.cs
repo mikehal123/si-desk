@@ -263,9 +263,11 @@ public sealed class ConnectorHost : IAsyncDisposable
                 "app_key" => _desk.GrokbotKey(Arg("keys")),
                 "app_navigate" => _desk.GrokbotNavigate(Arg("page")),
                 "read_swarm_board" => _desk.ReadSwarmBoard(BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
-                "swarm_submit_result" => SubmitSwarm(Arg("task_id"), Arg("result"), Arg("proof"), BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
+                "swarm_submit_result" => SubmitSwarm(Arg("task_id"), Arg("result"), BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
                 "swarm_continue" => SwarmContinue.Apply(_desk, BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id")), Arg("verdict"), Arg("notes")).ToolText(),
                 "swarm_run_status" => SwarmContinue.Status(_desk, BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
+                "swarm_run_events" => RunEvents(Arg("run_id"), Arg("since")),
+                "grokbot_post" => PostGrokbot(Arg("text")),
                 _ => ""
             };
             if (!KnownTool(name))
@@ -274,7 +276,8 @@ public sealed class ConnectorHost : IAsyncDisposable
                 TryRecord(name, ArgSummary(arguments), "Unknown tool.");
                 return ToolError("Unknown tool.");
             }
-            var auditTarget = name is "read_chat" or "send_to_chat" or "list_subagents" ? Arg("conversation") : name == "read_subagent" ? Arg("id") : name == "grokbot_inbox_reply" ? Arg("message_id") : name == "swarm_submit_result" ? Arg("task_id") : name is "read_swarm_board" or "swarm_continue" or "swarm_run_status" ? Arg("swarm_id") : null;
+            // Audit keeps names and ids only. grokbot_post has no id, so its target is empty; its text never reaches the audit.
+            var auditTarget = name is "read_chat" or "send_to_chat" or "list_subagents" ? Arg("conversation") : name == "read_subagent" ? Arg("id") : name == "grokbot_inbox_reply" ? Arg("message_id") : name == "swarm_submit_result" ? Arg("task_id") : name is "read_swarm_board" or "swarm_continue" or "swarm_run_status" ? Arg("swarm_id") : name == "swarm_run_events" ? Arg("run_id") : null;
             _audit.Write(name, Redact(auditTarget));
             TryRecord(name, ArgSummary(arguments), text);
             if (inboxContent is not null)
@@ -376,7 +379,13 @@ public sealed class ConnectorHost : IAsyncDisposable
         "read_chat" or "list_chats" or "send_to_chat" or "read_shared_room" or "post_shared_room" or
         "list_subagents" or "read_subagent" or "status" or "grokbot_inbox_list" or "grokbot_inbox_reply" or
         "app_ui_tree" or "app_click" or "app_type" or "app_key" or "app_navigate" or
-        "read_swarm_board" or "swarm_submit_result" or "swarm_continue" or "swarm_run_status";
+        "read_swarm_board" or "swarm_submit_result" or "swarm_continue" or "swarm_run_status" or
+        "swarm_run_events" or "grokbot_post";
+
+    /// <summary>Tools that change nothing on the desk or on disk. Listed with the MCP readOnlyHint annotation.</summary>
+    public static bool IsReadOnlyTool(string name) => name is
+        "read_chat" or "list_chats" or "read_shared_room" or "list_subagents" or "read_subagent" or "status" or
+        "read_swarm_board" or "swarm_run_status" or "swarm_run_events";
 
     private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -397,18 +406,28 @@ public sealed class ConnectorHost : IAsyncDisposable
 
     private static string? BlankArg(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-    private string SubmitSwarm(string taskId, string result, string proof, string? swarmId, string? runId)
+    private string RunEvents(string runId, string since)
     {
-        var review = SwarmHandoffReview.Parse(result);
-        if (string.IsNullOrWhiteSpace(taskId))
-        {
-            if (review is null) throw new ArgumentException("Task id is required.");
-            return SwarmHandoffReview.Record(swarmId, runId, review, null);
-        }
-        if (string.IsNullOrWhiteSpace(proof)) throw new ArgumentException("Nothing is done without proof.");
-        var line = _desk.SubmitSwarmResult(taskId, result, proof, swarmId, runId);
-        if (review is null) return line;
-        return line + "\n" + SwarmHandoffReview.Record(swarmId, runId, review, null, taskId);
+        if (string.IsNullOrWhiteSpace(runId)) throw new ArgumentException("run_id is required.");
+        var rows = _desk.ReadSwarmRunEvents(runId.Trim(), SwarmRunEvents.ParseSince(since));
+        return SwarmRunEvents.Text(rows);
+    }
+
+    private string PostGrokbot(string text)
+    {
+        if (!_rate.TryPost()) throw new InvalidOperationException("Rate limit: 20 messages a minute.");
+        var mail = _desk.PostGrokbot(text);
+        return "Posted\t" + mail.Id;
+    }
+
+    // Grok Bot is the grandparent above the manager, never a worker: a task_id (the worker submit path) is refused.
+    // The empty-task_id path records a handoff review on the run and is unchanged.
+    private static string SubmitSwarm(string taskId, string result, string? swarmId, string? runId)
+    {
+        if (!string.IsNullOrWhiteSpace(taskId))
+            throw new ArgumentException("Grok Bot is not a swarm worker. Leave task_id empty and send result lines verdict, issues, and next to record a handoff review, or call swarm_continue.");
+        var review = SwarmHandoffReview.Parse(result) ?? throw new ArgumentException("A handoff review needs result lines verdict, issues, and next.");
+        return SwarmHandoffReview.Record(swarmId, runId, review, null);
     }
 
     private string ReadSubagent(string id)
@@ -446,15 +465,19 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("grokbot_inbox_reply", "Post a reply into the Grokbot tab and mark that message Answered.", "message_id", true, false),
         Tool("app_screenshot", "PNG of the SI Desk window only. Requires Screenshots and permission to act.", null, false, false),
         Tool("app_ui_tree", "Visible controls in the SI Desk window: id, type, label, and bounds.", null, false, false),
-        Tool("app_click", "Click a control or a point inside the SI Desk window.", null, false, false),
+        Tool("app_click", "Click a control or a point inside the SI Desk window. " + ActWindowNote, null, false, false),
         Tool("app_type", "Type into a control in the SI Desk window. Secret fields are blocked.", "control_id", true, false),
-        Tool("app_key", "Send keys to the focused control in the SI Desk window.", "keys", true, false),
-        Tool("app_navigate", "Open Chat, Shared room, Settings, or Grokbot.", "page", true, false),
+        Tool("app_key", "Send keys to the focused control in the SI Desk window. " + ActWindowNote, "keys", true, false),
+        Tool("app_navigate", "Switch the SI Desk view to Chat, Shared room, Settings, or Grokbot. This changes what the user sees. " + ActWindowNote, "page", true, false),
         Tool("read_swarm_board", "Read a swarm board. Pass run_id to read that run even when it is not current. Omit swarm_id to list boards.", "swarm_id", false, false),
-        Tool("swarm_submit_result", "Submit a Grok Bot swarm result and proof for swarm_id and task_id. Pass run_id to write that run. Moves the task to review. Cannot mark it done. A handoff review may send an empty task_id with swarm_id, run_id, and result lines verdict, issues, and next. That records the review and does not mark a task done.", "task_id", true, false),
+        Tool("swarm_submit_result", "Record a handoff review on a swarm run: send swarm_id, run_id, an empty task_id, and result lines verdict, issues, and next. Does not mark a task done. Grok Bot is not a swarm worker, so a task_id is refused; use swarm_continue to post the verdict.", "task_id", true, false),
         Tool("swarm_continue", "After a handoff review, post the verdict into that swarm chat as Grok Bot. Verdict is continue, fix, or done. Continue and fix resume the manager. Done does not. A repeated call for the same review is ignored.", "swarm_id", true, false),
-        Tool("swarm_run_status", "Read the run id, review status, and each task status for a swarm run. Does not write the board.", "swarm_id", true, false)
+        Tool("swarm_run_status", "Read the run id, review status, and each task status for a swarm run. Does not write the board.", "swarm_id", true, false),
+        Tool("swarm_run_events", "Read-only. Events on a swarm run newer than since (ISO-8601; empty means the most recent, at most 50): one line each with UTC time, run id, kind (status, task, handoff, failed, finished), and a summary. A handoff line is followed by its SOVEREIGN_HANDOFF text. Routine task moves are included. Never writes the board.", "run_id", true, false),
+        Tool("grokbot_post", "Post a Grok Bot message into the Grokbot tab with no inbox message to answer, for example to relay a swarm status update or handoff to the user mid-run. Not gated by Act on.", null, false, false)
     ];
+
+    private const string ActWindowNote = "Runs only when Allow Grokbot control is on and the latest Grokbot-tab message is marked Act on and under 10 minutes old; otherwise the reply starts with Not switched and nothing happens.";
 
     private static object Tool(string name, string description, string? argument, bool required, bool limit)
     {
@@ -465,11 +488,13 @@ public sealed class ConnectorHost : IAsyncDisposable
             properties[argument] = new { type = "string" };
             if (required) requiredNames.Add(argument);
         }
-        if (name is "send_to_chat" or "post_shared_room" or "grokbot_inbox_reply" or "app_type")
+        if (name is "send_to_chat" or "post_shared_room" or "grokbot_inbox_reply" or "app_type" or "grokbot_post")
         {
             properties["text"] = new { type = "string" };
             requiredNames.Add("text");
         }
+        if (name == "swarm_run_events")
+            properties["since"] = new { type = "string" };
         if (name == "read_swarm_board")
             properties["run_id"] = new { type = "string" };
         if (name == "grokbot_inbox_list")
@@ -503,7 +528,11 @@ public sealed class ConnectorHost : IAsyncDisposable
             properties["y"] = new { type = "integer" };
         }
         if (limit) properties["limit"] = new { type = "integer" };
-        return new { name, description, inputSchema = new { type = "object", properties, required = requiredNames } };
+        var inputSchema = new { type = "object", properties, required = requiredNames };
+        // MCP tool annotations: read-only tools say so, so a client can call them without asking.
+        if (IsReadOnlyTool(name))
+            return new { name, description, inputSchema, annotations = new { readOnlyHint = true } };
+        return new { name, description, inputSchema };
     }
 
     public async ValueTask DisposeAsync() => await StopAsync();

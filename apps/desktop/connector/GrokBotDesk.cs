@@ -325,9 +325,12 @@ public interface IGrokBotDesk
     string GrokbotNavigate(string page);
     void RecordGrokbotTool(string tool, string args, string result);
     string ReadSwarmBoard(string? swarmId, string? runId = null);
-    string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null);
     bool GrokbotReviewsHandoffs(string conversationId);
     bool ConversationOpen(string conversationId);
     void DeliverSwarmReview(string conversationId, string text, bool resume);
     string? SwarmBoardRoot();
+    /// <summary>swarm_run_events: recorded run events newer than <paramref name="since"/>. Read-only; never touches the board.</summary>
+    IReadOnlyList<SwarmRunEvent> ReadSwarmRunEvents(string runId, DateTimeOffset? since) => [];
+    /// <summary>grokbot_post: a Grok Bot message in the Grokbot tab with no inbox message to answer.</summary>
+    GrokbotMail PostGrokbot(string text) => throw new InvalidOperationException("The Grokbot tab is not open on this desk.");
 }

@@ -62,6 +62,7 @@ internal sealed partial class ChatConversation
             _saved = _saved with { EnableSubagents = allow, SwarmMode = allow && _saved.SwarmEnabled, SubagentPreferenceVersion = 1 };
             UpdateSubagentOption();
             await ProjectPreferencesChangedAsync();
+            ReloadSwarmSection();
         };
         _swarmOption.IsChecked = _saved.SwarmEnabled;
         AutomationName(_swarmOption, "Plan big goals as a swarm (uses subagents)");
@@ -76,6 +77,7 @@ internal sealed partial class ChatConversation
             }
             else _saved = _saved with { SwarmMode = false };
             await ProjectPreferencesChangedAsync();
+            ReloadSwarmSection();
         };
         _swarmHire.Items.Add("Single model");
         _swarmHire.Items.Add("Mixed models");
@@ -234,6 +236,7 @@ internal sealed partial class ChatConversation
         view.SetSkills(skillCaption);
         if (_openSubagentPanels.TryGetValue(child.SessionId, out var skillPanel)) skillPanel.SetSkills(skillCaption);
         if (!_restoring && child.State == "completed" && previous?.State != "completed") RememberSkill(child);
+        if (!_restoring && swarmWorker && child.State == "completed" && previous?.State != "completed") NoteSwarmWorkerReply(child.Output);
         TrackTeamHelper(child);
         if (!_restoring && !_respawnedHelpers.Contains(child.SessionId) && previous is not null && SubagentActive(previous) && !SubagentActive(child))
             ApplySwarmInterrupt(child);
