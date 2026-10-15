@@ -13,6 +13,7 @@ internal sealed partial class ChatConversation
     private Button? _closeProject;
     private readonly ComboBox _projectBehavior = new() { Width = 156 };
     private readonly TextBlock _projectDescription = Note("Chat only · Open Folder to enable project tools.");
+    private bool _confirmingAlwaysAllow;
 
     private UIElement BuildProjectToolbar()
     {
@@ -53,15 +54,101 @@ internal sealed partial class ChatConversation
     private void RestoreProjectBehavior() => _projectBehavior.SelectedIndex = _saved.ProjectMode == CursorProjectMode.Plan
         ? 2 : _saved.Permissions == CursorPermissionPolicy.AlwaysAllow ? 1 : 0;
 
+    private (CursorProjectMode Mode, CursorPermissionPolicy Permissions) SelectedProjectBehavior()
+    {
+        var index = _projectBehavior.SelectedIndex;
+        return (index == 2 ? CursorProjectMode.Plan : CursorProjectMode.Agent,
+            index == 1 ? CursorPermissionPolicy.AlwaysAllow : CursorPermissionPolicy.AlwaysAsk);
+    }
+
     private async Task ProjectPreferencesChangedAsync()
     {
-        if (_restoring || _chatBusy) return;
+        if (_restoring || _chatBusy || _confirmingAlwaysAllow) return;
+        var next = SelectedProjectBehavior();
+        var dismissWarning = false;
+        if (AlwaysAllowWarningPreference.ShouldWarn(_saved.ProjectMode, _saved.Permissions, next.Mode, next.Permissions, AlwaysAllowWarningPreference.IsDismissed(_profileDirectory)))
+        {
+            _confirmingAlwaysAllow = true;
+            _projectBehavior.IsEnabled = false;
+            try
+            {
+                var choice = await ConfirmAlwaysAllowAsync();
+                if (!choice.TurnOn)
+                {
+                    _restoring = true;
+                    RestoreProjectBehavior();
+                    _restoring = false;
+                    return;
+                }
+                dismissWarning = choice.DontShowAgain;
+            }
+            catch (Exception)
+            {
+                // A dialog that cannot be shown must not turn Always allow on.
+                _restoring = true;
+                RestoreProjectBehavior();
+                _restoring = false;
+                return;
+            }
+            finally
+            {
+                _confirmingAlwaysAllow = false;
+                _projectBehavior.IsEnabled = !_chatBusy;
+            }
+        }
         var reconnect = _chatReady || _reconnectOnSend || ((CodexChat || CursorChat || GrokBuildChat) && !string.IsNullOrWhiteSpace(_saved.Model));
         Save(); // Capture model/draft before the new transport session clears the picker.
-        _saved = _saved with { ProjectMode = _projectBehavior.SelectedIndex == 2 ? CursorProjectMode.Plan : CursorProjectMode.Agent,
-            Permissions = _projectBehavior.SelectedIndex == 1 ? CursorPermissionPolicy.AlwaysAllow : CursorPermissionPolicy.AlwaysAsk };
+        var chosen = SelectedProjectBehavior();
+        _saved = _saved with { ProjectMode = chosen.Mode, Permissions = chosen.Permissions };
         ResetChat(); _reconnectOnSend = reconnect; SetChatBusy(false); Save();
+        if (dismissWarning)
+        {
+            try { AlwaysAllowWarningPreference.SaveDismissed(_profileDirectory, true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
         if (reconnect) await ConnectChatAsync();
+    }
+
+    private async Task<(bool TurnOn, bool DontShowAgain)> ConfirmAlwaysAllowAsync()
+    {
+        var dontShow = new CheckBox { Content = "Don't show again" };
+        AutomationName(dontShow, "Don't show again");
+        var dialog = new ContentDialog
+        {
+            XamlRoot = ((FrameworkElement)_owner.Content).XamlRoot,
+            Title = "Turn on Always allow?",
+            PrimaryButtonText = "Turn on",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            Content = new StackPanel
+            {
+                Spacing = DeskTheme.Space12,
+                MaxWidth = 440,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = AlwaysAllowWarningPreference.Message,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontFamily = DeskTheme.UiFont,
+                        FontSize = DeskTheme.SizeBody,
+                        Foreground = DeskTheme.Text
+                    },
+                    dontShow
+                }
+            }
+        };
+        AutomationName(dialog, "Turn on Always allow");
+        dialog.Resources["ContentDialogMaxWidth"] = 520d;
+        var held = false;
+        try
+        {
+            await _dialogs.WaitAsync();
+            held = true;
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return (false, false);
+            return (true, dontShow.IsChecked == true);
+        }
+        finally { if (held) _dialogs.Release(); }
     }
 
     private void UpdateProjectHeader()
