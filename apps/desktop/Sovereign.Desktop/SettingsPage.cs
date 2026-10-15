@@ -313,6 +313,21 @@ public sealed partial class MainWindow
         }
     }
 
+    private static void ApplyTailscaleRemoteNote(TextBlock note, ComboBox bind)
+    {
+        var offered = false;
+        var selected = false;
+        for (var i = 0; i < bind.Items.Count; i++)
+        {
+            if (bind.Items[i] as string != "Tailscale only") continue;
+            offered = true;
+            if (bind.SelectedIndex == i) selected = true;
+        }
+
+        note.Text = TailscaleRemoteAccessNote.Text;
+        note.Visibility = TailscaleRemoteAccessNote.ShouldShow(selected, offered) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private static string? ReadSavedXaiKey()
     {
         try

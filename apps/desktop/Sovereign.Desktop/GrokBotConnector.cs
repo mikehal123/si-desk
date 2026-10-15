@@ -14,6 +14,7 @@ public sealed partial class MainWindow
 {
     private readonly ToggleSwitch _connectorEnabled = new() { OnContent = "On", OffContent = "Off" };
     private readonly ComboBox _connectorBind = new() { Width = 220 };
+    private readonly TextBlock _connectorRemoteNote = Note(TailscaleRemoteAccessNote.Text);
     private readonly TextBlock _connectorStatus = Note("Off. Nothing is listening.");
     private readonly TextBlock _connectorAddress = Note("http://127.0.0.1:8790/mcp");
     private readonly TextBox _connectorToken = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
@@ -36,6 +37,7 @@ public sealed partial class MainWindow
     {
         AutomationName(_connectorEnabled, "Grok Bot connector");
         AutomationName(_connectorBind, "Grok Bot connector bind mode");
+        AutomationName(_connectorRemoteNote, "Grok Bot connector Tailscale remote access");
         AutomationName(_connectorToken, "Grok Bot connector token");
         AutomationId(_connectorToken, "grokbot-blocked-token");
         AutomationName(_grokbotTab, "Grokbot tab");
@@ -49,7 +51,11 @@ public sealed partial class MainWindow
             _connectorBind.Items.Add("Tailscale only");
         }
         _connectorEnabled.Toggled += async (_, _) => await ApplyConnectorSettingsAsync();
-        _connectorBind.SelectionChanged += async (_, _) => { if (_connectorBind.SelectedIndex >= 0) await ApplyConnectorSettingsAsync(); };
+        _connectorBind.SelectionChanged += async (_, _) =>
+        {
+            ApplyTailscaleRemoteNote(_connectorRemoteNote, _connectorBind);
+            if (_connectorBind.SelectedIndex >= 0) await ApplyConnectorSettingsAsync();
+        };
         Closed += async (_, _) => await StopConnectorAsync();
         _wakeKey.PasswordChanged += (_, _) => SyncWakeKeyReveal();
         var avatarPicker = BuildGrokbotAvatarPicker();
@@ -96,6 +102,7 @@ public sealed partial class MainWindow
             Note("Lets Grok Bot read and post in this app, and pick up the Grokbot tab. Off until you turn it on. This PC only binds 127.0.0.1:8790. Tailscale only runs tailscale ip -4 and binds that address on 8790. It never listens on a public address."),
             _connectorEnabled,
             _connectorBind,
+            _connectorRemoteNote,
             _connectorAddress,
             _connectorStatus,
             _connectorToken,
@@ -133,6 +140,7 @@ public sealed partial class MainWindow
         _connectorUi = false;
         _connectorStatus.Text = settings.Enabled ? "Starting…" : "Off. Nothing is listening.";
         _connectorAddress.Text = "http://127.0.0.1:" + XaiDeskIdentity.GrokBotPort + "/mcp";
+        ApplyTailscaleRemoteNote(_connectorRemoteNote, _connectorBind);
     }
 
     private ScrollViewer BuildGrokbotAvatarPicker()

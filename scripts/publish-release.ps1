@@ -64,7 +64,15 @@ if (Test-Path -LiteralPath $publishDir) {
 }
 New-Item -ItemType Directory -Path $publishDir | Out-Null
 
-& dotnet publish $projectPath -c Release -r win-x64 --self-contained true -o $publishDir
+# Release publish emits no PDBs. Debug builds do not pass SovereignReleasePublish, so they keep symbols.
+$releasePublish = @(
+    '-p:SovereignReleasePublish=true',
+    '-p:DebugType=none',
+    '-p:DebugSymbols=false',
+    '-p:CopyOutputSymbolsToPublishDirectory=false'
+)
+
+& dotnet publish $projectPath -c Release -r win-x64 --self-contained true -o $publishDir @releasePublish
 if ($LASTEXITCODE -ne 0) {
     throw "Publish failed with exit code $LASTEXITCODE."
 }
@@ -85,7 +93,7 @@ if (Test-Path -LiteralPath $setupDir) {
     Remove-Item -LiteralPath $setupDir -Recurse -Force
 }
 New-Item -ItemType Directory -Path $setupDir | Out-Null
-& dotnet publish $setupProject -c Release -r win-x64 --self-contained true -o $setupDir
+& dotnet publish $setupProject -c Release -r win-x64 --self-contained true -o $setupDir @releasePublish
 if ($LASTEXITCODE -ne 0) {
     throw "Setup publish failed with exit code $LASTEXITCODE."
 }
@@ -106,7 +114,7 @@ if (Test-Path -LiteralPath $helperDir) {
     Remove-Item -LiteralPath $helperDir -Recurse -Force
 }
 New-Item -ItemType Directory -Path $helperDir | Out-Null
-& dotnet publish $helperProject -c Release -r win-x64 --self-contained true -o $helperDir
+& dotnet publish $helperProject -c Release -r win-x64 --self-contained true -o $helperDir @releasePublish
 if ($LASTEXITCODE -ne 0) {
     throw "Update helper publish failed with exit code $LASTEXITCODE."
 }
@@ -149,6 +157,8 @@ if (Test-Path -LiteralPath $zipPath) {
 if (-not ('System.IO.Compression.ZipFile' -as [type])) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
 }
+# Drop any package PDB that publish still copied. The zip is what the release notes hash.
+& (Join-Path $PSScriptRoot 'Remove-ReleaseSymbols.ps1') -Directory $publishDir
 [System.IO.Compression.ZipFile]::CreateFromDirectory($publishDir, $zipPath)
 
 $zipItem = Get-Item -LiteralPath $zipPath
