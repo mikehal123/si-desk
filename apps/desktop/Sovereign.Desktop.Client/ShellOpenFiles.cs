@@ -251,7 +251,7 @@ public sealed class ShellOpenHost : IDisposable
                         PipeDirection.In,
                         1,
                         PipeTransmissionMode.Byte,
-                        PipeOptions.Asynchronous);
+                        LocalPipeAccess.Server);
                 }
                 catch (Exception ex)
                 {
@@ -330,7 +330,7 @@ public sealed class ShellOpenHost : IDisposable
 
         try
         {
-            using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+            using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out, LocalPipeAccess.SynchronousClient);
             client.Connect(ConnectTimeoutMilliseconds);
             var header = new byte[4];
             foreach (var body in frames)

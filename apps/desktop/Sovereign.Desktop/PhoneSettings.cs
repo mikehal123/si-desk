@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Sovereign.Desktop.Core;
 using Sovereign.Desktop.Phone;
 using Windows.Storage.Streams;
 
@@ -15,6 +16,7 @@ public sealed partial class MainWindow
     private readonly SemaphoreSlim _phoneSettingsGate = new(1, 1);
     private readonly ToggleSwitch _phoneEnabled = new() { OnContent = "On", OffContent = "Off" };
     private readonly ComboBox _phoneBind = new() { Width = 220 };
+    private readonly TextBlock _phoneRemoteNote = Note(TailscaleRemoteAccessNote.Text);
     private readonly ToggleSwitch _phoneNotify = new() { OnContent = "On", OffContent = "Off" };
     private readonly TextBlock _phoneStatus = Note("Off. Nothing is listening.");
     private readonly TextBlock _phoneAddress = Note("");
@@ -28,11 +30,16 @@ public sealed partial class MainWindow
     {
         AutomationName(_phoneEnabled, "Phone access");
         AutomationName(_phoneBind, "Phone access bind mode");
+        AutomationName(_phoneRemoteNote, "Phone access Tailscale remote access");
         AutomationName(_phoneNotify, "Phone notifications");
         EnsurePhoneBindOptions();
         _phoneEnabled.Toggled += async (_, _) => await ApplyPhoneSettingsAsync();
         _phoneNotify.Toggled += async (_, _) => await ApplyPhoneSettingsAsync();
-        _phoneBind.SelectionChanged += async (_, _) => { if (_phoneBind.SelectedIndex >= 0) await ApplyPhoneSettingsAsync(); };
+        _phoneBind.SelectionChanged += async (_, _) =>
+        {
+            ApplyTailscaleRemoteNote(_phoneRemoteNote, _phoneBind);
+            if (_phoneBind.SelectedIndex >= 0) await ApplyPhoneSettingsAsync();
+        };
         Closed += async (_, _) => await StopPhoneAsync();
         LoadPhoneControls();
         return new StackPanel { Spacing = DeskTheme.Space8, Children = {
@@ -40,6 +47,7 @@ public sealed partial class MainWindow
             Note("Same chats as this app. Off until you turn it on. This PC only is 127.0.0.1:8789. Your phone uses Tailscale only, on that machine’s 100.x address, with HTTPS."),
             _phoneEnabled,
             _phoneBind,
+            _phoneRemoteNote,
             _phoneNotify,
             Note("Notify this phone when a task finishes or needs approval."),
             _phoneStatus,
@@ -66,6 +74,7 @@ public sealed partial class MainWindow
         _phoneNotify.IsOn = settings.Notify;
         _phoneUi = false;
         _phoneStatus.Text = settings.Enabled ? "Saved as on. It starts with the app." : "Off. Nothing is listening.";
+        ApplyTailscaleRemoteNote(_phoneRemoteNote, _phoneBind);
     }
 
     internal async Task StartPhoneIfEnabledAsync()

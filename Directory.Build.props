@@ -18,5 +18,11 @@
     <InformationalVersion>$(Version)-desk-foundation</InformationalVersion>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
   </PropertyGroup>
+  <!-- scripts/publish-release.ps1 sets SovereignReleasePublish. Debug and ordinary Release builds keep symbols. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(SovereignReleasePublish)' == 'true'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
 </Project>
 
