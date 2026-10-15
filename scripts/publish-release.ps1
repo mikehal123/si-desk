@@ -49,6 +49,12 @@ if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
     throw 'Desktop project file was not found.'
 }
 
+$fetchScript = Join-Path $PSScriptRoot 'Get-Cloudflared.ps1'
+if (-not (Test-Path -LiteralPath $fetchScript -PathType Leaf)) {
+    throw 'scripts\Get-Cloudflared.ps1 was not found.'
+}
+& $fetchScript
+
 $publishDir = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts\publish\win-x64'))
 $repoPrefix = $repoRoot.TrimEnd('\') + '\'
 if (-not $publishDir.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -86,6 +92,9 @@ $xbfPath = Join-Path $publishDir 'App.xbf'
 if (-not (Test-Path -LiteralPath $xbfPath -PathType Leaf)) {
     throw 'Publish did not produce App.xbf. WinUI skips that copy when publish uses -o.'
 }
+
+$tunnelExe = [System.IO.Path]::Combine($publishDir, 'room-tunnel', 'cloudflared.exe')
+& $fetchScript -VerifyOnly -Destination $tunnelExe
 
 $setupProject = Join-Path $repoRoot 'apps\desktop\Sovereign.Desktop.PreviewSetup\Sovereign.Desktop.PreviewSetup.csproj'
 $setupDir = Join-Path $repoRoot 'artifacts\publish\setup'

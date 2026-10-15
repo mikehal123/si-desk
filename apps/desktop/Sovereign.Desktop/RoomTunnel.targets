@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <RoomTunnelExe Condition="'$(RoomTunnelExe)' == ''">$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)', '..', 'room-tunnel', 'cloudflared.exe'))</RoomTunnelExe>
+  </PropertyGroup>
+  <Target Name="EnsureRoomTunnelBinary" BeforeTargets="Build;Publish">
+    <Error Condition="'$(Configuration)' == 'Release' and !Exists('$(RoomTunnelExe)')" Text="Release build requires room-tunnel\cloudflared.exe (pinned cloudflared for online rooms). Run scripts/Get-Cloudflared.ps1 before a Release build or publish. The exe is not stored in git." />
+    <Warning Condition="'$(Configuration)' != 'Release' and !Exists('$(RoomTunnelExe)')" Code="ROOMTUNNEL001" Text="Dev build: room-tunnel\cloudflared.exe is missing, so Create online room cannot start. Run scripts/Get-Cloudflared.ps1 to download the pinned cloudflared. Release builds fail without this file." />
+  </Target>
+</Project>

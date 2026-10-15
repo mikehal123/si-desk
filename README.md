@@ -49,7 +49,7 @@ Source and releases: https://github.com/mikehal123/si-desk
 - Windows 10 or 11 (x64)
 - One connection: a Cursor subscription, the Grok Build CLI, or an API key for the xAI API
 - Cursor users click **Install Cursor** in the chat **Connection** panel, or run `setup\Install-CursorConnection.ps1` from the unzipped release once (the same file is `scripts\Install-CursorConnection.ps1` in a source checkout). See [Getting started](docs/GETTING-STARTED.md).
-- Shared room expects `room-tunnel\cloudflared.exe` beside the app and checks a pinned SHA-256. This repository does not include that file.
+- Online shared rooms ship with pinned cloudflared 2026.9.1 (`room-tunnel\cloudflared.exe`, SHA-256 `2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712`). That exe is not committed; release builds download it and check the hash.
 - The .NET SDK is only needed to build from source
 
 ## Build
@@ -64,7 +64,7 @@ This is the expected build command. Please check it against the project files be
 
 ## Shared room setup
 
-Shared room invites need cloudflared, which is not included in this repo. The app checks the copy it runs and verifies its SHA256. Tunnel state is kept in the SI Desk profile at `%LOCALAPPDATA%\SIDesk`.
+Shared room invites use pinned cloudflared 2026.9.1. Release zips include `room-tunnel\cloudflared.exe`, and the app checks that file's SHA-256 (`2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712`) before opening the tunnel. The git checkout does not contain the exe. Tunnel state is kept in the SI Desk profile at `%LOCALAPPDATA%\SIDesk`.
 
 ## Status
 

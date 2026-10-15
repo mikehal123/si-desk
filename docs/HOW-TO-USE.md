@@ -413,7 +413,7 @@ Other buttons on that page:
 
 **Connection and privacy** says your PC hosts while the app stays open, an invitation grants access to the room history, and this build sends the name you type, not an account email. Private chats are not sent. A room holds up to 8 members and 500 messages.
 
-Create online room expects `room-tunnel\cloudflared.exe` beside `SIDesk.exe` and checks a pinned checksum. This repository does not include that file. If the file is missing, or the status says **Room tunnel hash mismatch. Repair the app.**, the room does not start. If the link drops, the status says **Room connection unavailable. Retrying; an unsent message stays in the editor. Host must remain online.**
+Create online room uses the pinned cloudflared Windows amd64 binary **2026.9.1** (SHA-256 `2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712`). Release builds download that file into `room-tunnel\cloudflared.exe` beside `SIDesk.exe`. The git checkout does not contain the exe. If this install is missing it, the status says **Online rooms need the room tunnel (cloudflared.exe), which is missing from this install. Reinstall or update SI Desk.** If the checksum does not match, the status says **Room tunnel hash mismatch. Repair the app.** The room does not start in either case. If the link drops, the status says **Room connection unavailable. Retrying; an unsent message stays in the editor. Host must remain online.**
 
 If the name is empty, create and join say **Use a name of 1–40 characters.** The Settings page does not have an account section.
 
