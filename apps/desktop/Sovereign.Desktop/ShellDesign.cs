@@ -126,21 +126,7 @@ public sealed partial class MainWindow
         navPanel.Children.Add(brand);
         navPanel.Children.Add(_nav);
         navPanel.Children.Add(BuildChatRecents());
-        _accountName.FontFamily = DeskTheme.UiFont; _accountName.FontSize = DeskTheme.SizeBody; _accountName.Foreground = DeskTheme.Text;
-        _accountName.TextTrimming = TextTrimming.CharacterEllipsis; _accountName.MaxLines = 1;
-        _accountInitial.FontFamily = DeskTheme.UiFont; _accountInitial.FontSize = DeskTheme.SizeBody; _accountInitial.Foreground = DeskTheme.Text;
-        var identity = new Grid { ColumnSpacing = DeskTheme.Space12 };
-        identity.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        identity.ColumnDefinitions.Add(new ColumnDefinition());
-        identity.Children.Add(new Border { Background = DeskTheme.Raised, CornerRadius = new CornerRadius(DeskTheme.Radius6), Width = DeskTheme.Space24 + DeskTheme.Space8, Height = DeskTheme.Space24 + DeskTheme.Space8, Child = _accountInitial });
-        Grid.SetColumn(_accountName, 1); identity.Children.Add(_accountName);
-        var navGrid = new Grid(); navGrid.RowDefinitions.Add(new RowDefinition()); navGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        navGrid.Children.Add(new ScrollViewer { Content = navPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-        var profileButton = new Button { Content = identity, Background = DeskTheme.Transparent, BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(DeskTheme.Radius6), Padding = new Thickness(DeskTheme.Space12, DeskTheme.Space8, DeskTheme.Space12, DeskTheme.Space8), Margin = new Thickness(DeskTheme.Space8), HorizontalContentAlignment = HorizontalAlignment.Stretch, UseSystemFocusVisuals = true };
-        profileButton.Click += (_,_) => ShowAccountDialog(); AutomationName(profileButton,"Your SI Desk account");
-        var profileRow = new Border { BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0, 1, 0, 0), Child = profileButton };
-        Grid.SetRow(profileRow, 1); navGrid.Children.Add(profileRow);
-        var sidebar = new Border { Background = DeskTheme.Background, BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0,0,1,0), Child = navGrid };
+        var sidebar = new Border { Background = DeskTheme.Background, BorderBrush = DeskTheme.Divider, BorderThickness = new Thickness(0,0,1,0), Child = new ScrollViewer { Content = navPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
 
         var pageHeading = new StackPanel { Orientation = Orientation.Horizontal, Spacing = DeskTheme.Space8, Children = { Glyph("\uE8A5"), _pageTitle } };
         _metrics = new Grid { ColumnSpacing = DeskTheme.Space12, Margin = new Thickness(0, DeskTheme.Space16, 0, DeskTheme.Space16) };

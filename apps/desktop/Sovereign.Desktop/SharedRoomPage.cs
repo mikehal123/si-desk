@@ -12,7 +12,7 @@ namespace Sovereign.Desktop;
 public sealed partial class MainWindow
 {
     private readonly Grid _roomPage = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(DeskTheme.Space24 + DeskTheme.Space4), RowSpacing = DeskTheme.Space12 };
-    private readonly TextBox _roomName = new() { Header = "Your name", Text = "Sign in first", IsReadOnly = true, MaxLength = 40, Width = 180 };
+    private readonly TextBox _roomName = new() { Header = "Your name", PlaceholderText = "Shown in the room", MaxLength = 40, Width = 180 };
     private readonly TextBox _roomInvite = new() { Header = "Invitation · about 20 minutes · one use", PlaceholderText = "https://…/#…", IsSpellCheckEnabled = false };
     private readonly TextBlock _roomStatus = Note("Create a room on this PC, or paste an invitation to join. Nothing is shared until you connect.");
     private readonly TextBlock _roomMembers = Note("");
@@ -97,7 +97,7 @@ public sealed partial class MainWindow
         var security = new Expander
         {
             Header = "Connection and privacy", IsExpanded = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Content = Note("Your PC hosts while this app stays open. The relay carries messages encrypted in transit, not end-to-end. An invitation grants access to the room history. Joining also shares your signed account identity (including email) with the host. Refresh and provider tokens stay on your PC. Connect your provider in New chat first. Ask my connected AI sends the unsent box text plus this room’s messages to that provider. Private chats are excluded. Replies never trigger other AIs automatically. Room history is saved on the host PC.")
+            Content = Note("Your PC hosts while this app stays open. The relay carries messages encrypted in transit, not end-to-end. An invitation grants access to the room history. This build sends the name you type, not an account email. Refresh and provider tokens stay on your PC. Connect your provider in New chat first. Ask my connected AI sends the unsent box text plus this room’s messages to that provider. Private chats are excluded. Replies never trigger other AIs automatically. Room history is saved on the host PC.")
         };
         var bottom = new StackPanel { Spacing = DeskTheme.Space8, Children = { _roomJump, _roomDraftCard, _roomInput, askRow, Note("Enter to send · Shift+Enter for a new line"), security } };
         Grid.SetRow(bottom, 2); _roomPage.Children.Add(bottom);
@@ -178,14 +178,22 @@ public sealed partial class MainWindow
         _roomInvite.Text = "";
         _roomStatus.Text = "New invitation copied. It expires in about 20 minutes. The previous invitation no longer works, and the field was cleared.";
     }
+    private string RoomDisplayName()
+    {
+        var name = _roomName.Text.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 40 || name.Any(char.IsControl))
+            throw new IOException("Use a name of 1–40 characters.");
+        _roomName.Text = name;
+        return name;
+    }
     private async Task CreateRoomAsync()
     {
         if (_roomConnection is not null) throw new IOException("Leave the current room before creating another.");
+        var name = RoomDisplayName();
         _roomStatus.Text = "Starting your room and temporary internet relay…";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(75));
         try {
-            var identity = await RequireAccountAsync(timeout.Token);
-            _roomHost = new SharedRoomHost(_vm.ProfileDirectory, identity, (proof, ct) => _accountClient!.VerifyIdentityAsync(proof, null, ct)); await _roomHost.StartAsync(timeout.Token);
+            _roomHost = new SharedRoomHost(_vm.ProfileDirectory, name); await _roomHost.StartAsync(timeout.Token);
             _roomTunnel = new RoomTunnel(); _roomPublicAddress = await _roomTunnel.StartAsync(AppContext.BaseDirectory, _vm.ProfileDirectory, _roomHost.Address, timeout.Token);
             _roomConnection = new RoomConnection(_roomHost.Address, _roomHost.Owner);
             _roomInvite.Text = _roomHost.NewInvitation(_roomPublicAddress); StartRoomPolling();
@@ -196,10 +204,10 @@ public sealed partial class MainWindow
     private async Task JoinRoomAsync()
     {
         if (_roomConnection is not null) throw new IOException("Leave the current room first.");
+        var name = RoomDisplayName();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var identity = await RequireAccountAsync(timeout.Token);
-        _roomConnection = await RoomConnection.JoinAsync(_roomInvite.Text, identity.Name, timeout.Token, _accountSession!.IdToken, identity.Subject);
-        _roomInvite.Text = ""; StartRoomPolling(); _roomStatus.Text = "Joined with your verified Sovereign account. Room identity expires with your sign-in token.";
+        _roomConnection = await RoomConnection.JoinAsync(_roomInvite.Text, name, timeout.Token);
+        _roomInvite.Text = ""; StartRoomPolling(); _roomStatus.Text = "Joined.";
     }
     private void StartRoomPolling()
     {

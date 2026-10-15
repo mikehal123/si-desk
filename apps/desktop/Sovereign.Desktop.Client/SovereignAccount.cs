@@ -20,7 +20,7 @@ public sealed record AccountConfiguration(string Issuer, string ClientId)
         if (!Uri.TryCreate(Issuer, UriKind.Absolute, out var u) || u.Scheme != "https" || u.AbsolutePath != "/" || u.UserInfo.Length != 0 || u.Query.Length != 0 || u.Fragment.Length != 0)
             throw new IOException("Invalid account service address.");
         if (string.IsNullOrWhiteSpace(ClientId) || ClientId.Length > 256 || ClientId.Any(char.IsControl))
-            throw new IOException("Sovereign sign-in is not configured. The release needs its public Clerk Client ID.");
+            throw new IOException("Account sign-in client id is missing or invalid.");
     }
 }
 

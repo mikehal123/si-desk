@@ -70,7 +70,7 @@ public sealed partial class MainWindow
     }
 
     private bool WorkBlocksUpdate => _conversations.Any(c => c.IsWorking) ||
-        _roomAiCancel is not null || _roomConnection is not null || _roomHost is not null || _signInCancel is not null || _githubUpdateSignIn is not null || _runButton?.IsEnabled == false || DeskWorkBlocksUpdate;
+        _roomAiCancel is not null || _roomConnection is not null || _roomHost is not null || _githubUpdateSignIn is not null || _runButton?.IsEnabled == false || DeskWorkBlocksUpdate;
 
     private async Task DownloadOrInstallAsync()
     {

@@ -172,7 +172,6 @@ public sealed partial class MainWindow : Window
         Navigate("chat");
         App.CrashLog("after Navigate chat");
         root.Loaded += async (_,_) => { Sovereign.Desktop.Updates.SiDeskUpdateHelper.SignalReady(ShellViewModel.AppVersion); if ((Environment.GetCommandLineArgs().Contains("--chat-layout-verify") || Environment.GetCommandLineArgs().Contains("--chat-steering-verify") || Environment.GetCommandLineArgs().Contains("--desk-store-verify") || Environment.GetCommandLineArgs().Contains("--quant-desk-verify"))) return; await InitializeUpdatesAsync(); StartSiDeskUpdateCheck(); if (!_updateStartupFailed) await InitializeAccountAsync(); await StartPhoneIfEnabledAsync(); await StartConnectorIfEnabledAsync(); await MaybeShowFirstRunSetupAsync(); };
-        Closed += (_,_) => _signInCancel?.Cancel();
     }
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

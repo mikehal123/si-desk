@@ -23,7 +23,6 @@ public sealed partial class MainWindow
     private readonly CheckBox _classicChatOption = new() { Content = "Classic chat view", IsChecked = true };
     private readonly TextBlock _settingsProfilePath = new() { TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true, FontFamily = DeskTheme.UiFont, FontSize = DeskTheme.SizeBody, Foreground = DeskTheme.Text, LineHeight = DeskTheme.Space24 };
     private readonly StackPanel _githubWait = new() { Spacing = DeskTheme.Space8 };
-    private readonly Button _cancelSignInButton = new() { Visibility = Visibility.Collapsed, Content = "Cancel sign-in" };
 
     private void OpenSettings()
     {
@@ -163,10 +162,6 @@ public sealed partial class MainWindow
         action.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(action, 2); grid.Children.Add(action);
         parent.Children.Add(grid);
-    }
-    private void SyncSignInCancel()
-    {
-        _cancelSignInButton.Visibility = _signInCancel is not null ? Visibility.Visible : Visibility.Collapsed;
     }
     private void SyncGitHubCancel()
     {
