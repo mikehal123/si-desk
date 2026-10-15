@@ -130,11 +130,3 @@ tests/desktop/Sovereign.Desktop.Tests/Phase2LabTests.cs
 tests/desktop/Sovereign.Desktop.Tests/LabRootPersistenceTests.cs
 tests/desktop/Sovereign.Desktop.Tests/LegacyScanRootTests.cs
 tests/desktop/Sovereign.Desktop.Tests/EvidenceCredentialSetupTests.cs
-
-# private/local (si-desk-source)
-.*-backup/
-local.private.props
-.cursor/
-logs/
-*.log
-*.zip
