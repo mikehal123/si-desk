@@ -240,6 +240,8 @@ The permission dropdown sits beside the **+** button. Its name is **Agent mode a
 | **Always allow** | Cursor is started with its sandbox. SI Desk approves a request only when Cursor offers an allow-once choice. It does not write a permanent allow list. Grok Build is started with `--always-approve`. The status line includes **Always allow — tools within this project's permissions.** |
 | **Plan** | The agent may inspect and propose a plan. It does not implement the plan. The status line includes **Plan · inspect this project without implementing.** To implement, switch to **Always ask** or **Always allow** and send a new message. |
 
+Switching to **Always allow** asks you to confirm first. Always allow lets the agent run commands and edit files anywhere your Windows account can reach, not just this project folder, without asking. Only use it on projects you trust. **Turn on** applies the mode, **Cancel** keeps the previous mode, and **Don't show again** is saved for this user.
+
 Changing this dropdown reconnects the chat.
 
 While a reply is running, a stop icon appears. Its name is **Stop response**. The tooltip says **Stop the main agent and its helpers**. If you type during a Cursor or Grok Build reply, the arrow becomes a follow-up. Its name is **Send follow-up to the main agent**, and the tooltip says **Send follow-up · Enter**. That sends the text into the running turn.
