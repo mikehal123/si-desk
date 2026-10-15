@@ -17,12 +17,20 @@ public sealed record GrokbotMail(
     DateTimeOffset? PickedUpAt = null,
     bool Liked = false,
     byte[]? Image = null,
-    DateTimeOffset? ImageSentAt = null)
+    DateTimeOffset? ImageSentAt = null,
+    bool Posted = false)
 {
     /// <summary>The message had an image that an earlier list already delivered, and this copy omits the bytes.</summary>
     [JsonIgnore]
     public bool ImageWithheld => Image is null && ImageSentAt is not null;
+
+    /// <summary>A Grok Bot message posted with grokbot_post: no user text, only <see cref="Reply"/>. Never counts as a user message.</summary>
+    [JsonIgnore]
+    public bool IsPost => Posted;
 }
+
+/// <summary>Whether the latest Grokbot-tab user message opens the act window, and why not when it does not.</summary>
+public readonly record struct GrokbotActGate(bool Open, string Reason);
 
 public enum GrokbotLinkState { Off, Waiting, Connected }
 
@@ -47,6 +55,10 @@ public sealed class GrokbotMailbox
     public const int MaxMessages = 200;
     public const int MaxAudit = 100;
     public static readonly TimeSpan ConnectedWindow = TimeSpan.FromMinutes(10);
+    /// <summary>An Act on message lets app_navigate, app_click, and app_key run for this long after it was sent.</summary>
+    public static readonly TimeSpan ActWindow = TimeSpan.FromMinutes(10);
+    /// <summary>Tools that change the user's view or inject input. They need the act window open, not just Allow control.</summary>
+    public static bool NeedsActWindow(string? tool) => tool is "app_navigate" or "app_click" or "app_key";
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -61,6 +73,9 @@ public sealed class GrokbotMailbox
     private GrokbotPreferences _preferences = new();
     private DateTimeOffset? _lastPoll;
     private int _controlling;
+
+    /// <summary>The act-window clock. Tests set it; the app leaves UtcNow.</summary>
+    public Func<DateTimeOffset> Clock { get; set; } = static () => DateTimeOffset.UtcNow;
 
     public GrokbotMailbox(string? directory)
     {
@@ -101,7 +116,7 @@ public sealed class GrokbotMailbox
         var png = image is { Length: > 0 } bytes ? bytes.ToArray() : null;
         lock (_gate)
         {
-            var mail = new GrokbotMail(Guid.NewGuid().ToString("N"), clean, askToAct, GrokbotMailStatus.Queued, DateTimeOffset.UtcNow, null, null, Image: png);
+            var mail = new GrokbotMail(Guid.NewGuid().ToString("N"), clean, askToAct, GrokbotMailStatus.Queued, Clock(), null, null, Image: png);
             _messages.Add(mail);
             while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
             SaveMessages();
@@ -194,6 +209,24 @@ public sealed class GrokbotMailbox
         }
     }
 
+    /// <summary>
+    /// grokbot_post: Grok Bot speaks in the tab without an inbox message to answer, for example to relay a swarm
+    /// handoff mid-run. Stored as an answered entry with no user text so the reply rendering is reused.
+    /// </summary>
+    public GrokbotMail Post(string text)
+    {
+        var clean = CleanText(text);
+        lock (_gate)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var mail = new GrokbotMail(Guid.NewGuid().ToString("N"), "", false, GrokbotMailStatus.Answered, now, clean, now, Posted: true);
+            _messages.Add(mail);
+            while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
+            SaveMessages();
+            return mail;
+        }
+    }
+
     public GrokbotMail SetLiked(string id, bool liked)
     {
         if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("message_id is required.");
@@ -226,16 +259,63 @@ public sealed class GrokbotMailbox
         {
             if (_preferences.Stopped) return false;
             if (_preferences.AllowControl) return true;
-            return _messages.Count > 0 && _messages[^1].AskToAct;
+            return LatestUserMail()?.AskToAct == true;
         }
     }
 
+    /// <summary>The latest message the user sent. Grok Bot posts are skipped.</summary>
+    private GrokbotMail? LatestUserMail()
+    {
+        for (var i = _messages.Count - 1; i >= 0; i--)
+            if (!_messages[i].IsPost) return _messages[i];
+        return null;
+    }
+
+    /// <summary>
+    /// The act window is open when the latest Grokbot-tab user message is marked Act on and is under
+    /// <see cref="ActWindow"/> old. The clock is a parameter so the rule is testable.
+    /// </summary>
+    public GrokbotActGate ActGate(DateTimeOffset? now = null)
+    {
+        lock (_gate)
+        {
+            var latest = LatestUserMail();
+            if (latest is null) return new GrokbotActGate(false, "there is no Grokbot-tab message.");
+            if (!latest.AskToAct) return new GrokbotActGate(false, "the latest Grokbot-tab message is not marked Act on.");
+            var clock = now ?? Clock();
+            var age = clock - latest.Created;
+            if (age < TimeSpan.Zero) age = TimeSpan.Zero;
+            if (age >= ActWindow)
+                return new GrokbotActGate(false, "the latest Act on message is " + (int)age.TotalMinutes + " min old; the " + (int)ActWindow.TotalMinutes + " min window has passed.");
+            return new GrokbotActGate(true, "");
+        }
+    }
+
+    public bool ActWindowOpen(DateTimeOffset? now = null) => ActGate(now).Open;
+
+    public static string NotSwitched(GrokbotActGate gate) =>
+        "Not switched: " + gate.Reason + " app_navigate, app_click, and app_key run only while the latest Grokbot-tab message is marked Act on and under " + (int)ActWindow.TotalMinutes + " min old.";
+
+    /// <summary>
+    /// Every action needs control: Allow Grokbot control on, or Ask Grokbot to act on the latest message; Stop blocks all.
+    /// app_navigate, app_click, and app_key are stricter and need BOTH Allow Grokbot control on AND the act window
+    /// open (latest Grokbot-tab message marked Act on, under 10 min old). An Act on message alone does not move the view.
+    /// </summary>
     public void EnsureAction(string tool)
     {
-        _ = tool;
         if (!ActionsAllowed())
-            throw new InvalidOperationException("Grokbot control is off. Turn on Ask Grokbot to act for the latest message, or Allow Grokbot control. Stop Grokbot blocks every action.");
+            throw new InvalidOperationException(ControlOff);
+        if (!NeedsActWindow(tool)) return;
+        lock (_gate)
+        {
+            if (!_preferences.AllowControl || _preferences.Stopped)
+                throw new InvalidOperationException(ControlOff);
+        }
+        var gate = ActGate();
+        if (!gate.Open) throw new InvalidOperationException(NotSwitched(gate));
     }
+
+    public const string ControlOff = "Grokbot control is off. Turn on Ask Grokbot to act for the latest message, or Allow Grokbot control. Stop Grokbot blocks every action.";
 
     public void EnsureScreenshot()
     {
@@ -281,7 +361,7 @@ public sealed class GrokbotMailbox
             var saved = JsonSerializer.Deserialize<MailFile>(line, Json);
             if (saved is null || string.IsNullOrWhiteSpace(saved.Id)) return;
             var image = saved.Image is { Length: > 0 } png ? png : null;
-            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked, image, image is null ? null : saved.ImageSentAt));
+            _messages.Add(new GrokbotMail(saved.Id, saved.Text ?? "", saved.AskToAct, saved.Status, saved.Created, saved.Reply, saved.AnsweredAt, saved.WakeNote, saved.PickedUpAt, saved.Liked, image, image is null ? null : saved.ImageSentAt, saved.Posted));
         });
         while (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         LoadLines(Path.Combine(_directory, "audit.jsonl"), line =>
@@ -413,5 +493,6 @@ public sealed class GrokbotMailbox
         public bool Liked { get; set; }
         public byte[]? Image { get; set; }
         public DateTimeOffset? ImageSentAt { get; set; }
+        public bool Posted { get; set; }
     }
 }

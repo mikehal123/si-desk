@@ -134,8 +134,36 @@ public sealed class SwarmPhase1Tests
         Assert.DoesNotContain(rule, single, StringComparison.Ordinal);
         Assert.DoesNotContain("must differ", single, StringComparison.Ordinal);
         Assert.Contains(rule, mixed, StringComparison.Ordinal);
-        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", single, StringComparison.Ordinal);
-        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", mixed, StringComparison.Ordinal);
+        Assert.DoesNotContain("grokbot-", single, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("grokbot-", mixed, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Manager_brief_never_offers_grokbot_as_a_worker_but_still_asks_for_the_handoff_block()
+    {
+        var board = Path.Combine(Path.GetTempPath(), "board");
+        foreach (var brief in new[] { SwarmRoles.Manager(board), SwarmRoles.Manager(board, mixedModels: true), SwarmRoles.Manager(board, "Project memory: none") })
+        {
+            Assert.DoesNotContain("grokbot-", brief, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("wake ping", brief, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("wake role", brief, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("swarm_submit_result", brief, StringComparison.Ordinal);
+            Assert.DoesNotContain("stay wake roles", brief, StringComparison.Ordinal);
+            Assert.DoesNotContain("waiting on Grok Bot", brief, StringComparison.Ordinal);
+            Assert.Contains("Grok Bot is not a worker and is never on the board", brief, StringComparison.Ordinal);
+            Assert.Contains("grandparent above you", brief, StringComparison.Ordinal);
+            Assert.Contains("swarm_continue", brief, StringComparison.Ordinal);
+            Assert.Contains("all four roles: engineer, researcher, scout, and verifier", brief, StringComparison.Ordinal);
+            Assert.Contains("scout", brief, StringComparison.Ordinal);
+            Assert.Contains("SOVEREIGN_HANDOFF", brief, StringComparison.Ordinal);
+            Assert.Contains("END_SOVEREIGN_HANDOFF", brief, StringComparison.Ordinal);
+        }
+        foreach (var role in new[] { SwarmRole.Engineer, SwarmRole.Researcher, SwarmRole.Scout, SwarmRole.Investigator, SwarmRole.Verifier, "worker", "grokbot-" + "re" + "search" })
+            Assert.DoesNotContain("You are Grok Bot", SwarmRoles.For(role), StringComparison.Ordinal);
+        var scout = SwarmRoles.For(SwarmRole.Scout);
+        Assert.Contains("second and independent lookup", scout, StringComparison.Ordinal);
+        Assert.Contains("Cross-check", scout, StringComparison.Ordinal);
+        Assert.Contains("source", scout, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -176,28 +204,15 @@ public sealed class SwarmPhase1Tests
     }
 
     [Fact]
-    public async Task Grokbot_round_trip_wakes_and_submits_for_the_verifier()
+    public async Task Grokbot_cannot_submit_a_worker_result_but_can_still_read_the_board()
     {
         var root = Temp();
         try
         {
-            var board = SwarmLoop.OpenGoal("Look up the note", "Read the desk note", SwarmRole.GrokbotResearch, "The note is on the board only.", root);
+            var board = SwarmLoop.OpenGoal("Look up the note", "Read the desk note", SwarmRole.Researcher, "The note is on the board only.", root);
             var task = board.Tasks.Single();
-            Assert.Equal(SwarmStatus.Todo, task.Status);
-            board.Start(task.Id, "Grok Bot");
+            board.Start(task.Id, "researcher");
             Assert.Equal(SwarmStatus.Doing, board.TaskById(task.Id).Status);
-
-            using var handler = new CaptureHandler(HttpStatusCode.OK);
-            var receipt = await GrokbotWake.DeliverAsync(handler, "https://wake.example/hook", "wake-key", task.Id, false, GrokbotWake.Preview(task.Title), CancellationToken.None, _ => TimeSpan.Zero, board.Id, task.Id, task.Title, task.Details);
-            Assert.Equal("Grokbot pinged", receipt.Note);
-            Assert.Equal(200, receipt.StatusCode);
-            using var posted = JsonDocument.Parse(Assert.Single(handler.Bodies));
-            Assert.Equal("Bearer wake-key", Assert.Single(handler.Authorizations));
-            Assert.Equal(board.Id, posted.RootElement.GetProperty("swarm_id").GetString());
-            Assert.Equal(task.Id, posted.RootElement.GetProperty("task_id").GetString());
-            Assert.Equal(task.Title, posted.RootElement.GetProperty("title").GetString());
-            Assert.Equal(task.Details, posted.RootElement.GetProperty("details").GetString());
-            Assert.DoesNotContain("wake-key", handler.Bodies[0], StringComparison.Ordinal);
 
             var desk = new SwarmDesk(root);
             var secrets = new MemoryConnectorSecrets();
@@ -216,29 +231,33 @@ public sealed class SwarmPhase1Tests
                 @params = new
                 {
                     name = "swarm_submit_result",
-                    arguments = new { task_id = task.Id, result = "The note is local.", proof = "source: board " + task.Id }
+                    arguments = new { task_id = task.Id, swarm_id = board.Id, result = "The note is local.", proof = "source: board " + task.Id }
                 }
             });
             var response = await http.PostAsync(host.Url, new StringContent(call, Encoding.UTF8, "application/json"));
             var body = await response.Content.ReadAsStringAsync();
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.Contains(SwarmStatus.Review, body, StringComparison.Ordinal);
+            using (var json = JsonDocument.Parse(body))
+            {
+                var result = json.RootElement.GetProperty("result");
+                Assert.True(result.GetProperty("isError").GetBoolean());
+                Assert.Contains("Grok Bot is not a swarm worker", result.GetProperty("content")[0].GetProperty("text").GetString(), StringComparison.Ordinal);
+            }
             Assert.DoesNotContain(token, body, StringComparison.Ordinal);
-            var reviewed = SwarmBoard.Load(board.Id, root).TaskById(task.Id);
-            Assert.Equal(SwarmStatus.Review, reviewed.Status);
-            Assert.Equal("source: board " + task.Id, reviewed.Proof);
-            var done = reviewed.Status == SwarmStatus.Review
-                ? SwarmBoard.Load(board.Id, root).Verify(task.Id, true, VerifyResultSkill.Format(
-                    "The submitted proof names the task",
-                    "Read the board after swarm_submit_result and compared the proof with the task id.",
-                    "source: board " + task.Id,
-                    "Success: the proof cites this task. Skipped: no file was produced by this lookup handoff.",
-                    "pass because the proof names the task id"))
-                : reviewed;
-            Assert.Equal(SwarmStatus.Done, done.Status);
+            var unchanged = SwarmBoard.Load(board.Id, root).TaskById(task.Id);
+            Assert.Equal(SwarmStatus.Doing, unchanged.Status);
+            Assert.Equal("", unchanged.Result);
+            Assert.Equal("", unchanged.Proof);
             Assert.DoesNotContain(token, File.ReadAllText(audit), StringComparison.Ordinal);
-            Assert.Contains("swarm_submit_result", File.ReadAllText(audit), StringComparison.Ordinal);
 
+            // The tool list still carries the review tools and says the task path is closed.
+            var list = await http.PostAsync(host.Url, new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 3, method = "tools/list" }), Encoding.UTF8, "application/json"));
+            var tools = await list.Content.ReadAsStringAsync();
+            Assert.Contains("Grok Bot is not a swarm worker", tools, StringComparison.Ordinal);
+            Assert.Contains("\"swarm_continue\"", tools, StringComparison.Ordinal);
+            Assert.Contains("\"swarm_run_status\"", tools, StringComparison.Ordinal);
+
+            // The reviewer still reads live runs.
             var listed = await http.PostAsync(host.Url, new StringContent(JsonSerializer.Serialize(new
             {
                 jsonrpc = "2.0",
@@ -248,7 +267,7 @@ public sealed class SwarmPhase1Tests
             }), Encoding.UTF8, "application/json"));
             var boardText = await listed.Content.ReadAsStringAsync();
             Assert.Contains(board.Id, boardText, StringComparison.Ordinal);
-            Assert.Contains("done", boardText, StringComparison.Ordinal);
+            Assert.Contains("doing", boardText, StringComparison.Ordinal);
         }
         finally { Delete(root); }
     }
@@ -336,29 +355,9 @@ public sealed class SwarmPhase1Tests
         if (Directory.Exists(path)) Directory.Delete(path, true);
     }
 
-    private sealed class CaptureHandler : HttpMessageHandler
-    {
-        private readonly HttpStatusCode _code;
-        public List<string> Authorizations { get; } = [];
-        public List<string> Bodies { get; } = [];
-        public CaptureHandler(HttpStatusCode code) => _code = code;
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Authorizations.Add(request.Headers.Authorization?.ToString() ?? "");
-            Bodies.Add(request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken));
-            return new HttpResponseMessage(_code);
-        }
-    }
-
     private sealed class SwarmDesk(string root) : IGrokBotDesk
     {
         public string ReadSwarmBoard(string? swarmId, string? runId = null) => SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, root, string.IsNullOrWhiteSpace(runId) ? null : runId);
-        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null)
-        {
-            var board = SwarmBoard.RequireTask(taskId, root, out _, string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, string.IsNullOrWhiteSpace(runId) ? null : runId);
-            var task = board.Submit(taskId, result, proof);
-            return task.Id + "\t" + task.Status;
-        }
         public GrokBotStatus Status() => new("0.3.60", "Cursor", "grok-4.7", false);
         public IReadOnlyList<GrokBotChat> ListChats() => [];
         public IReadOnlyList<GrokBotMessage> ReadChat(string? conversation, int limit) => [];

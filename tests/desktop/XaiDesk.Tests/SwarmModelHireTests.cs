@@ -26,9 +26,15 @@ public sealed class SwarmModelHireTests
         Assert.Contains("verifier modelId: opus-5.5", catalog);
         Assert.Contains("researcher modelId: gemini-3.8-flash", catalog);
         Assert.Contains("investigator modelId: gemini-3.8-flash", catalog);
+        Assert.Contains("scout modelId: grok-4.7", catalog);
+        Assert.Contains("engineer, researcher, scout, investigator, and verifier", catalog);
         Assert.Contains("- fable-5.1 | Claude Fable 5.1", catalog);
-        Assert.Contains("grokbot-research and grokbot-ops stay wake roles", catalog);
+        Assert.DoesNotContain("grokbot", catalog, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("wake role", catalog, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Claude Fable 5.1 modelId", catalog);
+
+        var exact = SwarmModelHire.Catalog([M("fable-5.1", "Claude Fable 5.1"), M(SwarmRoleModels.ScoutDefaultModelId, "Grok 4.7 Fast")], "fable-5.1");
+        Assert.Contains("scout modelId: " + SwarmRoleModels.ScoutDefaultModelId, exact);
     }
 
     [Fact]

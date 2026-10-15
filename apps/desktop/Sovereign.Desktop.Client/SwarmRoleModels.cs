@@ -21,8 +21,11 @@ public static class SwarmRoleModels
     private static readonly string[] VerifierDefault = ["Opus 5.5", "GPT-5.6 Sol", "Fable"];
     private static readonly string[] InquiryDefault = ["Gemini 3.8", "Composer 2.5", "Muse Spark"];
     private static readonly string[] TesterDefault = ["Composer 2.5", "GPT-5.6 Sol", "Gemini 3.8"];
+    /// <summary>Default hire for the scout role (second, independent lookup). Exact id first, then looser matches. User-changeable like every role.</summary>
+    public const string ScoutDefaultModelId = "grok-4.7[context=256k,reasoning_effort=high,fast=true]";
+    private static readonly string[] ScoutDefault = [ScoutDefaultModelId, "Grok 4.7", "Gemini 3.8", "Composer 2.5"];
     private static readonly string[] CatalogRoles =
-        ["engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester"];
+        ["engineer", "coder", "planner", "reviewer", "verifier", "researcher", "scout", "investigator", "tester"];
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private static readonly JsonDocumentOptions ReadJson = new()
@@ -120,7 +123,6 @@ public static class SwarmRoleModels
         string? chatModelId,
         string? overrideId)
     {
-        if (IsWakeRole(role)) return null;
         var ranking = RankingFor(roles, role);
         if (IsVerifierFamily(role))
         {
@@ -153,8 +155,7 @@ public static class SwarmRoleModels
             if (AdvertisedId(advertised, pair.Value) is not { } id) continue;
             lines.Append("override ").Append(pair.Key).Append(" modelId: ").Append(id).Append('\n');
         }
-        lines.Append("Use those ids for engineer, coder, planner, reviewer, verifier, researcher, investigator, and tester. ");
-        lines.Append("grokbot-research and grokbot-ops take no modelId. ");
+        lines.Append("Use those ids for engineer, coder, planner, reviewer, verifier, researcher, scout, investigator, and tester. ");
         lines.Append("The verifier modelId must differ from the engineer modelId. ");
         lines.Append("If the helper tool rejects the model field, fall back to the parent modelId.\n");
         return lines.ToString();
@@ -183,15 +184,10 @@ public static class SwarmRoleModels
             lines.Append(role).Append(" modelId: ").Append(id).Append('\n');
         lines.Append("Single model mode; every role uses only this modelId, including the manager, workers, verifier, helpers, fallbacks, and retries; ");
         lines.Append("the verifier uses this same modelId; ");
-        lines.Append("grokbot-research and grokbot-ops take no modelId; ");
         lines.Append("if the helper tool rejects the model field, retry this same modelId; ");
         lines.Append("do not substitute another model or provider.\n");
         return lines.ToString();
     }
-
-    private static bool IsWakeRole(string? role) =>
-        string.Equals(role, "grokbot-research", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(role, "grokbot-ops", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsVerifierFamily(string? role) =>
         string.Equals(role, "verifier", StringComparison.OrdinalIgnoreCase)
@@ -201,6 +197,8 @@ public static class SwarmRoleModels
     {
         if (string.IsNullOrWhiteSpace(role)) return [];
         if (FindRole(roles, role) is { } found) return found;
+        // A rankings file written before the scout role existed has no entry for it; use the built-in default.
+        if (role.Equals("scout", StringComparison.OrdinalIgnoreCase)) return ScoutDefault.ToArray();
         string? fallback = null;
         if (role.Equals("coder", StringComparison.OrdinalIgnoreCase)) fallback = "engineer";
         else if (role.Equals("reviewer", StringComparison.OrdinalIgnoreCase)) fallback = "verifier";
@@ -263,6 +261,7 @@ public static class SwarmRoleModels
         ["reviewer"] = VerifierDefault.ToArray(),
         ["verifier"] = VerifierDefault.ToArray(),
         ["researcher"] = InquiryDefault.ToArray(),
+        ["scout"] = ScoutDefault.ToArray(),
         ["investigator"] = InquiryDefault.ToArray(),
         ["tester"] = TesterDefault.ToArray()
     };

@@ -76,6 +76,8 @@ public static class SwarmSection
             foreach (var candidate in Directory.EnumerateFiles(runs, "board.json", SearchOption.AllDirectories))
             {
                 if (!Path.GetFileName(candidate).Equals("board.json", StringComparison.OrdinalIgnoreCase)) continue;
+                var parent = Path.GetDirectoryName(candidate);
+                if (string.Equals(Path.GetFileName(parent), "archived", StringComparison.OrdinalIgnoreCase)) continue;
                 var write = File.GetLastWriteTimeUtc(candidate);
                 if (newest is null || write > newestWrite)
                 {
@@ -167,7 +169,6 @@ public static class SwarmSection
         if (previousStatus is not null && StatusLabel(previousStatus) == status) return null;
         var role = string.IsNullOrWhiteSpace(task.Role) ? "worker" : task.Role.Trim();
         var title = string.IsNullOrWhiteSpace(task.Title) ? task.Id : task.Title.Trim();
-        if (SwarmRole.IsGrokbot(role) && status is "review" or "done") return "Grok Bot returned result";
         if (status == "todo" && previousStatus == "doing")
             return role + " interrupted " + title + ". Respawn once, narrower.";
         if (status == "doing") return role + " started " + title;

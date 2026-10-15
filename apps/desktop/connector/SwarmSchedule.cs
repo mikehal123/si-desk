@@ -14,8 +14,8 @@ public static class SwarmSchedule
     [
         SwarmRole.Engineer,
         SwarmRole.Researcher,
-        SwarmRole.Verifier,
-        SwarmRole.GrokbotResearch
+        SwarmRole.Scout,
+        SwarmRole.Verifier
     ];
 
     public static bool CanSplit(string? goal)
@@ -48,6 +48,8 @@ public static class SwarmSchedule
             if (task is null || string.IsNullOrWhiteSpace(task.Id) || string.IsNullOrWhiteSpace(task.Title))
                 throw new ArgumentException("Every task needs an id and a title.", nameof(tasks));
             if (!ids.Add(task.Id)) throw new ArgumentException("Duplicate task ids are illegal.", nameof(tasks));
+            if (SwarmRole.IsLegacyGrokbot(task.Role))
+                throw new ArgumentException("Grok Bot is not a swarm worker. Use scout for the second lookup.", nameof(tasks));
         }
 
         if (!CanSplit(goal))
@@ -59,7 +61,7 @@ public static class SwarmSchedule
             if (tasks.Count is < 4 or > MaxSplit)
                 throw new ArgumentException("Lookup and write needs 4 to 6 tasks.", nameof(tasks));
             if (!HasAllCoreRoles(tasks))
-                throw new ArgumentException("Lookup and write needs engineer, researcher, verifier, and grokbot-research.", nameof(tasks));
+                throw new ArgumentException("Lookup and write needs engineer, researcher, scout, and verifier.", nameof(tasks));
             if (!VerifierHasAfter(tasks))
                 throw new ArgumentException("A verifier task needs an After list.", nameof(tasks));
         }
@@ -159,7 +161,7 @@ public static class SwarmSchedule
             && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
         var kept = existing.Tasks.All(task => incoming.Tasks.Any(next => next.Id == task.Id));
         if (sameGoal && kept) return;
-        throw new IOException("That run still has an open task, including any grokbot-research task waiting on Grok Bot. Leave its board.json alone and start a new run.");
+        throw new IOException("That run still has an open task. Leave its board.json alone and start a new run.");
     }
 
     private static bool HasCountWord(string goal)

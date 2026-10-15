@@ -267,7 +267,7 @@ The box is greyed out while **Allow subagents** is off. Checking it turns **Allo
 
 Grok Build can run a swarm, but it does not show this dropdown.
 
-The manager splits a large goal into tasks (engineer, investigator, researcher, verifier, and sometimes a Grok Bot lookup). A task is not done until the verifier records a pass with a reason. **Respawn** on a swarm task stops that helper and restarts its task once, with a narrower scope. Using it again fails that task. Other workers keep going.
+The manager splits a large goal into tasks (engineer, investigator, researcher, scout, verifier). The scout is a second, independent lookup that cross-checks the researcher. Grok Bot is never a swarm worker; it is the grandparent above the manager, relaying status updates and handoffs to you mid-run and reviewing handoffs when that option is on. A task is not done until the verifier records a pass with a reason. **Respawn** on a swarm task stops that helper and restarts its task once, with a narrower scope. Using it again fails that task. Other workers keep going.
 
 ## Grok Bot
 
@@ -288,7 +288,7 @@ The connector itself is off until you turn it on. In **Settings**, **Grok Bot co
 5. **Test connection** and **Test inbox** check the listener and the mailbox.
 6. **Wake webhook URL** and **Webhook sender key** are optional. **Save wake** stores them. The key is not shown again; the box shows dots when one is saved.
 
-Version 0.3.66 has no Connection-panel option named **Grokbot reviews handoffs**. The swarm row in this version is the **Swarm mode** dropdown only. Swarm can still wake Grok Bot: the roles `grokbot-research` and `grokbot-ops` do not take a model id. After a run, the manager may append a handoff block in its reply (`finding` for an observation, `verified` only when a verifier passed). That block is text in the reply, not a checkbox.
+Version 0.3.66 has no Connection-panel option named **Grokbot reviews handoffs**. The swarm row in this version is the **Swarm mode** dropdown only. After a run, the manager may append a handoff block in its reply (`finding` for an observation, `verified` only when a verifier passed). That block is text in the reply, not a checkbox.
 
 ## Settings
 

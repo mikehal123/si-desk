@@ -398,6 +398,9 @@ public sealed class GrokBotConnectorTests
         desk.Mail.SavePreferences(prefs);
         var tree = await Call(http, host.Url!, "app_ui_tree");
         Assert.Contains("title\tControlType.Text\tTitle\t10\t10\t40\t20", tree, StringComparison.Ordinal);
+        var noActOn = await Call(http, host.Url!, "app_click", new { control_id = "title" });
+        Assert.StartsWith("Not switched: there is no Grokbot-tab message.", noActOn, StringComparison.Ordinal);
+        desk.Mail.Queue("click the title", askToAct: true);
         var clicked = await Call(http, host.Url!, "app_click", new { control_id = "title" });
         Assert.Equal("Clicked.", clicked);
         var outside = await Call(http, host.Url!, "app_click", new { x = 500, y = 500 });
@@ -407,6 +410,146 @@ public sealed class GrokBotConnectorTests
         var stopped = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
         Assert.Contains("Grokbot control is off", stopped, StringComparison.Ordinal);
         Assert.Contains("app_navigate", string.Join("\n", desk.Mail.Audit.Select(line => line.Tool)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task App_navigate_is_refused_until_the_latest_tab_message_is_marked_act_on()
+    {
+        var desk = new MemoryDesk { CurrentPage = "grokbot" };
+        var prefs = desk.Mail.PreferencesCopy();
+        prefs.AllowControl = true;
+        desk.Mail.SavePreferences(prefs);
+        await using var host = await Start(desk);
+        using var http = Client();
+        var noMessage = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
+        Assert.StartsWith("Not switched: there is no Grokbot-tab message.", noMessage, StringComparison.Ordinal);
+        Assert.Equal("grokbot", desk.CurrentPage);
+        Assert.Null(desk.OpenedPage);
+        desk.Mail.Queue("just a note", askToAct: false);
+        var notActOn = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
+        Assert.StartsWith("Not switched: the latest Grokbot-tab message is not marked Act on.", notActOn, StringComparison.Ordinal);
+        Assert.Equal("grokbot", desk.CurrentPage);
+        var same = await Call(http, host.Url!, "app_navigate", new { page = "Grokbot" });
+        Assert.StartsWith("Not switched:", same, StringComparison.Ordinal);
+        Assert.Null(desk.OpenedPage);
+        var list = await http.PostAsync(host.Url, new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 2, method = "tools/list" }), Encoding.UTF8, "application/json"));
+        var listed = await list.Content.ReadAsStringAsync();
+        Assert.Contains("marked Act on and under 10 minutes old", listed, StringComparison.Ordinal);
+        Assert.Contains("swarm_run_events", listed, StringComparison.Ordinal);
+        Assert.Contains("grokbot_post", listed, StringComparison.Ordinal);
+        using var tools = JsonDocument.Parse(listed);
+        var byName = tools.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToDictionary(tool => tool.GetProperty("name").GetString() ?? "");
+        foreach (var readOnly in new[] { "swarm_run_events", "read_swarm_board", "swarm_run_status", "read_chat", "status" })
+            Assert.True(byName[readOnly].GetProperty("annotations").GetProperty("readOnlyHint").GetBoolean(), readOnly);
+        foreach (var writes in new[] { "grokbot_post", "grokbot_inbox_list", "app_navigate", "swarm_continue", "send_to_chat" })
+            Assert.False(byName[writes].TryGetProperty("annotations", out _), writes);
+        Assert.True(ConnectorHost.IsReadOnlyTool("swarm_run_events"));
+        Assert.False(ConnectorHost.IsReadOnlyTool("grokbot_post"));
+    }
+
+    [Fact]
+    public async Task App_navigate_click_and_key_open_only_inside_the_ten_minute_act_window()
+    {
+        var desk = new MemoryDesk { CurrentPage = "grokbot" };
+        desk.Controls.Add(new GrokbotControl("title", "ControlType.Text", "Title", 10, 10, 40, 20));
+        var prefs = desk.Mail.PreferencesCopy();
+        prefs.AllowControl = true;
+        desk.Mail.SavePreferences(prefs);
+        var start = new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
+        var now = start;
+        desk.Mail.Clock = () => now;
+        desk.Mail.Queue("open the chat", askToAct: true);
+        await using var host = await Start(desk);
+        using var http = Client();
+
+        now = start.AddMinutes(11);
+        var stale = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
+        Assert.StartsWith("Not switched: the latest Act on message is 11 min old; the 10 min window has passed.", stale, StringComparison.Ordinal);
+        Assert.Equal("grokbot", desk.CurrentPage);
+        var staleClick = await Call(http, host.Url!, "app_click", new { control_id = "title" });
+        Assert.StartsWith("Not switched:", staleClick, StringComparison.Ordinal);
+        var staleKey = await Call(http, host.Url!, "app_key", new { keys = "Tab" });
+        Assert.StartsWith("Not switched:", staleKey, StringComparison.Ordinal);
+        var typed = await Call(http, host.Url!, "app_type", new { control_id = "title", text = "x" });
+        Assert.Equal("Typed.", typed);
+        var tree = await Call(http, host.Url!, "app_ui_tree");
+        Assert.Contains("title\tControlType.Text", tree, StringComparison.Ordinal);
+
+        now = start.AddMinutes(2);
+        var moved = await Call(http, host.Url!, "app_navigate", new { page = "Chat" });
+        Assert.Equal("Opened Chat.", moved);
+        Assert.Equal("chat", desk.CurrentPage);
+        Assert.Equal("chat", desk.OpenedPage);
+        Assert.Equal("Clicked.", await Call(http, host.Url!, "app_click", new { control_id = "title" }));
+        Assert.Equal("Sent keys.", await Call(http, host.Url!, "app_key", new { keys = "Tab" }));
+    }
+
+    [Fact]
+    public async Task Swarm_run_events_filters_by_since_and_leaves_the_board_alone()
+    {
+        var desk = new MemoryDesk();
+        var root = Path.Combine(Path.GetTempPath(), "sidesk-events-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            desk.SwarmRoot = root;
+            var board = SwarmBoard.Create("Ship the thing", [new SwarmTask { Id = "t1", Title = "Build", Role = SwarmRole.Engineer }], root);
+            var file = Path.Combine(root, board.Id, "board.json");
+            var before = File.ReadAllBytes(file);
+            var t0 = new DateTimeOffset(2026, 10, 14, 9, 0, 0, TimeSpan.Zero);
+            desk.Events.Record(
+            [
+                new SwarmRunEvent(t0, "run-1", SwarmRunEventKind.Task, "t1 (engineer) Build: todo -> doing"),
+                new SwarmRunEvent(t0.AddMinutes(1), "run-1", SwarmRunEventKind.Status, "manager update: half way"),
+                new SwarmRunEvent(t0.AddMinutes(2), "run-1", SwarmRunEventKind.Handoff, "manager handoff ready: done", "SOVEREIGN_HANDOFF\nstatus: done"),
+                new SwarmRunEvent(t0.AddMinutes(3), "run-2", SwarmRunEventKind.Failed, "t9 (verifier) Check failed: timeout")
+            ]);
+            await using var host = await Start(desk);
+            using var http = Client();
+            var all = await Call(http, host.Url!, "swarm_run_events", new { run_id = "run-1" });
+            Assert.Contains("2026-10-14T09:00:00Z\trun-1\ttask\tt1 (engineer) Build: todo -> doing", all, StringComparison.Ordinal);
+            Assert.Contains("\trun-1\tstatus\tmanager update: half way", all, StringComparison.Ordinal);
+            Assert.Contains("\trun-1\thandoff\tmanager handoff ready: done", all, StringComparison.Ordinal);
+            Assert.Contains("SOVEREIGN_HANDOFF\nstatus: done", all, StringComparison.Ordinal);
+            Assert.DoesNotContain("run-2", all, StringComparison.Ordinal);
+            var since = await Call(http, host.Url!, "swarm_run_events", new { run_id = "run-1", since = "2026-10-14T09:01:00Z" });
+            Assert.DoesNotContain("todo -> doing", since, StringComparison.Ordinal);
+            Assert.DoesNotContain("half way", since, StringComparison.Ordinal);
+            Assert.Contains("handoff ready", since, StringComparison.Ordinal);
+            Assert.Equal("", await Call(http, host.Url!, "swarm_run_events", new { run_id = "run-none" }));
+            Assert.Contains("run_id is required", await Call(http, host.Url!, "swarm_run_events", new { run_id = "" }), StringComparison.Ordinal);
+            Assert.Equal(before, File.ReadAllBytes(file));
+            var audit = desk.Mail.Audit.First(line => line.Tool == "swarm_run_events");
+            Assert.Contains("run-1", audit.Args, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task Grokbot_post_appears_in_the_tab_as_a_bot_message_without_an_inbox_entry()
+    {
+        var desk = new MemoryDesk();
+        await using var host = await Start(desk);
+        using var http = Client();
+        var posted = await Call(http, host.Url!, "grokbot_post", new { text = "Swarm run-1: the manager is half way." });
+        Assert.StartsWith("Posted\t", posted, StringComparison.Ordinal);
+        var id = posted.Split('\t')[1];
+        var mail = Assert.Single(desk.Mail.Messages);
+        Assert.Equal(id, mail.Id);
+        Assert.True(mail.IsPost);
+        Assert.Equal("", mail.Text);
+        Assert.Equal(GrokbotMailStatus.Answered, mail.Status);
+        Assert.Equal("Swarm run-1: the manager is half way.", mail.Reply);
+        Assert.Empty(desk.Mail.ListSince(null));
+        Assert.False(desk.Mail.ActWindowOpen());
+        var audit = desk.Mail.Audit.Last(line => line.Tool == "grokbot_post");
+        Assert.DoesNotContain("half way", audit.Args, StringComparison.Ordinal);
+        Assert.DoesNotContain("half way", audit.Result, StringComparison.Ordinal);
+        Assert.Contains("empty", await Call(http, host.Url!, "grokbot_post", new { text = "" }), StringComparison.OrdinalIgnoreCase);
+        Assert.Single(desk.Mail.Messages);
     }
 
     [Fact]
@@ -430,6 +573,7 @@ public sealed class GrokBotConnectorTests
         var prefs = desk.Mail.PreferencesCopy();
         prefs.AllowControl = true;
         desk.Mail.SavePreferences(prefs);
+        desk.Mail.Queue("go ahead", askToAct: true); // opens the act window for app_click and app_key
         await using var host = await Start(desk);
         using var http = Client();
         var typed = await Call(http, host.Url!, "app_type", new { control_id = "xAI API key", text = "nope" });
@@ -651,24 +795,24 @@ public sealed class GrokBotConnectorTests
             GrokbotWindow.RequireFocused(FocusInside, FocusedSecret);
             return "Sent keys.";
         }
+        public string CurrentPage { get; set; } = "chat";
         public string GrokbotNavigate(string page)
         {
             Mail.EnsureAction("app_navigate");
-            OpenedPage = GrokbotWindow.CanonicalPage(page);
-            return "Opened " + page.Trim() + ".";
+            if (!PageSwitch.TryConnectorSwitch(CurrentPage, page, Mail.ActGate(), out var reply)) return reply;
+            CurrentPage = GrokbotWindow.CanonicalPage(page);
+            OpenedPage = CurrentPage;
+            return reply;
         }
         public void RecordGrokbotTool(string tool, string args, string result) => Mail.Record(tool, args, result);
         public string? SwarmRoot { get; set; }
         public string ReadSwarmBoard(string? swarmId, string? runId = null) => SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, SwarmRoot, string.IsNullOrWhiteSpace(runId) ? null : runId);
-        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null)
-        {
-            var board = SwarmBoard.RequireTask(taskId, SwarmRoot, out _, string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, string.IsNullOrWhiteSpace(runId) ? null : runId);
-            var task = board.Submit(taskId, result, proof);
-            return task.Id + "\t" + task.Status;
-        }
         public bool GrokbotReviewsHandoffs(string conversationId) => false;
         public bool ConversationOpen(string conversationId) => false;
         public void DeliverSwarmReview(string conversationId, string text, bool resume) { }
         public string? SwarmBoardRoot() => SwarmRoot;
+        public SwarmRunEvents Events { get; } = new();
+        public IReadOnlyList<SwarmRunEvent> ReadSwarmRunEvents(string runId, DateTimeOffset? since) => Events.Since(runId, since);
+        public GrokbotMail PostGrokbot(string text) => Mail.Post(text);
     }
 }

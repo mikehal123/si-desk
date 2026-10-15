@@ -267,7 +267,7 @@ public sealed partial class MainWindow
         foreach (ListViewItem item in _nav.Items)
             if ((string)item.Tag == "grokbot")
                 item.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        if (!on && _activeSystem == "grokbot") Navigate("chat");
+        if (!on && _activeSystem == "grokbot") Navigate("chat", PageSwitchSource.System);
     }
 
     internal void SetGrokbotControlling(bool on) =>
@@ -390,6 +390,14 @@ public sealed partial class MainWindow
             var now = DateTimeOffset.UtcNow;
             foreach (var mail in messages)
             {
+                if (mail.IsPost)
+                {
+                    // grokbot_post: a Grok Bot message with no user message to answer. Reply bubble only.
+                    if (string.IsNullOrWhiteSpace(mail.Reply)) continue;
+                    var postedAt = GrokTuiPresentation.UserBar(mail.Reply, (mail.AnsweredAt ?? mail.Created).ToLocalTime());
+                    _grokbotMessages.Children.Add(GrokbotReply(mail, postedAt.Text, postedAt.Time + " · Posted", prefs.AvatarColor, prefs.AvatarShape));
+                    continue;
+                }
                 var status = mail.Status switch
                 {
                     GrokbotMailStatus.Queued => "Queued",

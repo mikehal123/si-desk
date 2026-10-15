@@ -289,7 +289,7 @@ The **Swarm mode** label and the dropdown are shown only for **Cursor**. They ar
 
 Changing the swarm checkbox or the Swarm mode dropdown reconnects the chat.
 
-The manager can split a goal into tasks with roles such as engineer, investigator, researcher, and verifier, and sometimes a Grok Bot lookup (`grokbot-research` or `grokbot-ops`). A task is not done until the verifier records a pass with a reason. **Respawn** on a swarm task stops that helper and restarts its task once, with a narrower scope. Using it again fails that task. Other workers keep going.
+The manager can split a goal into tasks with roles such as engineer, investigator, researcher, scout, and verifier. The scout is a second, independent lookup: it cross-checks the researcher's facts and finds sources the researcher missed. Grok Bot is never a swarm worker and is never on the board. Grok Bot is the grandparent above the manager: it relays the manager's status updates and handoff blocks to you mid-run, in the Grokbot tab or over the Grokbot connection, and it reviews handoffs when that checkbox is on (see below). A task is not done until the verifier records a pass with a reason. **Respawn** on a swarm task stops that helper and restarts its task once, with a narrower scope. Using it again fails that task. Other workers keep going.
 
 The **Swarm** tab says **Tasks for this goal. Expand a task to read its subagent chat.** It shows the goal, a progress bar, a count such as done and total, and an **Activity** section. **Project memory** at the top of that tab says **None saved** until notes exist, or **Open a project folder to keep notes.** when no folder is open.
 
@@ -311,7 +311,7 @@ When it is on, and the reply contains a handoff block, SI Desk asks Grok Bot to 
 
 The wake line on the Swarm tab looks like **Wake sent** plus a time and **HTTP** plus a status code. Its name is **Grokbot wake**. If the webhook answers HTTP 400 or 401, a warning appears under it: **check wake key**.
 
-`grokbot-research` and `grokbot-ops` do not take a model id. They are wake roles.
+While a swarm run is live, SI Desk also wakes Grok Bot when the manager posts a status or plan update, when a handoff block is ready, when a task fails, and when the run finishes or is stopped. Routine task moves (todo, doing, review) do not wake Grok Bot. Wakes for one run are grouped: at most one wake per minute per run, and a grouped wake lists every event in it. Grok Bot reads the full event list with the connector tool `swarm_run_events` and can post to the Grokbot tab with `grokbot_post`. Nothing is sent when the wake webhook URL is not set.
 
 ### Review loop cap
 

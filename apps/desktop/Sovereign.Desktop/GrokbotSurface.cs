@@ -76,6 +76,7 @@ public sealed partial class MainWindow
         var pointX = control is null ? x!.Value : control.X + control.Width / 2;
         var pointY = control is null ? y!.Value : control.Y + control.Height / 2;
         RequirePointOnThisWindow(pointX, pointY);
+        NoteConnectorInput();
         if (!SetCursorPos(pointX, pointY))
             throw new InvalidOperationException("The click did not land on the SI Desk window.");
         mouse_event(LeftDown, 0, 0, 0, UIntPtr.Zero);
@@ -118,6 +119,7 @@ public sealed partial class MainWindow
         var inside = focused is not null && IsUnderWindow(hwnd, focused);
         var secret = focused is not null && GrokbotWindow.IsSecret(TextProp(focused, AutomationElement.AutomationIdProperty), TypeName(focused), TextProp(focused, AutomationElement.NameProperty), BoolProp(focused, AutomationElement.IsPasswordProperty));
         GrokbotWindow.RequireFocused(inside, secret);
+        NoteConnectorInput();
         foreach (var modifier in parsed.Modifiers) keybd_event((byte)modifier, 0, 0, UIntPtr.Zero);
         keybd_event((byte)parsed.Key, 0, 0, UIntPtr.Zero);
         keybd_event((byte)parsed.Key, 0, KeyUp, UIntPtr.Zero);
@@ -125,7 +127,14 @@ public sealed partial class MainWindow
         return "Sent keys.";
     }
 
-    internal void OpenNamedPage(string page) => Navigate(GrokbotWindow.CanonicalPage(page));
+    /// <summary>app_navigate. Switches only while the Grokbot-tab act window is open; otherwise the reply says Not switched.</summary>
+    internal string OpenNamedPage(string page)
+    {
+        var target = GrokbotWindow.CanonicalPage(page);
+        if (PageSwitch.TryConnectorSwitch(_activeSystem, page, _grokbotMail.ActGate(), out var reply))
+            Navigate(target, PageSwitchSource.Connector);
+        return reply;
+    }
 
     private void RequirePointOnThisWindow(int x, int y)
     {

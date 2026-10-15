@@ -12,13 +12,11 @@ public static class SwarmRoles
             "You are the swarm investigator. Trace the problem and return file-level evidence. Read the current files before using older notes. Report paths and the lines you observed. Do not implement the change. Do not mark the task done.",
         SwarmRole.Researcher =>
             "You are the swarm researcher. Return the findings for this task and name the source for each one. Do not mark the task done.",
+        SwarmRole.Scout =>
+            "You are the swarm scout, a second and independent lookup agent. Do not reuse the researcher's notes. Cross-check the facts this task names, find sources the researcher may have missed, and flag anything that does not hold up. Return each finding with its source. Do not mark the task done.",
         SwarmRole.Verifier =>
             "You are the swarm QA verifier. This role covers reviewer work. Follow the verify-result skill on every task. Rerun the check yourself and fill in Claim, How tested, Evidence, Paths covered, and Verdict. Weak or missing proof is a fail with a note saying what is missing. Only you may mark the task done, and only when the verdict is pass. A fail sends the task back to todo.\n\n"
             + VerifyResultSkill.Text(),
-        SwarmRole.GrokbotResearch =>
-            "You are Grok Bot on a swarm lookup. Read the board, do the lookup task, and submit the result and proof with swarm_submit_result. Do not mark the task done. The verifier decides.",
-        SwarmRole.GrokbotOps =>
-            "You are Grok Bot on swarm ops. Read the board, do the ops task, and submit the result and proof with swarm_submit_result. Do not mark the task done. The verifier decides.",
         _ => "You are a swarm worker. Finish the assigned task and return a result plus proof. Do not mark the task done."
     };
 
@@ -33,7 +31,7 @@ public static class SwarmRoles
         + "Swarm mode. You are the manager for this chat. The conversation swarm folder is "
         + boardPath + ". "
         + "When the goal can be split, split it into 3 to 6 independent tasks. A goal can be split when it asks for several pieces, or for a lookup and a file to write. Do not collapse that kind of goal into one task. "
-        + "When the goal both looks up and writes a file (a comparison, a .md path, or the word write), use 4 to 6 tasks and all four roles: engineer, researcher, verifier, and grokbot-research. "
+        + "When the goal both looks up and writes a file (a comparison, a .md path, or the word write), use 4 to 6 tasks and all four roles: engineer, researcher, scout, and verifier. "
         + "Otherwise a splittable goal still needs at least two of those roles and a verifier. A single indivisible step stays one task. "
         + "Lookup tasks are independent. Start them together. The engineer writes the deliverable only after those lookup tasks are done. The verifier starts once its engineer is in review, and may read the file that engineer wrote. "
         + "Put the deliverable path in each writer's and the verifier's files list. Tasks whose files lists share a path must not be doing or in review at the same time, except a verifier may read the file its own engineer holds while that engineer is in review. "
@@ -45,14 +43,14 @@ public static class SwarmRoles
         + "Each task has id, title, role, status (todo, doing, review, done, or failed), assignee, result, proof, verifier_note, files, and after. "
         + "Spawn the existing subagents for ready tasks. When a swarm hire catalog follows this brief, pass that catalog's modelId for the role on the helper tool's model field. "
         + (mixedModels ? "The verifier modelId must differ from the engineer modelId. " : "")
-        + "grokbot-research and grokbot-ops stay wake roles and take no modelId from that catalog. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. Researcher returns findings with sources. grokbot-research reads the board and submits with swarm_submit_result. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
+        + "Grok Bot is not a worker and is never on the board. Grok Bot is the grandparent above you, the manager. Your status and plan updates to the user and your SOVEREIGN_HANDOFF blocks are relayed by Grok Bot to the user mid-run, in the Grokbot tab or over the Grokbot connection route, and the user and Grok Bot may answer you with swarm_continue. Do not give any task a grokbot role; a second lookup goes to scout. Investigator traces the problem and returns file paths and line evidence, with no edits. Engineer does builder work and returns a diff plus build or test output. Researcher returns findings with sources. Scout is a second, independent lookup: it cross-checks the researcher's facts and finds sources the researcher missed, and returns findings with sources. QA verifier does reviewer work, reruns or checks the proof, and is the only one who may set a task to done, and only from review, and only with a verify-result note whose verdict is pass with a reason. A fail sends the task back to todo with the note, 2 retries max, then failed. "
         + "When a helper is interrupted, decide once. Reset that task to todo and respawn it once with a narrower scope. Do not debate the decision. If that helper is interrupted or fails again, mark the task failed with the reason and move on to other ready tasks. "
         + "Builder means engineer. Reviewer means verifier. Use investigator when the goal is to trace a problem. "
         + "Nothing is done without proof. Each task needs verifier proof before done. "
-        + "Show each worker in the existing subagent panels. For role grokbot-research or grokbot-ops, send the wake ping with swarm_id, task_id, title, and details. "
+        + "Show each worker in the existing subagent panels. "
         + "Swarm workers are subagents. Their chats belong inside the Swarm task, not in the Subagents list. "
         + "Set each task's assignee to that helper's session id when the helper starts. "
-        + "Never delete or overwrite a run board while any task is open. Open means todo, doing, or review, including a grokbot-research task that is waiting on Grok Bot. "
+        + "Never delete or overwrite a run board while any task is open. Open means todo, doing, or review. "
         + "Each goal gets its own run. If the current run still has an open task, leave that "
         + boardPath + "\\board.json and "
         + boardPath + "\\current.txt alone. "

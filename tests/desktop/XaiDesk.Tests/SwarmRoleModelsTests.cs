@@ -87,16 +87,37 @@ public sealed class SwarmRoleModelsTests
     }
 
     [Fact]
-    public void Catalog_says_grokbot_roles_take_no_model_id()
+    public void Catalog_never_offers_grokbot_as_a_worker()
     {
-        var roles = Defaults().Roles;
         var catalog = SwarmRoleModels.Catalog([M("fable-5", "Fable")], "parent-model", Defaults());
-        Assert.Contains("grokbot-research and grokbot-ops take no modelId", catalog);
+        Assert.DoesNotContain("grokbot", catalog, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("wake role", catalog, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("The verifier modelId must differ from the engineer modelId", catalog);
         Assert.Contains("fall back to the parent modelId", catalog);
-        Assert.Null(SwarmRoleModels.ForRole([], roles, "grokbot-research", "parent-model", "fable-5"));
-        Assert.Null(SwarmRoleModels.ForRole([], roles, "grokbot-ops", "parent-model", null));
-        Assert.Null(SwarmRoleModels.ForRole([], roles, "Grokbot-Research", "parent-model", null));
+    }
+
+    [Fact]
+    public void Scout_defaults_to_grok_4_7_fast_and_the_user_can_override_it()
+    {
+        var roles = Defaults().Roles;
+        Assert.Equal(SwarmRoleModels.ScoutDefaultModelId, roles["scout"][0]);
+        CursorChatModel[] models =
+        [
+            M("fable-5", "Fable"),
+            M("grok-4.7", "Grok 4.7"),
+            M(SwarmRoleModels.ScoutDefaultModelId, "Grok 4.7 Fast")
+        ];
+        Assert.Equal(SwarmRoleModels.ScoutDefaultModelId, SwarmRoleModels.ForRole(models, roles, "scout", "chat-model", null));
+        Assert.Equal("grok-4.7", SwarmRoleModels.ForRole([M("fable-5", "Fable"), M("grok-4.7", "Grok 4.7")], roles, "scout", "chat-model", null));
+        Assert.Equal("fable-5", SwarmRoleModels.ForRole(models, roles, "Scout", "chat-model", "fable-5"));
+        Assert.Equal("chat-model", SwarmRoleModels.ForRole([M("fable-5", "Fable")], roles, "scout", "chat-model", null));
+        var catalog = SwarmRoleModels.Catalog(models, "parent-model", Defaults());
+        Assert.Contains("scout modelId: " + SwarmRoleModels.ScoutDefaultModelId, catalog);
+        Assert.Contains("researcher, scout, investigator", catalog);
+
+        // A rankings file written before the scout role existed still hires the default scout.
+        var old = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase) { ["engineer"] = ["Fable"] };
+        Assert.Equal(SwarmRoleModels.ScoutDefaultModelId, SwarmRoleModels.ForRole(models, old, "scout", "chat-model", null));
     }
 
     [Fact]
@@ -287,12 +308,12 @@ public sealed class SwarmRoleModelsTests
             M("grok-4.7", "Grok 4.7")
         ];
         var catalog = SwarmRoleModels.SingleCatalog(models, "composer-2.5");
-        foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "investigator", "tester" })
+        foreach (var role in new[] { "engineer", "coder", "planner", "reviewer", "verifier", "researcher", "scout", "investigator", "tester" })
             Assert.Contains(role + " modelId: composer-2.5", catalog);
         Assert.Contains("Single model mode", catalog);
         Assert.Contains("every role uses only this modelId", catalog);
         Assert.Contains("the verifier uses this same modelId", catalog);
-        Assert.Contains("grokbot-research and grokbot-ops take no modelId", catalog);
+        Assert.DoesNotContain("grokbot", catalog, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("do not substitute another model or provider", catalog);
         Assert.Contains("- composer-2.5 | Composer 2.5", catalog);
         Assert.DoesNotContain("grok-4.7", catalog);

@@ -241,10 +241,13 @@ internal sealed partial class ChatConversation
     private bool ArmHandoffReview(string reply, string outcome)
     {
         _holdSwarmHelpersForReview = false;
-        if (outcome is not ("completed" or "redirected")) return false;
-        var board = SwarmSection.TryLoad(_saved.Id);
-        if (!SwarmHandoffReview.ShouldStart(_saved.GrokbotReviewsHandoffs, reply, board, _saved.GrokbotReviewLoopCap))
-            return false;
+        var board = outcome is "completed" or "redirected" ? SwarmSection.TryLoad(_saved.Id) : null;
+        var armed = board is not null
+            && SwarmHandoffReview.ShouldStart(_saved.GrokbotReviewsHandoffs, reply, board, _saved.GrokbotReviewLoopCap);
+        // Every manager turn ends here (ChatRoom and both ChatSteering loops), so this is the status-update hook.
+        // When a review is armed its wake follows at once and carries these events, so they are held, not sent.
+        NoteSwarmManagerTurn(reply, outcome, reviewComing: armed);
+        if (!armed) return false;
         _holdSwarmHelpersForReview = true;
         return true;
     }
@@ -304,33 +307,15 @@ internal sealed partial class ChatConversation
         }
     }
 
-    private async Task<SwarmWakeSend> SendReviewWakeAsync(string json, CancellationToken cancellationToken)
+    /// <summary>
+    /// The handoff-review wake shares the per-run 60 s window with the run-event wakes (ChatSwarmWake.cs), so one
+    /// window is one wake. The HTTP send, audit, and panel are unchanged in DeliverRunWakeAsync.
+    /// </summary>
+    private Task<SwarmWakeSend> SendReviewWakeAsync(string json, CancellationToken cancellationToken)
     {
-        var attempt = Interlocked.Increment(ref _reviewWakeAttempt);
-        try
-        {
-            var folder = Path.Combine(XaiDeskIdentity.DataDirectory(), "grokbot");
-            var url = (GrokbotMailbox.Open(folder).PreferencesCopy().WakeUrl ?? "").Trim();
-            var key = GrokbotWakeKey.Read() ?? "";
-            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
-            var receipt = await GrokbotWake.DeliverAsync(handler, url, key, "review", false, "", cancellationToken, body: json).ConfigureAwait(false);
-            var at = DateTimeOffset.Now;
-            SwarmWakeRepeat.TryReadIdentity(json, out var runId, out var loop);
-            try { SwarmWakeRepeat.AppendAudit(folder, SwarmWakeRepeat.Audit(at, runId, loop, attempt, receipt.StatusCode)); }
-            catch (Exception) { }
-            ShowWakePanel(SwarmWakeRepeat.Panel(at, receipt.StatusCode), SwarmWakeRepeat.Warning(receipt.StatusCode));
-            var note = receipt.Note ?? "Wake failed.";
-            if (!string.IsNullOrEmpty(key) && note.Contains(key, StringComparison.Ordinal)) note = "Wake failed.";
-            return new SwarmWakeSend(note == "Grokbot pinged", note, receipt.StatusCode);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            return new SwarmWakeSend(false, "Wake failed.");
-        }
+        SwarmWakeRepeat.TryReadIdentity(json, out var runId, out _);
+        if (string.IsNullOrEmpty(runId)) return DeliverRunWakeAsync(json, cancellationToken);
+        return RunWaker.OfferReviewAsync(runId, json, cancellationToken);
     }
 
     private void ShowWakePanel(string panel, string? warning)

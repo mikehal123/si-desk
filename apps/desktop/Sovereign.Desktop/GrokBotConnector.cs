@@ -29,6 +29,8 @@ public sealed partial class MainWindow
     private readonly List<Button> _grokbotAvatarButtons = [];
     private bool _connectorUi;
     private ConnectorHost? _connectorHost;
+    /// <summary>Swarm run events for every open chat, read by the swarm_run_events tool. In memory only.</summary>
+    internal SwarmRunEvents SwarmEvents { get; } = new();
     private CancellationTokenSource? _connectorRetry;
     private Task? _connectorStart;
     private readonly StoredConnectorSecrets _connectorSecrets = DeskVault.ConnectorSecrets();
@@ -610,23 +612,19 @@ public sealed partial class MainWindow
             finally { HideControlBanner(); }
         }
 
-        public string GrokbotUiTree() => Act(() =>
+        public string GrokbotUiTree() => Act("app_ui_tree", () =>
         {
             var rows = window.ReadGrokbotControls();
             return string.Join("\n", rows.Select(item => string.Join('\t', item.Id, item.Type, item.Label, item.X, item.Y, item.Width, item.Height)));
         });
 
-        public string GrokbotClick(string? controlId, int? x, int? y) => Act(() => window.PerformGrokbotClick(controlId, x, y));
+        public string GrokbotClick(string? controlId, int? x, int? y) => Act("app_click", () => window.PerformGrokbotClick(controlId, x, y));
 
-        public string GrokbotType(string controlId, string text) => Act(() => window.PerformGrokbotType(controlId, text));
+        public string GrokbotType(string controlId, string text) => Act("app_type", () => window.PerformGrokbotType(controlId, text));
 
-        public string GrokbotKey(string keys) => Act(() => window.PerformGrokbotKeys(keys));
+        public string GrokbotKey(string keys) => Act("app_key", () => window.PerformGrokbotKeys(keys));
 
-        public string GrokbotNavigate(string page) => Act(() =>
-        {
-            window.OpenNamedPage(page);
-            return "Opened " + page.Trim() + ".";
-        });
+        public string GrokbotNavigate(string page) => Act("app_navigate", () => window.OpenNamedPage(page));
 
         public void RecordGrokbotTool(string tool, string args, string result)
         {
@@ -637,13 +635,6 @@ public sealed partial class MainWindow
 
         public string ReadSwarmBoard(string? swarmId, string? runId = null) =>
             SwarmBoard.ReadText(string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, null, string.IsNullOrWhiteSpace(runId) ? null : runId);
-
-        public string SubmitSwarmResult(string taskId, string result, string proof, string? swarmId = null, string? runId = null)
-        {
-            var board = SwarmBoard.RequireTask(taskId, null, out _, string.IsNullOrWhiteSpace(swarmId) ? null : swarmId, string.IsNullOrWhiteSpace(runId) ? null : runId);
-            var task = board.Submit(taskId, result, proof);
-            return task.Id + "\t" + task.Status;
-        }
 
         public bool GrokbotReviewsHandoffs(string conversationId) => OnWindow(() => ReviewsOn(conversationId));
 
@@ -660,6 +651,16 @@ public sealed partial class MainWindow
         }, TimeSpan.FromSeconds(2));
 
         public string? SwarmBoardRoot() => null;
+
+        public IReadOnlyList<SwarmRunEvent> ReadSwarmRunEvents(string runId, DateTimeOffset? since) =>
+            window.SwarmEvents.Since(runId, since);
+
+        public GrokbotMail PostGrokbot(string text)
+        {
+            var mail = window.GrokbotMail.Post(text);
+            window.DispatcherQueue.TryEnqueue(window.RefreshGrokbot);
+            return mail;
+        }
 
         private bool ReviewsOn(string conversationId)
         {
@@ -681,9 +682,10 @@ public sealed partial class MainWindow
             }
         }
 
-        private string Act(Func<string> work)
+        // The tool name matters: app_navigate, app_click, and app_key also need the Grokbot-tab act window (GrokbotMailbox.EnsureAction).
+        private string Act(string tool, Func<string> work)
         {
-            window.GrokbotMail.EnsureAction("action");
+            window.GrokbotMail.EnsureAction(tool);
             ShowControlBanner();
             try { return OnWindow(work); }
             finally { HideControlBanner(); }

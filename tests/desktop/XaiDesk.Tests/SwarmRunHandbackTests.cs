@@ -1,6 +1,4 @@
-using System.Net;
 using System.Text;
-using System.Text.Json;
 using Sovereign.Desktop.Connector;
 using Xunit;
 
@@ -81,31 +79,8 @@ public sealed class SwarmRunHandbackTests
         finally { Delete(root); }
     }
 
-    [Fact]
-    public async Task Wake_payload_includes_the_run_id()
-    {
-        var root = Temp();
-        try
-        {
-            var swarm = Guid.NewGuid().ToString("N");
-            var run = Open(root, swarm, "wake-task");
-            using var json = JsonDocument.Parse(SwarmLoop.WakeJson(run, run.Tasks.Single()));
-            Assert.Equal(swarm, json.RootElement.GetProperty("swarm_id").GetString());
-            Assert.Equal(run.Id, json.RootElement.GetProperty("run_id").GetString());
-            Assert.Equal("wake-task", json.RootElement.GetProperty("task_id").GetString());
-
-            using var handler = new CaptureHandler();
-            var receipt = await GrokbotWake.DeliverAsync(handler, "https://wake.example/hook", "wake-key", "wake-task", false, "Hand back", CancellationToken.None, _ => TimeSpan.Zero, swarm, "wake-task", "Hand back", "details", run.Id);
-            Assert.Equal("Grokbot pinged", receipt.Note);
-            using var posted = JsonDocument.Parse(handler.Body);
-            Assert.Equal(run.Id, posted.RootElement.GetProperty("run_id").GetString());
-            Assert.Equal(swarm, posted.RootElement.GetProperty("swarm_id").GetString());
-        }
-        finally { Delete(root); }
-    }
-
     private static SwarmBoard Open(string root, string swarm, string taskId) =>
-        SwarmSchedule.OpenRun(swarm, "Hand the result back", [new SwarmTask { Id = taskId, Title = "Hand the result back", Role = SwarmRole.GrokbotResearch, Status = SwarmStatus.Todo }], root);
+        SwarmSchedule.OpenRun(swarm, "Hand the result back", [new SwarmTask { Id = taskId, Title = "Hand the result back", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo }], root);
 
     private static void Stamp(SwarmBoard older, SwarmBoard newer)
     {
@@ -123,15 +98,5 @@ public sealed class SwarmRunHandbackTests
     private static void Delete(string path)
     {
         if (Directory.Exists(path)) Directory.Delete(path, true);
-    }
-
-    private sealed class CaptureHandler : HttpMessageHandler
-    {
-        public string Body { get; private set; } = "";
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK);
-        }
     }
 }

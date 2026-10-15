@@ -11,7 +11,7 @@ public sealed partial class MainWindow
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         ShowShellWindow(hwnd, 9);
         FocusShellWindow(hwnd);
-        OpenChat();
+        Navigate("chat", Sovereign.Desktop.Connector.PageSwitchSource.Shell);
         _currentChat.EnqueueShellFile(path);
     }
 
