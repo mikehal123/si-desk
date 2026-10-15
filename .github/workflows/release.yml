@@ -43,12 +43,20 @@ jobs:
       - name: Publish release zip
         run: ./scripts/publish-release.ps1
 
+      - name: Compute zip SHA-256
+        if: github.event_name == 'push'
+        run: |
+          $hash = (Get-FileHash "SIDesk-$env:VERSION-win-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          'SHA-256 of SIDesk-{0}-win-x64.zip: {1}' -f $env:VERSION, $hash | Out-File -FilePath release-body.md -Encoding utf8
+
       - name: Upload zip to GitHub release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           files: SIDesk-${{ env.VERSION }}-win-x64.zip
-          prerelease: true
+          body_path: release-body.md
+          prerelease: false
+          make_latest: true
           fail_on_unmatched_files: true
 
       - name: Upload zip as workflow artifact

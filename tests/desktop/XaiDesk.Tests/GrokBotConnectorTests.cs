@@ -132,6 +132,96 @@ public sealed class GrokBotConnectorTests
     }
 
     [Fact]
+    public async Task Audit_log_names_why_each_401_happened_without_header_values()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "xai-desk-connector-" + Guid.NewGuid().ToString("N"));
+        var audit = Path.Combine(folder, "audit.log");
+        await using var host = await Start(new MemoryDesk(), audit);
+        using var http = new HttpClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(host.Url, Body("status"))).StatusCode);
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", "Basic c2VjcmV0LWJhc2ljLXZhbHVl");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(host.Url, Body("status"))).StatusCode);
+        http.DefaultRequestHeaders.Remove("Authorization");
+        http.DefaultRequestHeaders.Authorization = new("Bearer", "stale-token-value-123");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(host.Url, Body("status"))).StatusCode);
+        var lines = File.ReadAllLines(audit);
+        Assert.Equal(["missing-header", "not-bearer", "wrong-token"], lines.Select(line => line.Split('\t')).Where(cells => cells[1] == "rejected").Select(cells => cells[2]).ToArray());
+        var log = string.Join("\n", lines);
+        Assert.DoesNotContain("stale-token-value-123", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("c2VjcmV0LWJhc2ljLXZhbHVl", log, StringComparison.Ordinal);
+        Assert.DoesNotContain(Token, log, StringComparison.Ordinal);
+        Directory.Delete(folder, true);
+    }
+
+    [Theory]
+    [InlineData(null, "Bearer abc", "no-token-set")]
+    [InlineData("abc", null, "missing-header")]
+    [InlineData("abc", "   ", "missing-header")]
+    [InlineData("abc", "Basic abc", "not-bearer")]
+    [InlineData("abc", "bearer abc", "not-bearer")]
+    [InlineData("abc", "Bearer    ", "empty-token")]
+    [InlineData("abc", "Bearer abd", "wrong-token")]
+    [InlineData("abc", "Bearer abc", null)]
+    public void Reject_reason_names_the_cause(string? saved, string? header, string? expected) =>
+        Assert.Equal(expected, ConnectorToken.RejectReason(saved, header));
+
+    [Fact]
+    public async Task Inbox_list_sends_an_image_once_then_a_reference_unless_asked()
+    {
+        var png = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 9 };
+        var data = Convert.ToBase64String(png);
+        var desk = new MemoryDesk();
+        var mail = desk.Mail.Queue("look at this", false, png);
+        await using var host = await Start(desk);
+        using var http = Client();
+        var first = await CallBody(http, host.Url!, "grokbot_inbox_list");
+        Assert.Contains(data, first, StringComparison.Ordinal);
+        var second = await CallBody(http, host.Url!, "grokbot_inbox_list");
+        Assert.DoesNotContain(data, second, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"image\"", second, StringComparison.Ordinal);
+        Assert.Contains(mail.Id + "\\timage already sent", second, StringComparison.Ordinal);
+        var asked = await CallBody(http, host.Url!, "grokbot_inbox_list", new { include_images = true });
+        Assert.Contains(data, asked, StringComparison.Ordinal);
+        Assert.NotNull(desk.Mail.Messages.Single().Image);
+    }
+
+    [Fact]
+    public void Inbox_list_and_polls_write_disk_only_on_change()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "xai-desk-mailbox-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var box = GrokbotMailbox.Open(folder);
+            box.Queue("hello", false, [137, 80, 78, 71]);
+            var thread = Path.Combine(folder, "thread.jsonl");
+            var state = Path.Combine(folder, "state.json");
+            Assert.Single(box.ListSince(null));
+            var afterPick = File.GetLastWriteTimeUtc(thread);
+            var pickedText = File.ReadAllText(thread);
+            Thread.Sleep(30);
+            Assert.Single(box.ListSince(null));
+            Assert.Single(box.ListSince(null));
+            Assert.Equal(afterPick, File.GetLastWriteTimeUtc(thread));
+            Assert.Equal(pickedText, File.ReadAllText(thread));
+
+            var t0 = new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
+            box.NotePoll(t0);
+            var firstState = File.ReadAllText(state);
+            box.NotePoll(t0.AddSeconds(20));
+            box.NotePoll(t0.AddSeconds(50));
+            Assert.Equal(firstState, File.ReadAllText(state));
+            Assert.Equal(t0.AddSeconds(50), box.Link(true, t0.AddSeconds(51)).LastPoll);
+            box.NotePoll(t0.AddSeconds(61));
+            Assert.NotEqual(firstState, File.ReadAllText(state));
+
+            var reopened = new GrokbotMailbox(folder);
+            var row = Assert.Single(reopened.ListSince(null));
+            Assert.True(row.ImageWithheld);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [Fact]
     public void Tailscale_address_comes_from_the_command_not_another_100_address()
     {
         var first = Cg(64, 1, 2);
@@ -458,6 +548,13 @@ public sealed class GrokBotConnectorTests
         return json.RootElement.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString() ?? "";
     }
 
+    private static async Task<string> CallBody(HttpClient http, string url, string tool, object? arguments = null)
+    {
+        var response = await http.PostAsync(url, Body(tool, arguments));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsStringAsync();
+    }
+
     private static bool PortOpen(int port)
     {
         try
@@ -517,6 +614,7 @@ public sealed class GrokBotConnectorTests
         public bool FocusedSecret { get; set; }
         public void NoteGrokbotPoll() => Mail.NotePoll();
         public IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since) => Mail.ListSince(since);
+        public IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since, bool includeImages) => Mail.ListSince(since, includeImages);
         public GrokbotMail ReplyGrokbotInbox(string messageId, string text) => Mail.Reply(messageId, text);
         public GrokbotPng CaptureGrokbotScreenshot()
         {

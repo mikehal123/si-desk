@@ -17,8 +17,11 @@ public sealed class ConnectorHost : IAsyncDisposable
     private readonly ConnectorRateGate _rate;
     private WebApplication? _app;
     private ConnectorBindMode _mode = ConnectorBindMode.Loopback;
+    public static readonly TimeSpan BindRetryInterval = TimeSpan.FromSeconds(5);
     public bool Running => _app is not null;
     public string? Url { get; private set; }
+    /// <summary>The last start failed because another listener already holds the address and port.</summary>
+    public bool PortBusy { get; private set; }
 
     public ConnectorHost(IConnectorSecrets secrets, IGrokBotDesk desk, ConnectorAudit audit, ConnectorRateGate? rate = null)
     {
@@ -30,6 +33,7 @@ public sealed class ConnectorHost : IAsyncDisposable
 
     public async Task<string?> StartAsync(bool enabled, ConnectorBindMode mode, CancellationToken ct = default, Func<CancellationToken, Task<(IPAddress? Address, string? Error)>>? tailscale = null)
     {
+        PortBusy = false;
         if (!enabled) return "Grok Bot connector is off.";
         if (mode == ConnectorBindMode.Loopback)
             return await ListenAsync(IPAddress.Loopback, ConnectorBind.Port, mode, ct);
@@ -44,8 +48,35 @@ public sealed class ConnectorHost : IAsyncDisposable
     public Task<string?> ListenForChecksAsync(IPAddress address, int port, ConnectorBindMode mode, CancellationToken ct = default) =>
         ListenAsync(address, port, mode, ct);
 
+    /// <summary>
+    /// Like <see cref="StartAsync"/>, but while the port is taken it waits and tries again until it binds or <paramref name="ct"/> is cancelled.
+    /// <paramref name="busy"/> runs once, on the first busy attempt. Other failures return right away.
+    /// </summary>
+    public Task<string?> StartWithRetryAsync(bool enabled, ConnectorBindMode mode, Action<string>? busy, CancellationToken ct = default, TimeSpan? interval = null, Func<CancellationToken, Task<(IPAddress? Address, string? Error)>>? tailscale = null) =>
+        RetryAsync(token => StartAsync(enabled, mode, token, tailscale), ConnectorBind.Port, busy, interval, ct);
+
+    public Task<string?> ListenWithRetryForChecksAsync(IPAddress address, int port, ConnectorBindMode mode, Action<string>? busy, TimeSpan interval, CancellationToken ct = default) =>
+        RetryAsync(token => ListenAsync(address, port, mode, token), port, busy, interval, ct);
+
+    private async Task<string?> RetryAsync(Func<CancellationToken, Task<string?>> attempt, int port, Action<string>? busy, TimeSpan? interval, CancellationToken ct)
+    {
+        var told = false;
+        while (true)
+        {
+            var error = await attempt(ct);
+            if (error is null || !PortBusy || ct.IsCancellationRequested) return error;
+            if (!told)
+            {
+                told = true;
+                busy?.Invoke(ConnectorBind.BusyStatus(port));
+            }
+            await Task.Delay(interval ?? BindRetryInterval, ct);
+        }
+    }
+
     private async Task<string?> ListenAsync(IPAddress address, int port, ConnectorBindMode mode, CancellationToken ct)
     {
+        PortBusy = false;
         if (!ConnectorBind.ConnectionAllowed(address, mode))
             return "Refusing an address that is not loopback or Tailscale.";
         await StopAsync();
@@ -83,6 +114,7 @@ public sealed class ConnectorHost : IAsyncDisposable
         catch (Exception ex)
         {
             await ReleaseAsync(app);
+            PortBusy = ConnectorBind.IsAddressInUse(ex);
             return "Grok Bot connector could not start. " + ConnectorBind.OneLine(ex.Message);
         }
         var boundPort = BoundPort(app, port);
@@ -132,11 +164,10 @@ public sealed class ConnectorHost : IAsyncDisposable
 
     private async Task HandleAsync(HttpContext context)
     {
-        var header = context.Request.Headers.Authorization.ToString();
-        var presented = header.StartsWith("Bearer ", StringComparison.Ordinal) ? header["Bearer ".Length..].Trim() : "";
-        if (!ConnectorToken.Matches(_secrets.Current(), presented))
+        var reason = ConnectorToken.RejectReason(_secrets.Current(), context.Request.Headers.Authorization.ToString());
+        if (reason is not null)
         {
-            _audit.Write("rejected", null);
+            _audit.Write("rejected", reason);
             context.Response.StatusCode = 401;
             return;
         }
@@ -209,7 +240,9 @@ public sealed class ConnectorHost : IAsyncDisposable
             object[]? inboxContent = null;
             if (name == "grokbot_inbox_list")
             {
-                var rows = _desk.ListGrokbotInbox(string.IsNullOrWhiteSpace(Arg("since")) ? null : Arg("since"));
+                var includeImages = arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty("include_images", out var images) &&
+                    (images.ValueKind == JsonValueKind.True || (images.ValueKind == JsonValueKind.String && string.Equals(images.GetString(), "true", StringComparison.OrdinalIgnoreCase)));
+                var rows = _desk.ListGrokbotInbox(string.IsNullOrWhiteSpace(Arg("since")) ? null : Arg("since"), includeImages);
                 text = InboxText(rows);
                 inboxContent = InboxContent(text, rows);
             }
@@ -237,7 +270,7 @@ public sealed class ConnectorHost : IAsyncDisposable
             };
             if (!KnownTool(name))
             {
-                _audit.Write("rejected", null);
+                _audit.Write("rejected", "unknown-tool");
                 TryRecord(name, ArgSummary(arguments), "Unknown tool.");
                 return ToolError("Unknown tool.");
             }
@@ -284,6 +317,11 @@ public sealed class ConnectorHost : IAsyncDisposable
         var content = new List<object> { new { type = "text", text } };
         foreach (var mail in rows)
         {
+            if (mail.ImageWithheld)
+            {
+                content.Add(new { type = "text", text = mail.Id + "\timage already sent. Call grokbot_inbox_list with include_images=true to get it again." });
+                continue;
+            }
             if (mail.Image is not { Length: > 0 } png) continue;
             content.Add(new { type = "text", text = mail.Id });
             content.Add(new { type = "image", mimeType = "image/png", data = Convert.ToBase64String(png) });
@@ -404,7 +442,7 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("list_subagents", "Subagents in a chat.", "conversation", true, false),
         Tool("read_subagent", "Status and final result for one subagent.", "id", true, false),
         Tool("status", "App version, connection, model, and whether a turn is running.", null, false, false),
-        Tool("grokbot_inbox_list", "Grokbot tab messages that are not answered yet. Listing marks Queued messages as Picked up.", "since", false, false),
+        Tool("grokbot_inbox_list", "Grokbot tab messages that are not answered yet. Listing marks Queued messages as Picked up. An attached image is sent once; later lists send a reference line unless include_images is true.", "since", false, false),
         Tool("grokbot_inbox_reply", "Post a reply into the Grokbot tab and mark that message Answered.", "message_id", true, false),
         Tool("app_screenshot", "PNG of the SI Desk window only. Requires Screenshots and permission to act.", null, false, false),
         Tool("app_ui_tree", "Visible controls in the SI Desk window: id, type, label, and bounds.", null, false, false),
@@ -434,6 +472,8 @@ public sealed class ConnectorHost : IAsyncDisposable
         }
         if (name == "read_swarm_board")
             properties["run_id"] = new { type = "string" };
+        if (name == "grokbot_inbox_list")
+            properties["include_images"] = new { type = "boolean" };
         if (name == "swarm_submit_result")
         {
             properties["swarm_id"] = new { type = "string" };

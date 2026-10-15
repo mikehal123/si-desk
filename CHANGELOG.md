@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.68
+
+- In-app updates. On startup, and from Check for updates in Settings, SI Desk makes one unauthenticated request to the latest public GitHub release. A newer non-pre-release shows "SI Desk X.Y.Z available" with Update and Later. Update downloads the release zip to `%TEMP%`, refuses it unless its SHA-256 matches GitHub's digest, and hands off to `SIDesk.UpdateHelper.exe`. The helper waits for SI Desk to exit, swaps only the app folder, keeps the old one as `<folder>.bak` until the new version starts, and rolls back if it does not. Profile, chats, settings and Credential Manager entries are not touched. A copy run from a source tree, a folder under a `.git` repo, or a folder with a `SIDesk.dev-build` file shows "dev build, updates off".
+- Grok Bot connector: the audit log names why each request was refused (`missing-header`, `not-bearer`, `empty-token`, `wrong-token`, `no-token-set`), never the header or token. An inbox image is sent once; later lists send a reference line unless `include_images` is true. Listing no longer rewrites the mailbox when nothing changed, and the last poll time is saved at most once a minute.
+- The saved Grok Bot token is kept across restarts, previous xAIDesk secrets are copied once, and a busy connector port is retried every 5 seconds.
+
 ## 0.3.67
 
 - The sidebar header next to the SI logo and the Settings About card now read Super Intelligence Desk. The app name, window title, and SIDesk.exe are unchanged. The sidebar label wraps to two lines when the sidebar is narrow.

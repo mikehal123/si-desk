@@ -36,6 +36,8 @@ public partial class App : Application
             var ex = e.Exception;
             var text = ex.GetType().Name + ": " + ex.Message;
             if (text.Contains("Cannot get credential from Vault", StringComparison.Ordinal)) return;
+            // The connector retries a busy port every few seconds and logs that once itself.
+            if (Sovereign.Desktop.Connector.ConnectorBind.IsAddressInUse(ex)) return;
             var interesting = text.Contains("already", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("Xaml", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("theme", StringComparison.OrdinalIgnoreCase)
@@ -112,6 +114,8 @@ public partial class App : Application
             }
 
             Directory.CreateDirectory(profile);
+            if (!Environment.GetCommandLineArgs().Any(arg => arg.Contains("-verify", StringComparison.Ordinal)))
+                DeskVault.MigrateLegacySecrets(profile);
             var fixtures = Path.Combine(AppContext.BaseDirectory, "fixtures");
             string? hostProfile = null;
             if (options.Mode == ApplicationMode.NativeConnection)

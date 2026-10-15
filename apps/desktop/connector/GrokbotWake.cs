@@ -234,7 +234,8 @@ public static class GrokbotWakeKey
     private const int CredPersistLocalMachine = 2;
     private const int ErrorNotFound = 1168;
 
-    public static string? Read() => Read(Target) ?? Read(LegacyTarget);
+    /// <summary>Only <see cref="Target"/>. The legacy key is copied once at startup by <see cref="LegacySecretMigration"/>.</summary>
+    public static string? Read() => Read(Target);
 
     public static string? Read(string target)
     {
@@ -284,11 +285,7 @@ public static class GrokbotWakeKey
         }
     }
 
-    public static void Clear()
-    {
-        Clear(Target);
-        Clear(LegacyTarget);
-    }
+    public static void Clear() => Clear(Target);
 
     public static void Clear(string target)
     {

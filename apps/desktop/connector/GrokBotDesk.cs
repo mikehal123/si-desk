@@ -77,6 +77,20 @@ public static class ConnectorBind
         return false;
     }
 
+    /// <summary>True when the exception or any inner exception says the address and port are already taken.</summary>
+    public static bool IsAddressInUse(Exception? ex)
+    {
+        for (var item = ex; item is not null; item = item.InnerException)
+        {
+            if (item is SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse }) return true;
+            if (item.GetType().Name == "AddressInUseException") return true;
+            if (item is IOException && item.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    public static string BusyStatus(int port) => "Port " + port + " busy, retrying";
+
     public static string OneLine(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
@@ -219,6 +233,17 @@ public static class ConnectorToken
         var right = Encoding.UTF8.GetBytes(presented);
         return left.Length == right.Length && CryptographicOperations.FixedTimeEquals(left, right);
     }
+
+    /// <summary>Why a request is refused, or null when it may pass. Returns a reason name only, never header or token text.</summary>
+    public static string? RejectReason(string? saved, string? authorization)
+    {
+        if (string.IsNullOrEmpty(saved)) return "no-token-set";
+        if (string.IsNullOrWhiteSpace(authorization)) return "missing-header";
+        if (!authorization.StartsWith("Bearer ", StringComparison.Ordinal)) return "not-bearer";
+        var presented = authorization["Bearer ".Length..].Trim();
+        if (presented.Length == 0) return "empty-token";
+        return Matches(saved, presented) ? null : "wrong-token";
+    }
 }
 
 public sealed class ConnectorAudit
@@ -289,6 +314,8 @@ public interface IGrokBotDesk
     GrokBotSubagent? ReadSubagent(string id);
     void NoteGrokbotPoll();
     IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since);
+    /// <summary>Like <see cref="ListGrokbotInbox(string?)"/>; <paramref name="includeImages"/> resends images an earlier list delivered.</summary>
+    IReadOnlyList<GrokbotMail> ListGrokbotInbox(string? since, bool includeImages) => ListGrokbotInbox(since);
     GrokbotMail ReplyGrokbotInbox(string messageId, string text);
     GrokbotPng CaptureGrokbotScreenshot();
     string GrokbotUiTree();
