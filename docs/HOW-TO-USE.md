@@ -48,7 +48,7 @@ You may see that warning the first time you open `SIDesk.exe`. It is the same wa
 
 ### The first window
 
-The left sidebar shows **Super Intelligence Desk**, then **Chat**, **Shared room**, **Grok Bot**, and **Settings**. The bottom of the sidebar is your account. Before you sign in there, it says **Not signed in**. That account is for Shared room. It is separate from Cursor, Grok Build, and the xAI API key.
+The left sidebar shows **Super Intelligence Desk**, then **Chat**, **Shared room**, **Grok Bot**, and **Settings**. This build has no account row at the bottom of the sidebar. Cursor, Grok Build, and the xAI API key are separate.
 
 The menu bar has **File**, **View**, and **Help**.
 
@@ -385,23 +385,14 @@ If some snapshots were dropped, the tab says how many reported file details are 
 
 **Shared room** is in the left sidebar and under **View**. The page heading is **Shared room**. The opening line says **Create a room on this PC, or paste an invitation to join. Nothing is shared until you connect.**
 
-Shared room uses your sidebar account, not the Cursor or Grok sign-in.
+This build has no account sign-in. Shared room uses the name you type in **Your name**. It does not use Cursor, Grok Build, or the xAI API key as your room name.
 
-1. Click the account row at the bottom of the sidebar. Its name is **Your SI Desk account**. Before sign-in it says **Not signed in**.
-2. The dialog title is **Your Sovereign account**. It says sign-in opens your browser, and to enter your password or email code there.
-3. Click **Sign in with browser**.
-4. Finish in the browser. The status says **Finish sign-in in your browser. Waiting up to five minutes…**
-5. When it works, the sidebar shows your name, and the status says you are signed in. Local chats and files stay on this Windows profile.
-
-**Your name** on the Shared room page is filled from that account and is read-only. Before sign-in it says **Sign in first**.
-
-Then:
-
-1. Connect a model in Chat first. The chip on the room page says **No model connected** until you do. After that it names the provider and the model, such as **Cursor ·** plus the model id.
-2. Click **Create online room** to host, or paste an invitation and click **Join room**.
-3. The invitation field is labeled **Invitation · about 20 minutes · one use**. The placeholder is `https://…/#…`.
-4. Click **Copy invitation** and send that link to the other person. The field clears after a successful copy. The status says **Invitation copied. It expires in about 20 minutes. The field was cleared.**
-5. Keep SI Desk open while you host. The status says **Hosting on this PC. Copy the invitation for the person you're inviting. It expires in about 20 minutes. Keep this app open.**
+1. In **Your name**, type the name people in the room should see. It can be 1–40 characters. The placeholder is **Shown in the room**. An empty name says **Use a name of 1–40 characters.**
+2. Connect a model in Chat first. The chip on the room page says **No model connected** until you do. After that it names the provider and the model, such as **Cursor ·** plus the model id.
+3. Click **Create online room** to host, or paste an invitation and click **Join room**. A successful join says **Joined.**
+4. The invitation field is labeled **Invitation · about 20 minutes · one use**. The placeholder is `https://…/#…`.
+5. Click **Copy invitation** and send that link to the other person. The field clears after a successful copy. The status says **Invitation copied. It expires in about 20 minutes. The field was cleared.**
+6. Keep SI Desk open while you host. The status says **Hosting on this PC. Copy the invitation for the person you're inviting. It expires in about 20 minutes. Keep this app open.**
 
 Other buttons on that page:
 
@@ -418,11 +409,11 @@ Other buttons on that page:
 
 **Rooms on this PC** lists saved host transcripts. Opening one does not restart the room. The status says **Opened a host transcript from this PC.**
 
-**Connection and privacy** says your PC hosts while the app stays open, an invitation grants access to the room history, and joining shares your signed account identity (including email) with the host. Private chats are not sent. A room holds up to 8 members and 500 messages.
+**Connection and privacy** says your PC hosts while the app stays open, an invitation grants access to the room history, and this build sends the name you type, not an account email. Private chats are not sent. A room holds up to 8 members and 500 messages.
 
 Create online room expects `room-tunnel\cloudflared.exe` beside `SIDesk.exe` and checks a pinned checksum. This repository does not include that file. If the file is missing, or the status says **Room tunnel hash mismatch. Repair the app.**, the room does not start. If the link drops, the status says **Room connection unavailable. Retrying; an unsent message stays in the editor. Host must remain online.**
 
-If you are not signed in, create and join say **Sign in to Sovereign from Settings or your sidebar profile before joining a room.** Use the sidebar account row. The Settings page does not have a separate account section.
+If the name is empty, create and join say **Use a name of 1–40 characters.** The Settings page does not have an account section.
 
 ## Grok Bot
 
@@ -619,15 +610,9 @@ From Settings, the Cursor row's **Sign in** button does the same browser login. 
 
 **Grok Build is not signed in. Open Settings, click Sign in next to Grok Build, then click Connect / refresh models.** and **Grok Build auth failed. Open Settings, sign in again next to Grok Build, then click Connect / refresh models.** both mean do those steps. **Sign in with Grok** on the Connection panel is the same login.
 
-**Shared room account**
+**Shared room**
 
-1. Click the account row at the bottom of the sidebar.
-2. Click **Sign in with browser**.
-3. Finish in the browser.
-
-If SI Desk could not restore a saved sign-in, the status says **Could not restore Sovereign sign-in. Check your connection and sign in again. Local data is unchanged.** If you cancel or the wait ends, it says **Sign-in canceled or timed out. You can try again.** If the browser step fails, it says **Sign-in failed at:** plus a stage name. Open the account row and try again. Local chats and files stay on this PC.
-
-**Sign out** in that dialog signs the Shared room account out. The sidebar returns to **Not signed in**. It does not sign you out of Cursor, Grok Build, or the xAI API.
+This build has no shared-room account and no **Sign in with browser** button. Type a name on the Shared room page. That does not sign you in or out of Cursor, Grok Build, or the xAI API.
 
 ### Models are not showing
 

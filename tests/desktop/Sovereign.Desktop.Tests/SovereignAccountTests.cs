@@ -10,7 +10,7 @@ namespace Sovereign.Desktop.Tests;
 
 public sealed class SovereignAccountTests
 {
-    private static readonly AccountConfiguration Configuration=new("https://example.clerk.accounts.dev","public-desktop-client");
+    private static readonly AccountConfiguration Configuration=new("https://account.example","public-desktop-client");
     private static string Token(SecurityKey key,string? issuer=null,string? audience=null,bool verified=true,string nonce="expected",bool expired=false) =>
         new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(issuer??Configuration.Issuer,audience??Configuration.ClientId,
             [new Claim("sub","user-one"),new Claim("name","Caesar"),new Claim("email","test@example.com"),new Claim("email_verified",verified?"true":"false",ClaimValueTypes.Boolean),new Claim("nonce",nonce)],
@@ -36,7 +36,7 @@ public sealed class SovereignAccountTests
         using var client=new SovereignAccountClient(Configuration);
         var url=client.AuthorizationUri("http://127.0.0.1:12345/callback","state","nonce","verifier").AbsoluteUri;
         Assert.Contains("code_challenge_method=S256",url);Assert.Contains("state=state",url);Assert.Contains("nonce=nonce",url);
-        Assert.DoesNotContain("prompt=",url); // Clerk rejects select_account.
+        Assert.DoesNotContain("prompt=",url);
         Assert.DoesNotContain("client_secret",url);Assert.DoesNotContain("code_verifier",url);
         Assert.False(SovereignAccountClient.StateMatches("expected","wrong"));
         Assert.False(SovereignAccountClient.StateMatches("expected","Expected"));
