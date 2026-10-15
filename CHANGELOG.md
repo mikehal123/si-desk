@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.69
+
+- Grok Bot is grandparent only. SI Desk switches pages only when you act, or on a fresh "Act on" message less than 10 minutes old. The scout role replaces grokbot-research, and old grokbot roles read as scout. New `swarm_run_events` and `grokbot_post` connector tools and a wake rule. (#28)
+- Swarm panel: Clear swarm archives the run, Done and Stopped timers freeze, a Stalled line shows, and the tab hides when swarm mode is off. (#28)
+- Turning on Always allow now asks first, with a Don't show again option. (#23)
+- Releases no longer ship `.pdb` files. Local named pipes are limited to the current user. Settings says Tailscale mode is remote access protected only by the access token. (#25)
+- The Clerk dev sign-in is removed from the public build; Shared room uses a typed name. (#26)
+- Online rooms ship a pinned, hash-checked cloudflared 2026.9.1 in `room-tunnel`. (#27)
+- Thanks to @georgeartem for the security report in #24.
+
 ## 0.3.68
 
 - In-app updates. On startup, and from Check for updates in Settings, SI Desk makes one unauthenticated request to the latest public GitHub release. A newer non-pre-release shows "SI Desk X.Y.Z available" with Update and Later. Update downloads the release zip to `%TEMP%`, refuses it unless its SHA-256 matches GitHub's digest, and hands off to `SIDesk.UpdateHelper.exe`. The helper waits for SI Desk to exit, swaps only the app folder, keeps the old one as `<folder>.bak` until the new version starts, and rolls back if it does not. Profile, chats, settings and Credential Manager entries are not touched. A copy run from a source tree, a folder under a `.git` repo, or a folder with a `SIDesk.dev-build` file shows "dev build, updates off".
