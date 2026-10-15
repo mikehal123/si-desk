@@ -31,6 +31,7 @@
     <Content Include="skill-chroma\embed384.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\SubagentAvatars\*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\..\scripts\Install-CursorConnection.ps1" Link="setup\Install-CursorConnection.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- cloudflared.exe is downloaded by scripts/Get-Cloudflared.ps1 and is gitignored. -->
     <Content Include="..\room-tunnel\*" Link="room-tunnel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
@@ -129,4 +130,5 @@
   <Target Name="CopyAppXamlBinaryToPublish" AfterTargets="Publish">
     <Copy SourceFiles="$(IntermediateOutputPath)App.xbf" DestinationFiles="$(PublishDir)App.xbf" SkipUnchangedFiles="true" Condition="Exists('$(IntermediateOutputPath)App.xbf') and '$(PublishDir)' != ''" />
   </Target>
+  <Import Project="RoomTunnel.targets" />
 </Project>

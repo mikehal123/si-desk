@@ -1,0 +1,6 @@
+# Pinned cloudflared Windows amd64 binary for SI Desk online rooms.
+# scripts/Get-Cloudflared.ps1 downloads this asset and refuses a SHA-256 mismatch.
+# cloudflared.exe is gitignored. Do not commit it.
+version=2026.9.1
+asset=cloudflared-windows-amd64.exe
+sha256=2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712

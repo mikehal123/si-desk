@@ -11,7 +11,13 @@ public sealed class RoomTunnel : IDisposable
     {
         if (!local.IsLoopback || local.Scheme != "http") throw new ArgumentException("Tunnel origin must be loopback.");
         var executable = Path.Combine(install, "room-tunnel", "cloudflared.exe");
-        await using (var file = File.OpenRead(executable)) {
+        FileStream file;
+        try { file = File.OpenRead(executable); }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) {
+            throw new IOException("Online rooms need the room tunnel (cloudflared.exe), which is missing from this install. Reinstall or update SI Desk.", ex);
+        }
+        await using (file) {
+            // Pinned cloudflared 2026.9.1 windows-amd64. See apps/desktop/room-tunnel/cloudflared.pin.
             if (!Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).Equals("2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712", StringComparison.OrdinalIgnoreCase)) throw new IOException("Room tunnel hash mismatch. Repair the app.");
         }
         var home = Path.Combine(profile, "shared-rooms", "tunnel-home"); Directory.CreateDirectory(home);

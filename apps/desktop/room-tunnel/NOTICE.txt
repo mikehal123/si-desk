@@ -1,0 +1,14 @@
+cloudflared (Cloudflare)
+https://github.com/cloudflare/cloudflared
+
+SI Desk uses cloudflared so a shared room can accept an online invitation while the host app stays open.
+Release builds download the pinned Windows amd64 binary below and copy it to room-tunnel\cloudflared.exe next to SIDesk.exe.
+The git repository does not contain that executable.
+
+Pinned release: 2026.9.1
+Asset: cloudflared-windows-amd64.exe
+Download: https://github.com/cloudflare/cloudflared/releases/download/2026.9.1/cloudflared-windows-amd64.exe
+SHA-256: 2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712
+
+License: Apache License, Version 2.0. The license text is LICENSE.txt in this folder.
+Upstream license: https://github.com/cloudflare/cloudflared/blob/master/LICENSE

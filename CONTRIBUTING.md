@@ -32,7 +32,7 @@ dotnet test tests/desktop/Sovereign.Desktop.Tests
 4. Keep PRs small and explain what changed and why. Screenshots help for UI changes.
 
 ## Release builds
-Maintainers build releases with `scripts/publish-release.ps1`, which also runs the public scan. Tagging `v*` runs the same script in GitHub Actions.
+Maintainers build releases with `scripts/publish-release.ps1`, which downloads the pinned cloudflared, checks its SHA-256, and runs the public scan. Tagging `v*` runs the same script in GitHub Actions. Debug builds warn if `apps/desktop/room-tunnel/cloudflared.exe` is missing; Release builds fail.
 
 ## License
 By contributing you agree your work is released under the MIT License (see `LICENSE`).

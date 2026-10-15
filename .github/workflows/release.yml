@@ -32,6 +32,12 @@ jobs:
           }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Test pinned cloudflared script
+        run: ./scripts/Get-Cloudflared.Tests.ps1
+
+      - name: Download pinned cloudflared
+        run: ./scripts/Get-Cloudflared.ps1
+
       - name: Test (XaiDesk.Tests)
         run: dotnet test tests/desktop/XaiDesk.Tests -c Release
 

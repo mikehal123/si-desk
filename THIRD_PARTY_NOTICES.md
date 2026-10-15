@@ -37,7 +37,7 @@ SOFTWARE.
 - Source: https://github.com/cloudflare/cloudflared
 - License: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 - Use: Shared room invites run through a cloudflared tunnel.
-- cloudflared is **not bundled** in this repository. You download it separately from Cloudflare's releases page (see README). It is covered by its own Apache-2.0 license and any NOTICE file Cloudflare ships with it, at https://github.com/cloudflare/cloudflared/blob/master/LICENSE.
+- Published releases include the pinned Windows amd64 binary cloudflared 2026.9.1 (`cloudflared-windows-amd64.exe`, SHA-256 `2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712`). The git repository does not commit that exe. `scripts/Get-Cloudflared.ps1` downloads it for Release builds. The Apache-2.0 text shipped beside the binary is `apps/desktop/room-tunnel/LICENSE.txt`. The pin is recorded in `apps/desktop/room-tunnel/NOTICE.txt`. Upstream license: https://github.com/cloudflare/cloudflared/blob/master/LICENSE.
 
 ## PdfPig
 

@@ -4,6 +4,7 @@
 *.pyc
 .env
 *.sqlite*
+# Release builds download apps/desktop/room-tunnel/cloudflared.exe. Do not commit it.
 *.exe
 *.dll
 *.pdb
