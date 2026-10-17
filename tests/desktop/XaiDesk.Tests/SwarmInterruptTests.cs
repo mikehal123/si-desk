@@ -30,6 +30,7 @@ public sealed class SwarmInterruptTests
             Assert.Equal(SwarmStatus.Todo, parked.Status);
             Assert.Equal(1, parked.InterruptRetries);
 
+            DoctrineFixture.ReadyForWork(board, "t-a");
             board.Start("t-a", "helper-2");
             var second = board.Interrupt("t-a", "stopped again");
             Assert.Equal(SwarmStatus.Failed, second.Status);

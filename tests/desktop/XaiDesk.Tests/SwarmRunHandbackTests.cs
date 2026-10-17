@@ -21,6 +21,7 @@ public sealed class SwarmRunHandbackTests
             var before = File.ReadAllText(current);
 
             var board = SwarmBoard.RequireTask("newer-task", root, out _, swarm);
+            DoctrineFixture.ReadyForWork(board, "newer-task");
             board.Submit("newer-task", "The note is on the newer run.", "proof: newer-task");
 
             var savedNewer = SwarmBoard.Read(SwarmBoard.RunBoardPath(swarm, newer.Id, root));
@@ -48,6 +49,7 @@ public sealed class SwarmRunHandbackTests
             var before = File.ReadAllText(current);
 
             var board = SwarmBoard.RequireTask("shared-task", root, out _, swarm, older.Id);
+            DoctrineFixture.ReadyForWork(board, "shared-task");
             board.Submit("shared-task", "Pinned to the named run.", "proof: shared-task");
 
             var savedOlder = SwarmBoard.Read(SwarmBoard.RunBoardPath(swarm, older.Id, root));

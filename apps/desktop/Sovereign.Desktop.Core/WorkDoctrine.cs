@@ -1,8 +1,14 @@
 namespace Sovereign.Desktop.Core;
 
+/// <summary>
+/// The skill file on disk is the reminder. SwarmBoard.Start, Submit, and Verify are the doors.
+/// </summary>
 public static class WorkDoctrine
 {
     public static string? Warning { get; private set; }
+
+    public static DoctrineDecision Evaluate(DoctrineRow candidate, DoctrineContext context, IReadOnlyList<DoctrineRow> accepted) =>
+        DoctrineStage.Evaluate(candidate, context, accepted);
 
     public static string Text()
     {

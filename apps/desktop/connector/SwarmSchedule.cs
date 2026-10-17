@@ -157,9 +157,10 @@ public static class SwarmSchedule
     public static void EnsureSameRun(SwarmBoard existing, SwarmBoard incoming)
     {
         if (!HasOpenWork(existing)) return;
-        var sameGoal = string.Equals(existing.Id, incoming.Id, StringComparison.Ordinal)
-            && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
+        var sameId = string.Equals(existing.Id, incoming.Id, StringComparison.Ordinal);
         var kept = existing.Tasks.All(task => incoming.Tasks.Any(next => next.Id == task.Id));
+        if (DoctrineWrite.Allow && sameId && kept) return;
+        var sameGoal = sameId && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
         if (sameGoal && kept) return;
         throw new IOException("That run still has an open task. Leave its board.json alone and start a new run.");
     }

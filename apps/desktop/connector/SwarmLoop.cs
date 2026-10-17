@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.Connector;
 
@@ -39,6 +40,7 @@ public static class SwarmLoop
         if (task.Status != SwarmStatus.Doing) throw new InvalidOperationException("Engineer proof starts from doing.");
         Directory.CreateDirectory(workDir);
         var file = Path.Combine(workDir, "proof.txt");
+        DoctrineGate.GuardWrite(board, taskId, file);
         var before = File.Exists(file) ? File.ReadAllText(file).Replace("\r", "").Replace("\n", "") : "";
         var body = "swarm phase 1 " + task.Id;
         File.WriteAllText(file, body + Environment.NewLine);
@@ -81,12 +83,41 @@ public static class SwarmLoop
                 "exit " + output.ExitCode + "\n" + output.Text.Trim(),
                 "The success path failed. Skipped: no further paths.",
                 "fail because the proof did not match the file"));
+        RecordPass(board, taskId, file, body);
         return board.Verify(taskId, true, VerifyResultSkill.Format(
             "proof.txt contains " + body,
             "Reran findstr on the current proof.txt at " + stamp + ". This is the file on disk, not a cached result.",
             "exit " + output.ExitCode + "\n" + output.Text.Trim(),
             "Success: the file exists and findstr matched. Skipped: error, empty, cancel, and persistence were not part of this file check.",
             "pass because findstr matched the current proof file"));
+    }
+
+    static void RecordPass(SwarmBoard board, string taskId, string file, string body)
+    {
+        DoctrineGate.Record(board, new DoctrineLogRow
+        {
+            TaskId = taskId,
+            Phase = DoctrinePhase.Verification,
+            Verdict = "pass",
+            Text = "Existence audit: claim: proof.txt contains " + body + " artifact: " + file + "\n"
+                + "Raw output: findstr matched " + body + "\n"
+                + "Gap audit: skipped error, empty, cancel, and persistence\n"
+                + "Deviations: error, empty, cancel, and persistence were not part of this file check\n"
+                + "Unverified claims: none named",
+            Read = file
+        });
+        DoctrineGate.Record(board, new DoctrineLogRow
+        {
+            TaskId = taskId,
+            Phase = DoctrinePhase.Interface,
+            Verdict = "report",
+            Text = "Answer: proof.txt contains " + body + "\n"
+                + "Failures: none\n"
+                + "Skips: error, empty, cancel, and persistence\n"
+                + "Open guesses: findstr is the check that was run\n"
+                + "State changes: REVERSIBLE " + file,
+            Read = file
+        });
     }
 
     public static async Task<(int ExitCode, string Text)> CommandAsync(string file, string arguments)

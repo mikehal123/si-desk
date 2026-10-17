@@ -28,6 +28,8 @@ public sealed class SwarmScheduleTests
             };
 
             var run = SwarmSchedule.OpenRun(conversationId, goal, tasks, root);
+            foreach (var id in new[] { "t-a", "t-b", "t-c", "t-d" })
+                DoctrineFixture.ReadyForWork(run, id);
 
             Assert.Equal(legacyText, File.ReadAllText(legacy.BoardPath));
             Assert.Equal(run.Id, File.ReadAllText(Path.Combine(root, conversationId, "current.txt")));
@@ -84,6 +86,7 @@ public sealed class SwarmScheduleTests
                 Item("t-1", SwarmRole.Engineer, "First notes", ["notes.txt"]),
                 Item("t-2", SwarmRole.Engineer, "Second notes", ["notes.txt"])
             ], root);
+            DoctrineFixture.ReadyForWork(board, "t-1");
             board.Start("t-1", "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "t-2"));
             Assert.Throws<InvalidOperationException>(() => board.Start("t-2", "engineer"));
@@ -105,6 +108,7 @@ public sealed class SwarmScheduleTests
                 Item("ver", SwarmRole.Verifier, "Check notes", [file], ["eng"])
             ], root);
 
+            DoctrineFixture.ReadyForWork(board, "eng");
             board.Start("eng", "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "eng-2"));
             Assert.Throws<InvalidOperationException>(() => board.Start("eng-2", "engineer"));
@@ -130,6 +134,7 @@ public sealed class SwarmScheduleTests
         {
             var tasks = Enumerable.Range(1, 5).Select(n => Item("t-" + n, SwarmRole.Engineer, "Task " + n)).ToList();
             var board = SwarmBoard.Create("Queue the extra hands", tasks, root);
+            for (var n = 1; n <= 4; n++) DoctrineFixture.ReadyForWork(board, "t-" + n);
             for (var n = 1; n <= 4; n++) board.Start("t-" + n, "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "t-5"));
             Assert.Empty(SwarmSchedule.Ready(board));
@@ -153,6 +158,7 @@ public sealed class SwarmScheduleTests
             var reread = SwarmBoard.Load(id, root);
             Assert.Equal("Read the apps", reread.Goal);
             Assert.Equal("todo", reread.TaskById("t-wait").Status);
+            DoctrineFixture.ReadyForWork(reread, "t-wait");
             reread.Start("t-wait", "researcher");
             Assert.Equal("doing", SwarmBoard.Load(id, root).TaskById("t-wait").Status);
             Assert.True(SwarmSection.IsSwarmWorker("swarm-" + id + "-t-wait", null, null, reread));
@@ -239,8 +245,7 @@ public sealed class SwarmScheduleTests
 
     private static void Finish(SwarmBoard board, string taskId)
     {
-        board.Submit(taskId, "result " + taskId, "proof " + taskId);
-        board.Verify(taskId, true, "checked " + taskId);
+        DoctrineFixture.MarkDone(board, taskId);
     }
 
     private static SwarmTask Item(string id, string role, string title, IEnumerable<string>? files = null, IEnumerable<string>? after = null) => new()

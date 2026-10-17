@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Sovereign.Desktop.Core;
 
 namespace Sovereign.Desktop.Connector;
 
@@ -57,6 +58,8 @@ public sealed class SwarmTask
     [JsonPropertyName("interrupt_retries")] public int InterruptRetries { get; set; }
     [JsonPropertyName("files")] public List<string> Files { get; set; } = [];
     [JsonPropertyName("after")] public List<string> After { get; set; } = [];
+    [JsonPropertyName("phase")] public string Phase { get; set; } = "";
+    [JsonPropertyName("pinned_goal")] public string PinnedGoal { get; set; } = "";
 }
 
 public sealed class SwarmBoard
@@ -130,6 +133,8 @@ public sealed class SwarmBoard
             task.Role = SwarmRole.Normalize(task.Role);
             task.Files ??= [];
             task.After ??= [];
+            task.Phase ??= "";
+            task.PinnedGoal ??= "";
         }
         return board;
     }
@@ -252,14 +257,28 @@ public sealed class SwarmBoard
 
     public SwarmTask Start(string taskId, string assignee)
     {
-        var task = TaskById(taskId);
+        if (string.IsNullOrWhiteSpace(assignee))
+            throw new ArgumentException("A claim needs the helper's name.", nameof(assignee));
+        var name = assignee.Trim();
+        using var gate = SwarmBoardLock.Acquire(BoardPath);
+        var live = Reload();
+        var task = live.TaskById(taskId);
+        if (task.Status == SwarmStatus.Doing)
+        {
+            var owner = string.IsNullOrWhiteSpace(task.Assignee) ? "an unnamed helper" : task.Assignee.Trim();
+            throw new InvalidOperationException("Task " + task.Id + " is already claimed by " + owner + ".");
+        }
         if (task.Status != SwarmStatus.Todo) throw new InvalidOperationException("Only a todo task can move to doing.");
-        if (!SwarmSchedule.CanStart(this, taskId))
+        if (!SwarmSchedule.CanStart(live, taskId))
             throw new InvalidOperationException("That task is not ready. At most 4 tasks can be doing, and a task waits while its files are in use or its earlier tasks are not done.");
+        DoctrineGate.RequireForStart(live, taskId);
         task.Status = SwarmStatus.Doing;
-        task.Assignee = assignee?.Trim() ?? "";
-        Save();
-        return task;
+        task.Assignee = name;
+        DoctrineWrite.Allow = true;
+        try { live.Save(); }
+        finally { DoctrineWrite.Allow = false; }
+        CopyFrom(live);
+        return TaskById(taskId);
     }
 
     public SwarmTask Submit(string taskId, string result, string proof)
@@ -268,6 +287,7 @@ public sealed class SwarmBoard
         if (task.Status is not (SwarmStatus.Doing or SwarmStatus.Todo))
             throw new InvalidOperationException("Only a todo or doing task can move to review.");
         if (string.IsNullOrWhiteSpace(proof)) throw new ArgumentException("Nothing is done without proof.");
+        DoctrineGate.RequireForSubmit(this, taskId);
         task.Result = result ?? "";
         task.Proof = proof.Trim();
         task.Status = SwarmStatus.Review;
@@ -279,13 +299,19 @@ public sealed class SwarmBoard
     {
         var task = TaskById(taskId);
         if (task.Status != SwarmStatus.Review) throw new InvalidOperationException("Only the verifier can finish a task, and only from review.");
-        task.VerifierNote = note ?? "";
         if (pass)
         {
             if (string.IsNullOrWhiteSpace(task.Proof)) throw new InvalidOperationException("Nothing is done without proof.");
+            DoctrineGate.RequireForVerifyPass(this, taskId);
+            task.VerifierNote = note ?? "";
             task.Status = SwarmStatus.Done;
+            DoctrineWrite.Allow = true;
+            try { Save(); }
+            finally { DoctrineWrite.Allow = false; }
+            return task;
         }
-        else if (task.Retries >= MaxRetries)
+        task.VerifierNote = note ?? "";
+        if (task.Retries >= MaxRetries)
         {
             task.Status = SwarmStatus.Failed;
         }
@@ -293,6 +319,7 @@ public sealed class SwarmBoard
         {
             task.Retries++;
             task.Status = SwarmStatus.Todo;
+            task.Assignee = "";
         }
         Save();
         return task;
@@ -356,6 +383,45 @@ public sealed class SwarmBoard
         return Interrupt(taskId, reason);
     }
 
+    private SwarmBoard Reload()
+    {
+        if (!File.Exists(BoardPath)) return this;
+        var live = Read(BoardPath);
+        live.Root = Root;
+        live.Id = Id;
+        return live;
+    }
+
+    private void CopyFrom(SwarmBoard live)
+    {
+        Id = live.Id;
+        Goal = live.Goal;
+        Tasks = live.Tasks;
+        ReviewLoops = live.ReviewLoops;
+        ReviewHandled = live.ReviewHandled;
+        ReviewStatus = live.ReviewStatus;
+        ReviewVerdict = live.ReviewVerdict;
+        ReviewIssues = live.ReviewIssues;
+        ReviewNext = live.ReviewNext;
+        ReviewNote = live.ReviewNote;
+        Root = live.Root;
+    }
+
+    private void RejectUngated(SwarmBoard? existing)
+    {
+        if (DoctrineWrite.Allow) return;
+        foreach (var task in Tasks)
+        {
+            var prior = existing?.Tasks.FirstOrDefault(item => item is not null && item.Id == task.Id);
+            var wasDoing = prior is not null && prior.Status == SwarmStatus.Doing;
+            var wasDone = prior is not null && prior.Status == SwarmStatus.Done;
+            if (task.Status == SwarmStatus.Doing && !wasDoing)
+                throw new InvalidOperationException("Only DoctrineGate can move a task into work.");
+            if (task.Status == SwarmStatus.Done && !wasDone)
+                throw new InvalidOperationException("Only DoctrineGate can mark a task done.");
+        }
+    }
+
     private static string ClipReason(string? reason)
     {
         var why = string.IsNullOrWhiteSpace(reason) ? "The helper was interrupted." : reason.Trim().Replace("\r", " ").Replace("\n", " ");
@@ -365,9 +431,12 @@ public sealed class SwarmBoard
     public void Save()
     {
         var path = BoardPath;
+        SwarmBoard? existing = null;
         if (File.Exists(path))
         {
-            SwarmSchedule.EnsureSameRun(Read(path), this);
+            existing = Read(path);
+            SwarmSchedule.EnsureSameRun(existing, this);
+            RejectUngated(existing);
             File.Copy(path, path + ".bak", true);
         }
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -390,6 +459,8 @@ public sealed class SwarmBoard
         Retries = source.Retries,
         InterruptRetries = source.InterruptRetries,
         Files = source.Files is null ? [] : [.. source.Files],
-        After = source.After is null ? [] : [.. source.After]
+        After = source.After is null ? [] : [.. source.After],
+        Phase = source.Phase ?? "",
+        PinnedGoal = source.PinnedGoal ?? ""
     };
 }
