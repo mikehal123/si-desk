@@ -46,9 +46,20 @@ internal sealed partial class ChatConversation
             child.Task, child.State, steps, errors, met, string.IsNullOrWhiteSpace(child.Task) ? child.Name : child.Task,
             stepsText, tools.Select(tool => string.IsNullOrWhiteSpace(tool.Kind) ? tool.Title : tool.Kind).ToArray(),
             child.CompletedAt ?? DateTimeOffset.UtcNow);
-        try { _owner.Skills.Consider(run); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { _chatStatus.Text = "Skill library could not be saved: " + ex.Message; }
+        // Saving embeds the run with a local model process that can take many seconds. It must not run on the UI
+        // thread: a board reload (for example after Clear swarm) replays finished workers here, and a blocked UI
+        // thread queues the user's clicks and replays them later.
+        var skills = _owner.Skills;
+        var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        _ = Task.Run(() =>
+        {
+            try { skills.Consider(run); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                var message = "Skill library could not be saved: " + ex.Message;
+                queue?.TryEnqueue(() => { if (!_disposed) _chatStatus.Text = message; });
+            }
+        });
     }
 
     private static int ClampCount(long value) => value < 0 ? 0 : value > 10000 ? 10000 : (int)value;

@@ -58,6 +58,34 @@ try
     Check(wide.Consider(Run("wide", "alpha task", 1, 0, true)) == SkillOutcome.RejectedEmbed && wide.Cards.Count == 0,
         "a 1024-d vector is refused");
 
+    var gate = new GateEmbedder();
+    try
+    {
+        var slow = new SkillLibrary(Path.Combine(root, "slow"), gate, enabled: true, capacity: 50);
+        var saving = Task.Run(() => slow.Consider(Run("slow", "alpha task", 1, 0, true)));
+        Check(gate.Started.Wait(5000), "a slow save reaches the embedder");
+        var reader = Task.Run(() => (slow.Cards.Count, slow.Retrieve("alpha task").Cards.Length, slow.Enabled, slow.ReadAudit().Length));
+        Check(reader.Wait(2000) && reader.Result.Item1 == 0 && reader.Result.Item2 == 0 && reader.Result.Item3,
+            "cards, retrieval and audit do not wait while a save is embedding");
+        gate.Release.Set();
+        Check(saving.Wait(5000) && saving.Result == SkillOutcome.Saved && slow.Cards.Count == 1, "the slow save completes after the embedder returns");
+    }
+    finally { gate.Release.Set(); }
+
+    var late = new GateEmbedder();
+    try
+    {
+        var toggled = new SkillLibrary(Path.Combine(root, "toggled"), late, enabled: true, capacity: 50);
+        var pending = Task.Run(() => toggled.Consider(Run("late", "alpha task", 1, 0, true)));
+        Check(late.Started.Wait(5000), "a second slow save reaches the embedder");
+        var turnOff = Task.Run(() => toggled.Enabled = false);
+        Check(turnOff.Wait(2000), "turning the library off does not wait on a save");
+        late.Release.Set();
+        Check(pending.Wait(5000) && pending.Result == SkillOutcome.Disabled && toggled.Cards.Count == 0,
+            "a save that finishes after the library is turned off is dropped");
+    }
+    finally { late.Release.Set(); }
+
     var off = new SkillLibrary(Path.Combine(root, "off"), new BoomEmbedder(), enabled: false, capacity: 50);
     var before = off.ReadAudit();
     Check(off.Consider(Run("off", "alpha task", 1, 0, true)) == SkillOutcome.Disabled && off.Retrieve("alpha task").Injection.Length == 0 && off.Cards.Count == 0 && off.ReadAudit() == before,
@@ -105,6 +133,21 @@ sealed class AngleEmbedder : ISkillEmbedder
 sealed class WideEmbedder : ISkillEmbedder
 {
     public float[]? Embed(string text) => new float[1024];
+}
+
+sealed class GateEmbedder : ISkillEmbedder
+{
+    public ManualResetEventSlim Started { get; } = new();
+    public ManualResetEventSlim Release { get; } = new();
+
+    public float[]? Embed(string text)
+    {
+        Started.Set();
+        Release.Wait(10000);
+        var vector = new float[384];
+        vector[0] = 1;
+        return vector;
+    }
 }
 
 sealed class BoomEmbedder : ISkillEmbedder
