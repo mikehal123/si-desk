@@ -64,6 +64,8 @@ public sealed class SkillLibrary
     private readonly ISkillEmbedder _embedder;
     private readonly List<SkillCard> _cards = [];
     private readonly object _gate = new();
+    // Saves run one model process at a time. Readers never wait on it; _gate is not held while embedding.
+    private readonly object _embedGate = new();
     private bool _enabled;
     private int _capacity;
 
@@ -131,7 +133,13 @@ public sealed class SkillLibrary
                 Log("reject-quality", "run=" + Clean(run.RunId) + " steps=" + run.Steps.ToString(CultureInfo.InvariantCulture) + " errors=" + run.ToolErrors.ToString(CultureInfo.InvariantCulture));
                 return SkillOutcome.RejectedQuality;
             }
-            var vector = Accept(_embedder.Embed(EmbedText(run)));
+        }
+        // The embedder can start a slow model process. Holding _gate here would stall every reader, including the UI.
+        float[]? vector;
+        lock (_embedGate) vector = Accept(_embedder.Embed(EmbedText(run)));
+        lock (_gate)
+        {
+            if (!_enabled) return SkillOutcome.Disabled;
             if (vector is null)
             {
                 Log("reject-embed", "run=" + Clean(run.RunId) + " model=" + EmbedModel);
@@ -163,8 +171,12 @@ public sealed class SkillLibrary
         lock (_gate)
         {
             if (!_enabled || _cards.Count == 0) return new([], "", "");
-            var vector = Accept(_embedder.Embed(query));
-            if (vector is null) return new([], "", "");
+        }
+        var vector = Accept(_embedder.Embed(query));
+        if (vector is null) return new([], "", "");
+        lock (_gate)
+        {
+            if (!_enabled || _cards.Count == 0) return new([], "", "");
             var ranked = _cards.Select(card => (Card: card, Rank: SimilarityWeight * Cosine(vector, card.Vector) + (1 - SimilarityWeight) * card.Score))
                 .Where(item => item.Rank >= RetrievalFloor)
                 .OrderByDescending(item => item.Rank)
