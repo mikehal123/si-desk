@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Sovereign.Desktop.Connector;
 
-/// <summary>MCP dispatch for the in-app swarm manager. Stdio uses Content-Length framing.</summary>
+/// <summary>MCP dispatch for the in-app swarm manager. Stdio is one JSON-RPC message per line.</summary>
 public static class SwarmManagerMcp
 {
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -54,44 +54,36 @@ public static class SwarmManagerMcp
 
     public static byte[]? ReadMessage(Stream input)
     {
-        var header = new StringBuilder();
-        var previous = -1;
+        using var buffer = new MemoryStream();
         while (true)
         {
             var next = input.ReadByte();
-            if (next < 0) return header.Length == 0 ? null : throw new IOException("MCP header ended early.");
-            header.Append((char)next);
-            if (previous == '\r' && next == '\n' && header.Length >= 4 && header[^4] == '\r' && header[^3] == '\n' && header[^2] == '\r' && header[^1] == '\n')
-                break;
-            previous = next;
-            if (header.Length > 8192) throw new IOException("MCP header is too large.");
+            if (next < 0)
+            {
+                if (buffer.Length == 0) return null;
+                throw new IOException("MCP stdio message ended without a newline.");
+            }
+            if (next == '\n')
+            {
+                var bytes = buffer.ToArray();
+                buffer.SetLength(0);
+                if (bytes.Length > 0 && bytes[^1] == '\r')
+                    bytes = bytes[..^1];
+                if (bytes.Length == 0) continue;
+                return bytes;
+            }
+            buffer.WriteByte((byte)next);
+            if (buffer.Length > 8_000_000) throw new IOException("MCP stdio message is too large.");
         }
-        var length = 0;
-        foreach (var line in header.ToString().Split("\r\n"))
-        {
-            const string marker = "Content-Length:";
-            if (!line.StartsWith(marker, StringComparison.OrdinalIgnoreCase)) continue;
-            if (!int.TryParse(line[marker.Length..].Trim(), out length) || length < 0)
-                throw new IOException("MCP Content-Length is not a number.");
-        }
-        if (length == 0) throw new IOException("MCP header has no Content-Length.");
-        var body = new byte[length];
-        var read = 0;
-        while (read < length)
-        {
-            var count = input.Read(body, read, length - read);
-            if (count == 0) throw new IOException("MCP body ended early.");
-            read += count;
-        }
-        return body;
     }
 
     public static void WriteMessage(Stream output, string json)
     {
+        if (json.Contains('\n') || json.Contains('\r'))
+            throw new IOException("MCP stdio message must be one line.");
         var body = Encoding.UTF8.GetBytes(json);
-        var prefix = Encoding.ASCII.GetBytes("Content-Length: " + body.Length.ToString() + "\r\n\r\n");
-        output.Write(prefix);
         output.Write(body);
+        output.WriteByte((byte)'\n');
         output.Flush();
     }
 

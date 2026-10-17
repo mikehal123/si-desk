@@ -108,6 +108,10 @@ public sealed class SwarmManagerToolTests
             Assert.Equal(System.Net.HttpStatusCode.Unauthorized, bare.StatusCode);
 
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", host.Token);
+            var note = await http.PostAsync(host.Url, new StringContent("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}", Encoding.UTF8, "application/json"));
+            var noteBody = await note.Content.ReadAsByteArrayAsync();
+            Assert.Equal(System.Net.HttpStatusCode.Accepted, note.StatusCode);
+            Assert.Empty(noteBody);
             var listed = await PostAsync(http, host.Url!, new { jsonrpc = "2.0", id = 2, method = "tools/list" });
             var names = listed.GetProperty("result").GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).ToArray();
             Assert.Equal(SwarmManagerTools.Names, names);
@@ -146,6 +150,9 @@ public sealed class SwarmManagerToolTests
         var request = JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 7, method = "tools/list" });
         using var outbound = new MemoryStream();
         SwarmManagerMcp.WriteMessage(outbound, request);
+        var framed = Encoding.UTF8.GetString(outbound.ToArray());
+        Assert.Equal(request + "\n", framed);
+        Assert.DoesNotContain("Content-Length", framed, StringComparison.Ordinal);
         outbound.Position = 0;
         var body = SwarmManagerMcp.ReadMessage(outbound);
         Assert.NotNull(body);
@@ -159,6 +166,105 @@ public sealed class SwarmManagerToolTests
         using var parsed = JsonDocument.Parse(reply);
         var names = parsed.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).ToArray();
         Assert.Equal(SwarmManagerTools.Names, names);
+    }
+
+    [Fact]
+    public async Task Built_swarm_manager_exe_speaks_newline_delimited_tools_list()
+    {
+        var stage = Path.Combine(Path.GetTempPath(), "swarm-manager-exe-" + Guid.NewGuid().ToString("N"));
+        var project = Path.Combine(Repo(), "apps", "desktop", "swarm-manager", "Sovereign.Desktop.SwarmManager.csproj");
+        var publish = await RunDotnet("publish", "\"" + project + "\" -c Release --self-contained false -o \"" + stage + "\" --nologo");
+        Assert.Equal(0, publish.Exit);
+        var exeName = OperatingSystem.IsWindows() ? "Sovereign.Desktop.SwarmManager.exe" : "Sovereign.Desktop.SwarmManager";
+        var exe = Path.Combine(stage, exeName);
+        Assert.True(File.Exists(exe), publish.Text);
+        Assert.True(File.Exists(Path.Combine(stage, "Sovereign.Desktop.SwarmManager.runtimeconfig.json")));
+        Assert.True(File.Exists(Path.Combine(stage, "Sovereign.Desktop.SwarmManager.deps.json")));
+        Assert.True(File.Exists(Path.Combine(stage, "Sovereign.Desktop.SwarmManager.dll")));
+        Assert.True(File.Exists(Path.Combine(stage, "Sovereign.Desktop.Connector.dll")));
+
+        using var process = new System.Diagnostics.Process();
+        process.StartInfo = new System.Diagnostics.ProcessStartInfo(exe)
+        {
+            WorkingDirectory = stage,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        Assert.True(process.Start());
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        try
+        {
+            var stdin = process.StandardInput.BaseStream;
+            void Send(string json)
+            {
+                var bytes = Encoding.UTF8.GetBytes(json + "\n");
+                stdin.Write(bytes);
+                stdin.Flush();
+            }
+            Send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
+            var initLine = await ReadProcessLine(process);
+            Assert.DoesNotContain("Content-Length", initLine, StringComparison.Ordinal);
+            using (var init = JsonDocument.Parse(initLine))
+            {
+                Assert.Equal(1, init.RootElement.GetProperty("id").GetInt32());
+                Assert.Equal("2025-03-26", init.RootElement.GetProperty("result").GetProperty("protocolVersion").GetString());
+            }
+            Send("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
+            Send("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
+            var toolsLine = await ReadProcessLine(process);
+            Assert.DoesNotContain("Content-Length", toolsLine, StringComparison.Ordinal);
+            Assert.DoesNotContain("\n", toolsLine, StringComparison.Ordinal);
+            using var tools = JsonDocument.Parse(toolsLine);
+            Assert.Equal(2, tools.RootElement.GetProperty("id").GetInt32());
+            var names = tools.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).ToArray();
+            Assert.Equal(SwarmManagerTools.Names, names);
+        }
+        finally
+        {
+            try { process.StandardInput.Close(); }
+            catch (Exception) { }
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (Exception) { }
+            try { await Task.WhenAny(stderrTask, Task.Delay(TimeSpan.FromSeconds(2))); }
+            catch (Exception) { }
+            try { if (Directory.Exists(stage)) Directory.Delete(stage, true); }
+            catch (IOException) { }
+        }
+    }
+
+    static async Task<string> ReadProcessLine(System.Diagnostics.Process process)
+    {
+        var read = process.StandardOutput.ReadLineAsync();
+        var finished = await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(8)));
+        if (finished != read)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (Exception) { }
+            throw new TimeoutException("The swarm manager exe did not write a line.");
+        }
+        var line = await read;
+        if (line is not null) return line;
+        var error = await process.StandardError.ReadToEndAsync();
+        throw new IOException("The swarm manager exe closed stdout. " + error);
+    }
+
+    static async Task<(int Exit, string Text)> RunDotnet(string command, string arguments)
+    {
+        using var process = new System.Diagnostics.Process();
+        process.StartInfo = new System.Diagnostics.ProcessStartInfo("dotnet", command + " " + arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        process.Start();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        await Task.WhenAll(stdoutTask, stderrTask);
+        await process.WaitForExitAsync();
+        return (process.ExitCode, stdoutTask.Result + stderrTask.Result);
     }
 
     [Fact]
@@ -249,8 +355,11 @@ public sealed class SwarmManagerToolTests
     {
         Assert.Empty(SwarmManagerSession.McpServers(null, default));
         Assert.Empty(SwarmManagerSession.McpServers(new CursorProjectOptions(), default));
-        var missing = Assert.Throws<IOException>(() => SwarmManagerSession.McpServers(new CursorProjectOptions { SwarmBrief = "Swarm mode." }, default));
-        Assert.Contains("manager tool server is not available", missing.Message, StringComparison.Ordinal);
+        Assert.Null(SwarmManagerSession.ToolWarning(null, default));
+        Assert.Null(SwarmManagerSession.ToolWarning(new CursorProjectOptions(), default));
+        var missingOptions = new CursorProjectOptions { SwarmBrief = "Swarm mode." };
+        Assert.Empty(SwarmManagerSession.McpServers(missingOptions, default));
+        Assert.Equal(SwarmManagerSession.UnavailableText, SwarmManagerSession.ToolWarning(missingOptions, default));
 
         using var httpInit = JsonDocument.Parse("""{"agentCapabilities":{"mcpCapabilities":{"http":true}}}""");
         var refused = Assert.Throws<IOException>(() => SwarmManagerSession.McpServers(new CursorProjectOptions
@@ -272,6 +381,24 @@ public sealed class SwarmManagerToolTests
         Assert.Contains("http://127.0.0.1:9/mcp", json, StringComparison.Ordinal);
         Assert.DoesNotContain("8790", json, StringComparison.Ordinal);
         Assert.DoesNotContain("grokbot", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(SwarmManagerSession.ToolWarning(new CursorProjectOptions
+        {
+            SwarmBrief = "Swarm mode.",
+            SwarmManagerUrl = "http://127.0.0.1:9/mcp",
+            SwarmManagerToken = "token"
+        }, httpInit.RootElement));
+
+        var desk = File.ReadAllText(Path.Combine(Repo(), "apps", "desktop", "Sovereign.Desktop", "Sovereign.Desktop.csproj"));
+        Assert.DoesNotContain("swarm-manager\\Sovereign.Desktop.SwarmManager.csproj\" />", desk, StringComparison.Ordinal);
+        Assert.Contains("StageSwarmManager", desk, StringComparison.Ordinal);
+        Assert.Contains("--self-contained false", desk, StringComparison.Ordinal);
+        Assert.Contains("$(OutDir)", desk, StringComparison.Ordinal);
+        Assert.Contains("$(PublishDir)", desk, StringComparison.Ordinal);
+        Assert.Contains("Sovereign.Desktop.SwarmManager.runtimeconfig.json", desk, StringComparison.Ordinal);
+        Assert.Contains("Sovereign.Desktop.SwarmManager.deps.json", desk, StringComparison.Ordinal);
+        var room = File.ReadAllText(Path.Combine(Repo(), "apps", "desktop", "Sovereign.Desktop", "ChatRoom.cs"));
+        Assert.Contains("grok.SwarmToolWarning", room, StringComparison.Ordinal);
+        Assert.Contains("_cursorChat?.SwarmToolWarning", room, StringComparison.Ordinal);
     }
 
     [Fact]

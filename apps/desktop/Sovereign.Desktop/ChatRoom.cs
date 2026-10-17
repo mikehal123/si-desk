@@ -616,6 +616,7 @@ internal sealed partial class ChatConversation
                     var grokStatus = _chatReady ? (_projectFolder is null ? "Grok Build connected. Open Folder to work on files."
                         : ProjectConnectionStatus("Grok Build can edit files in this folder.")) : DeskConnectionErrors.GrokNotSignedIn;
                     if (grok.ModeWarning is { Length: > 0 } modeWarning) grokStatus += " " + modeWarning;
+                    if (grok.SwarmToolWarning is { Length: > 0 } grokSwarmTools) grokStatus += " " + grokSwarmTools;
                     _chatStatus.Text = grokStatus;
                     return;
                 }
@@ -671,6 +672,7 @@ internal sealed partial class ChatConversation
                     : usingCache && cursorModels.Length > 0
                         ? DeskConnectionErrors.WithCachedModels(cursorStatus)
                         : cursorStatus;
+                if (_cursorChat?.SwarmToolWarning is { Length: > 0 } cursorSwarmTools) _chatStatus.Text += " " + cursorSwarmTools;
                 return;
             }
             if(PlanChat)

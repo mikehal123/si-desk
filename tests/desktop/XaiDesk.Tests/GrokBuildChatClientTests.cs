@@ -108,6 +108,37 @@ public sealed class GrokBuildChatClientTests
     }
 
     [Fact(Timeout = 15000)]
+    public async Task Swarm_mode_still_opens_a_session_when_the_manager_tool_server_is_missing()
+    {
+        using var transport = new LineTransport();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        var ct = timeout.Token;
+        var workspace = Path.Combine(Path.GetTempPath(), "SIDesk", "grok-swarm-missing");
+        using var client = new GrokBuildChatClient(workspace, transport.Reader, transport.Writer, new CursorProjectOptions
+        {
+            SwarmBrief = "Swarm mode.",
+            SwarmManagerCommand = Path.Combine(Path.GetTempPath(), "missing-swarm-manager-" + Guid.NewGuid().ToString("N"))
+        });
+        var modelsTask = client.ModelsAsync(ct);
+        var initialize = await transport.NextRequestAsync(ct);
+        transport.Reply(Id(initialize), new { protocolVersion = 1 });
+        var sessionNew = await transport.NextRequestAsync(ct);
+        Assert.Equal("session/new", Method(sessionNew));
+        Assert.Equal(0, sessionNew.GetProperty("params").GetProperty("mcpServers").GetArrayLength());
+        Assert.Equal(SwarmManagerSession.UnavailableText, client.SwarmToolWarning);
+        transport.Reply(Id(sessionNew), new
+        {
+            sessionId = "sess-missing-tools",
+            models = new { availableModels = new[] { new { modelId = "grok-4.7", name = "Grok 4.7" } } }
+        });
+        var setMode = await transport.NextRequestAsync(ct);
+        transport.Reply(Id(setMode), new { accepted = true });
+        var models = await modelsTask;
+        Assert.Single(models);
+        Assert.Equal(SwarmManagerSession.UnavailableText, client.SwarmToolWarning);
+    }
+
+    [Fact(Timeout = 15000)]
     public async Task Swarm_mode_session_load_attaches_the_manager_server()
     {
         using var transport = new LineTransport();

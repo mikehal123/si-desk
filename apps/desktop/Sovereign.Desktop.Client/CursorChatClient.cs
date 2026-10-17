@@ -48,6 +48,7 @@ public sealed class CursorChatClient(string workspace, CursorProjectOptions? pro
     public string? LastStopReason => _session?.LastStopReason;
     public bool SupportsImages => _session?.SupportsImages == true;
     public bool SupportsSubagents => _session?.SupportsSubagents == true;
+    public string? SwarmToolWarning => _session?.SwarmToolWarning;
     public CursorChatModel[] AdvertisedModels => _session?.Models ?? [];
     internal int? InternalProcessId => _process?.Id;
     internal string? InternalSessionId => _session?.SessionId;
@@ -229,6 +230,7 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
     public string? LastStopReason { get; private set; }
     public bool SupportsImages { get; private set; }
     public bool SupportsSubagents => _supportsSubagents;
+    public string? SwarmToolWarning { get; private set; }
     internal string? SessionId => _sessionId;
 
     public async Task ConnectAsync(string workspace, CancellationToken ct)
@@ -237,6 +239,7 @@ internal sealed class CursorAcpSession(TextReader reader, TextWriter writer, Cur
             clientCapabilities = new { fs = new { readTextFile = false, writeTextFile = false }, terminal = false, _meta = new { subagents = project?.SubagentsAllowed == true } },
             clientInfo = new { name = "SI Desk", version = DesktopClientVersion.Current } }, null, ct);
         if (init.GetProperty("protocolVersion").GetInt32() != 1) throw new IOException("Unsupported Cursor ACP protocol.");
+        SwarmToolWarning = SwarmManagerSession.ToolWarning(project, init);
         SupportsImages = init.TryGetProperty("agentCapabilities", out var capabilities) && capabilities.TryGetProperty("promptCapabilities", out var promptCaps) && promptCaps.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.True;
         _supportsSubagents = capabilities.ValueKind == JsonValueKind.Object && capabilities.TryGetProperty("sessionCapabilities", out var sessions) && sessions.TryGetProperty("subagents", out _);
         // Older ACP runtimes can still serve ordinary project chats. Helpers are offered only after negotiation.

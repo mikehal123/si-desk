@@ -108,7 +108,11 @@ public sealed class SwarmManagerHost : IAsyncDisposable
         var method = methodElement.GetString() ?? "";
         var hasId = message.TryGetProperty("id", out var id);
         var result = SwarmManagerMcp.Handle(method, message, _root);
-        if (!hasId || result is null) return;
+        if (!hasId || result is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status202Accepted;
+            return;
+        }
         await context.Response.WriteAsJsonAsync(new { jsonrpc = "2.0", id, result }, Json, context.RequestAborted);
     }
 

@@ -42,6 +42,7 @@ public sealed class GrokBuildChatClient : IDisposable
     public string SkillGuidance { get; set; } = "";
     public string? LastStopReason { get; private set; }
     public string? ModeWarning { get; private set; }
+    public string? SwarmToolWarning { get; private set; }
     public bool SupportsSubagents => _supportsSubagents;
     public bool SupportsImages { get; private set; }
     public CursorChatModel[] Models { get; private set; } = [];
@@ -265,6 +266,7 @@ public sealed class GrokBuildChatClient : IDisposable
 
     private async Task<JsonElement> OpenSessionAsync(JsonElement initialize, CancellationToken ct)
     {
+        SwarmToolWarning = SwarmManagerSession.ToolWarning(_project, initialize);
         var cwd = Path.GetFullPath(_workspace);
         var resume = ResumeSessionId;
         if (!string.IsNullOrWhiteSpace(resume) && GrokBuildAcp.SupportsLoadSession(initialize))

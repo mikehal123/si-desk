@@ -6,6 +6,17 @@ namespace Sovereign.Desktop.Client;
 public static class SwarmManagerSession
 {
     public const string ServerName = "si-desk-swarm-manager";
+    public const string UnavailableText = "Swarm mode is on, and the manager tool server is not available.";
+
+    /// <summary>Status text when swarm mode is on and neither HTTP nor the stdio exe can be attached. Null when tools are attached or swarm mode is off.</summary>
+    public static string? ToolWarning(CursorProjectOptions? project, JsonElement initialize)
+    {
+        if (project?.SwarmBrief is not { Length: > 0 }) return null;
+        if (HttpReady(project, initialize)) return null;
+        var command = CommandPath(project);
+        if (!string.IsNullOrWhiteSpace(command) && File.Exists(command)) return null;
+        return UnavailableText;
+    }
 
     public static object[] McpServers(CursorProjectOptions? project, JsonElement initialize)
     {
@@ -27,9 +38,9 @@ public static class SwarmManagerSession
                 }
             ];
         }
-        var command = string.IsNullOrWhiteSpace(project.SwarmManagerCommand) ? FindCommand() : project.SwarmManagerCommand.Trim();
+        var command = CommandPath(project);
         if (string.IsNullOrWhiteSpace(command) || !File.Exists(command))
-            throw new IOException("Swarm mode is on, and the manager tool server is not available.");
+            return [];
         var dll = command.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
         return
         [
@@ -41,6 +52,20 @@ public static class SwarmManagerSession
                 env = Array.Empty<object>()
             }
         ];
+    }
+
+    static bool HttpReady(CursorProjectOptions project, JsonElement initialize)
+    {
+        if (!HttpAccepted(initialize)) return false;
+        if (project.SwarmManagerUrl is not { Length: > 0 } url) return false;
+        if (project.SwarmManagerToken is not { Length: > 0 }) return false;
+        return !url.Contains(":8790", StringComparison.Ordinal);
+    }
+
+    static string? CommandPath(CursorProjectOptions? project)
+    {
+        if (project is null) return null;
+        return string.IsNullOrWhiteSpace(project.SwarmManagerCommand) ? FindCommand() : project.SwarmManagerCommand.Trim();
     }
 
     public static string? FindCommand()
