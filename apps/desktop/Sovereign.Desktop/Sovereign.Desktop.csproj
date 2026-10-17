@@ -43,6 +43,36 @@
     <ProjectReference Include="..\Sovereign.Desktop.Client\Sovereign.Desktop.Client.csproj" />
     <ProjectReference Include="..\Sovereign.Desktop.Presentation\Sovereign.Desktop.Presentation.csproj" />
   </ItemGroup>
+  <!-- NETSDK1150: a self-contained SIDesk.exe cannot ProjectReference this non-self-contained exe.
+       Publish it framework-dependent and copy the exe, runtimeconfig.json, deps.json, and dlls
+       next to SIDesk.exe for Debug builds and for dotnet publish -o (the release zip). -->
+  <Target Name="StageSwarmManager" AfterTargets="Build">
+    <PropertyGroup>
+      <_SwarmManagerProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\swarm-manager\Sovereign.Desktop.SwarmManager.csproj'))</_SwarmManagerProject>
+      <_SwarmManagerStage>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)swarm-manager'))</_SwarmManagerStage>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(_SwarmManagerProject)&quot; -c $(Configuration) --self-contained false -o &quot;$(_SwarmManagerStage)&quot; --nologo" />
+    <ItemGroup>
+      <_SwarmManagerFile Include="$(_SwarmManagerStage)\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SwarmManagerFile)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(OutDir)Sovereign.Desktop.SwarmManager.runtimeconfig.json')" Text="Swarm manager runtimeconfig.json was not copied next to SIDesk.exe." />
+    <Error Condition="!Exists('$(OutDir)Sovereign.Desktop.SwarmManager.deps.json')" Text="Swarm manager deps.json was not copied next to SIDesk.exe." />
+    <Error Condition="!Exists('$(OutDir)Sovereign.Desktop.SwarmManager.dll')" Text="Swarm manager dll was not copied next to SIDesk.exe." />
+    <Error Condition="!Exists('$(OutDir)Sovereign.Desktop.SwarmManager.exe') and !Exists('$(OutDir)Sovereign.Desktop.SwarmManager')" Text="Swarm manager exe was not copied next to SIDesk.exe." />
+  </Target>
+  <Target Name="StageSwarmManagerPublish" AfterTargets="Publish" DependsOnTargets="StageSwarmManager">
+    <PropertyGroup>
+      <_SwarmManagerStage>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)swarm-manager'))</_SwarmManagerStage>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SwarmManagerPublished Include="$(_SwarmManagerStage)\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SwarmManagerPublished)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(PublishDir)' != ''" />
+    <Error Condition="'$(PublishDir)' != '' and !Exists('$(PublishDir)Sovereign.Desktop.SwarmManager.runtimeconfig.json')" Text="Swarm manager runtimeconfig.json was not copied into the publish folder next to SIDesk.exe." />
+    <Error Condition="'$(PublishDir)' != '' and !Exists('$(PublishDir)Sovereign.Desktop.SwarmManager.deps.json')" Text="Swarm manager deps.json was not copied into the publish folder next to SIDesk.exe." />
+    <Error Condition="'$(PublishDir)' != '' and !Exists('$(PublishDir)Sovereign.Desktop.SwarmManager.dll')" Text="Swarm manager dll was not copied into the publish folder next to SIDesk.exe." />
+  </Target>
   <UsingTask TaskName="ResolveWindowsDesktopAutomationTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <NetCoreRoot ParameterType="System.String" />
