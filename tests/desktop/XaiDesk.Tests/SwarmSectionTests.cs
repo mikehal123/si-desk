@@ -29,14 +29,16 @@ public sealed class SwarmSectionTests
         try
         {
             var id = Guid.NewGuid().ToString("N");
-            var board = SwarmBoard.Create("Write a marker", [new SwarmTask { Id = "t-1", Title = "Write marker", Role = "engineer" }], root, id);
+            var board = SwarmBoard.Create("Write a marker", [new SwarmTask { Id = "t-1", Title = "Write marker", Role = "engineer" }], root, id, DoctrineFixture.Case);
             var first = SwarmSection.TryLoad(id, root);
             Assert.NotNull(first);
             Assert.Equal("todo", SwarmSection.StatusLabel(first!.TaskById("t-1").Status));
             Assert.Equal("queued", SwarmSection.PillState("todo"));
 
+            DoctrineFixture.ReadyForWork(board, "t-1");
             board.Start("t-1", "engineer");
             board.Submit("t-1", "marker", "line");
+            DoctrineFixture.RecordPass(board, "t-1");
             var note = "Claim: the marker is on disk\nHow tested: read the board\nEvidence: status done\nPaths covered: success\nVerdict: pass because the marker task is done";
             board.Verify("t-1", true, note);
             var again = SwarmSection.TryLoad(id, root);

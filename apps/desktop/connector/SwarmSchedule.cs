@@ -135,7 +135,7 @@ public static class SwarmSchedule
         return ready;
     }
 
-    public static SwarmBoard OpenRun(string conversationId, string goal, IEnumerable<SwarmTask> tasks, string? root = null)
+    public static SwarmBoard OpenRun(string conversationId, string goal, IEnumerable<SwarmTask> tasks, string? root = null, string? caseAgainst = null)
     {
         if (string.IsNullOrEmpty(conversationId) || !Guid.TryParseExact(conversationId, "N", out _))
             throw new ArgumentException("Conversation id must be a Guid in N format.", nameof(conversationId));
@@ -145,7 +145,7 @@ public static class SwarmSchedule
         var folder = string.IsNullOrWhiteSpace(root) ? SwarmBoard.DefaultRoot() : root;
         var runId = Guid.NewGuid().ToString("N");
         var conversationDir = Path.Combine(folder, conversationId);
-        var board = SwarmBoard.Create(goal, plan, Path.Combine(conversationDir, "runs"), runId);
+        var board = SwarmBoard.Create(goal, plan, Path.Combine(conversationDir, "runs"), runId, caseAgainst);
         Directory.CreateDirectory(conversationDir);
         File.WriteAllText(Path.Combine(conversationDir, "current.txt"), board.Id, new UTF8Encoding(false));
         return board;
@@ -157,9 +157,10 @@ public static class SwarmSchedule
     public static void EnsureSameRun(SwarmBoard existing, SwarmBoard incoming)
     {
         if (!HasOpenWork(existing)) return;
-        var sameGoal = string.Equals(existing.Id, incoming.Id, StringComparison.Ordinal)
-            && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
+        var sameId = string.Equals(existing.Id, incoming.Id, StringComparison.Ordinal);
         var kept = existing.Tasks.All(task => incoming.Tasks.Any(next => next.Id == task.Id));
+        if (DoctrineWrite.Allow && sameId && kept) return;
+        var sameGoal = sameId && string.Equals(existing.Goal, incoming.Goal, StringComparison.Ordinal);
         if (sameGoal && kept) return;
         throw new IOException("That run still has an open task. Leave its board.json alone and start a new run.");
     }

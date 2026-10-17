@@ -16,7 +16,7 @@ public sealed class SwarmScheduleTests
         try
         {
             var conversationId = Guid.NewGuid().ToString("N");
-            var legacy = SwarmBoard.Create("old goal", [Item("t-old", SwarmRole.Engineer, "Old work")], root, conversationId);
+            var legacy = SwarmBoard.Create("old goal", [Item("t-old", SwarmRole.Engineer, "Old work")], root, conversationId, DoctrineFixture.Case);
             var legacyText = File.ReadAllText(legacy.BoardPath);
             var tasks = new[]
             {
@@ -27,14 +27,16 @@ public sealed class SwarmScheduleTests
                 Item("t-e", SwarmRole.Verifier, "Check compare.md", ["F:\\xai-desk\\swarm-test\\compare.md"], ["t-d"])
             };
 
-            var run = SwarmSchedule.OpenRun(conversationId, goal, tasks, root);
+            var run = SwarmSchedule.OpenRun(conversationId, goal, tasks, root, DoctrineFixture.Case);
+            foreach (var id in new[] { "t-a", "t-b", "t-c", "t-d" })
+                DoctrineFixture.ReadyForWork(run, id);
 
             Assert.Equal(legacyText, File.ReadAllText(legacy.BoardPath));
             Assert.Equal(run.Id, File.ReadAllText(Path.Combine(root, conversationId, "current.txt")));
             Assert.Contains(Path.Combine("runs", run.Id, "board.json"), run.BoardPath);
             Assert.True(File.Exists(run.BoardPath));
             Assert.True(File.Exists(legacy.BoardPath));
-            Assert.Throws<IOException>(() => SwarmBoard.Create(goal, [Item("t-again", SwarmRole.Engineer, "Again")], run.Root, run.Id));
+            Assert.Throws<IOException>(() => SwarmBoard.Create(goal, [Item("t-again", SwarmRole.Engineer, "Again")], run.Root, run.Id, DoctrineFixture.Case));
 
             var ready = SwarmSchedule.Ready(run);
             Assert.Equal<string>(["t-a", "t-b", "t-c"], ready);
@@ -83,7 +85,8 @@ public sealed class SwarmScheduleTests
             [
                 Item("t-1", SwarmRole.Engineer, "First notes", ["notes.txt"]),
                 Item("t-2", SwarmRole.Engineer, "Second notes", ["notes.txt"])
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
+            DoctrineFixture.ReadyForWork(board, "t-1");
             board.Start("t-1", "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "t-2"));
             Assert.Throws<InvalidOperationException>(() => board.Start("t-2", "engineer"));
@@ -103,8 +106,9 @@ public sealed class SwarmScheduleTests
                 Item("eng", SwarmRole.Engineer, "Write notes", [file]),
                 Item("eng-2", SwarmRole.Engineer, "Rewrite notes", [file]),
                 Item("ver", SwarmRole.Verifier, "Check notes", [file], ["eng"])
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
 
+            DoctrineFixture.ReadyForWork(board, "eng");
             board.Start("eng", "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "eng-2"));
             Assert.Throws<InvalidOperationException>(() => board.Start("eng-2", "engineer"));
@@ -129,7 +133,8 @@ public sealed class SwarmScheduleTests
         try
         {
             var tasks = Enumerable.Range(1, 5).Select(n => Item("t-" + n, SwarmRole.Engineer, "Task " + n)).ToList();
-            var board = SwarmBoard.Create("Queue the extra hands", tasks, root);
+            var board = SwarmBoard.Create("Queue the extra hands", tasks, root, caseAgainst: DoctrineFixture.Case);
+            for (var n = 1; n <= 4; n++) DoctrineFixture.ReadyForWork(board, "t-" + n);
             for (var n = 1; n <= 4; n++) board.Start("t-" + n, "engineer");
             Assert.False(SwarmSchedule.CanStart(board, "t-5"));
             Assert.Empty(SwarmSchedule.Ready(board));
@@ -145,7 +150,7 @@ public sealed class SwarmScheduleTests
         try
         {
             var id = Guid.NewGuid().ToString("N");
-            var board = SwarmBoard.Create("Read the apps", [new SwarmTask { Id = "t-wait", Title = "Read Grok-Desktop", Role = SwarmRole.Researcher, Status = "todo" }], root, id);
+            var board = SwarmBoard.Create("Read the apps", [new SwarmTask { Id = "t-wait", Title = "Read Grok-Desktop", Role = SwarmRole.Researcher, Status = "todo" }], root, id, DoctrineFixture.Case);
             Assert.True(SwarmSchedule.HasOpenWork(board));
             board.Goal = "A different goal";
             var ex = Assert.Throws<IOException>(() => board.Save());
@@ -153,6 +158,7 @@ public sealed class SwarmScheduleTests
             var reread = SwarmBoard.Load(id, root);
             Assert.Equal("Read the apps", reread.Goal);
             Assert.Equal("todo", reread.TaskById("t-wait").Status);
+            DoctrineFixture.ReadyForWork(reread, "t-wait");
             reread.Start("t-wait", "researcher");
             Assert.Equal("doing", SwarmBoard.Load(id, root).TaskById("t-wait").Status);
             Assert.True(SwarmSection.IsSwarmWorker("swarm-" + id + "-t-wait", null, null, reread));
@@ -229,7 +235,7 @@ public sealed class SwarmScheduleTests
             Assert.Contains(legacyLookup, File.ReadAllText(path), StringComparison.Ordinal);
 
             // Create goes through Copy and remaps too.
-            var created = SwarmBoard.Create("g2", [Item("t-x", "grokbot-ops", "Ops"), Item("t-y", SwarmRole.Verifier, "Check", null, ["t-x"])], root);
+            var created = SwarmBoard.Create("g2", [Item("t-x", "grokbot-ops", "Ops"), Item("t-y", SwarmRole.Verifier, "Check", null, ["t-x"])], root, caseAgainst: DoctrineFixture.Case);
             Assert.Equal(SwarmRole.Scout, created.TaskById("t-x").Role);
             Assert.Equal(SwarmRole.Scout, SwarmBoard.Read(created.BoardPath).TaskById("t-x").Role);
             Assert.DoesNotContain("grokbot", File.ReadAllText(created.BoardPath), StringComparison.OrdinalIgnoreCase);
@@ -239,8 +245,7 @@ public sealed class SwarmScheduleTests
 
     private static void Finish(SwarmBoard board, string taskId)
     {
-        board.Submit(taskId, "result " + taskId, "proof " + taskId);
-        board.Verify(taskId, true, "checked " + taskId);
+        DoctrineFixture.MarkDone(board, taskId);
     }
 
     private static SwarmTask Item(string id, string role, string title, IEnumerable<string>? files = null, IEnumerable<string>? after = null) => new()

@@ -268,6 +268,11 @@ public sealed class ConnectorHost : IAsyncDisposable
                 "swarm_run_status" => SwarmContinue.Status(_desk, BlankArg(Arg("swarm_id")), BlankArg(Arg("run_id"))),
                 "swarm_run_events" => RunEvents(Arg("run_id"), Arg("since")),
                 "grokbot_post" => PostGrokbot(Arg("text")),
+                "grokbot_doctrine_overrule" => DoctrineOwner(Arg("swarm_id"), Arg("run_id"), Arg("task_id"), yes: false),
+                "grokbot_doctrine_owner_yes" => DoctrineOwner(Arg("swarm_id"), Arg("run_id"), Arg("task_id"), yes: true),
+                "swarm_assumption" => DoctrineManagerAssumption(Arg("swarm_id"), Arg("run_id"), Arg("task_id"), Arg("verdict"), Arg("text")),
+                "swarm_rollback" => DoctrineManagerRollback(Arg("swarm_id"), Arg("run_id"), Arg("task_id"), Arg("verdict"), Arg("undo"), Arg("path")),
+                "swarm_decay" => DoctrineManagerDecay(Arg("swarm_id"), Arg("run_id"), Arg("task_id")),
                 _ => ""
             };
             if (!KnownTool(name))
@@ -380,7 +385,9 @@ public sealed class ConnectorHost : IAsyncDisposable
         "list_subagents" or "read_subagent" or "status" or "grokbot_inbox_list" or "grokbot_inbox_reply" or
         "app_ui_tree" or "app_click" or "app_type" or "app_key" or "app_navigate" or
         "read_swarm_board" or "swarm_submit_result" or "swarm_continue" or "swarm_run_status" or
-        "swarm_run_events" or "grokbot_post";
+        "swarm_run_events" or "grokbot_post" or
+        "grokbot_doctrine_overrule" or "grokbot_doctrine_owner_yes" or
+        "swarm_assumption" or "swarm_rollback" or "swarm_decay";
 
     /// <summary>Tools that change nothing on the desk or on disk. Listed with the MCP readOnlyHint annotation.</summary>
     public static bool IsReadOnlyTool(string name) => name is
@@ -411,6 +418,44 @@ public sealed class ConnectorHost : IAsyncDisposable
         if (string.IsNullOrWhiteSpace(runId)) throw new ArgumentException("run_id is required.");
         var rows = _desk.ReadSwarmRunEvents(runId.Trim(), SwarmRunEvents.ParseSince(since));
         return SwarmRunEvents.Text(rows);
+    }
+
+    private string DoctrineOwner(string swarmId, string runId, string taskId, bool yes)
+    {
+        var board = OpenDoctrineBoard(swarmId, runId);
+        if (yes) DoctrineGate.OwnerYes(board, taskId);
+        else DoctrineGate.Overrule(board, taskId);
+        return (yes ? "owner_yes" : "overruled") + "\t" + taskId.Trim();
+    }
+
+    private string DoctrineManagerAssumption(string swarmId, string runId, string taskId, string verdict, string text)
+    {
+        var board = OpenDoctrineBoard(swarmId, runId);
+        DoctrineGate.AppendAssumption(board, taskId, verdict, text);
+        return "assumption\t" + taskId.Trim() + "\t" + verdict.Trim();
+    }
+
+    private string DoctrineManagerRollback(string swarmId, string runId, string taskId, string verdict, string undo, string path)
+    {
+        var board = OpenDoctrineBoard(swarmId, runId);
+        DoctrineGate.AppendRollback(board, taskId, verdict, undo, path);
+        return "rollback\t" + taskId.Trim() + "\t" + verdict.Trim();
+    }
+
+    private string DoctrineManagerDecay(string swarmId, string runId, string taskId)
+    {
+        var board = OpenDoctrineBoard(swarmId, runId);
+        DoctrineGate.AppendDecay(board, taskId);
+        return "decay\t" + taskId.Trim() + "\t" + (board.Goal ?? "");
+    }
+
+    private SwarmBoard OpenDoctrineBoard(string swarmId, string runId)
+    {
+        if (string.IsNullOrWhiteSpace(swarmId) || string.IsNullOrWhiteSpace(runId))
+            throw new ArgumentException("Swarm id and run id are required.");
+        var path = SwarmBoard.RunBoardPath(swarmId, runId, _desk.SwarmBoardRoot());
+        if (!File.Exists(path)) throw new KeyNotFoundException("That swarm board is not on disk.");
+        return SwarmBoard.Read(path);
     }
 
     private string PostGrokbot(string text)
@@ -474,7 +519,12 @@ public sealed class ConnectorHost : IAsyncDisposable
         Tool("swarm_continue", "After a handoff review, post the verdict into that swarm chat as Grok Bot. Verdict is continue, fix, or done. Continue and fix resume the manager. Done does not. A repeated call for the same review is ignored.", "swarm_id", true, false),
         Tool("swarm_run_status", "Read the run id, review status, and each task status for a swarm run. Does not write the board.", "swarm_id", true, false),
         Tool("swarm_run_events", "Read-only. Events on a swarm run newer than since (ISO-8601; empty means the most recent, at most 50): one line each with UTC time, run id, kind (status, task, handoff, failed, finished), and a summary. A handoff line is followed by its SOVEREIGN_HANDOFF text. Routine task moves are included. Never writes the board.", "run_id", true, false),
-        Tool("grokbot_post", "Post a Grok Bot message into the Grokbot tab with no inbox message to answer, for example to relay a swarm status update or handoff to the user mid-run. Not gated by Act on.", null, false, false)
+        Tool("grokbot_post", "Post a Grok Bot message into the Grokbot tab with no inbox message to answer, for example to relay a swarm status update or handoff to the user mid-run. Not gated by Act on.", null, false, false),
+        Tool("grokbot_doctrine_overrule", "Owner only, from Grok Bot. Append a disagreement row with verdict overruled for one swarm task. The manager cannot call this.", "swarm_id", true, false),
+        Tool("grokbot_doctrine_owner_yes", "Owner only, from Grok Bot. Set the owner's yes on the latest IRREVERSIBLE rollback row. The manager cannot call this.", "swarm_id", true, false),
+        Tool("swarm_assumption", "Manager only. Append an assumption row. Verdict is STATED, INFERRED, GUESSED, or OVERTURNED.", "swarm_id", true, false),
+        Tool("swarm_rollback", "Manager only. Append a rollback row. Class is REVERSIBLE, RECOVERABLE, or IRREVERSIBLE. Owner yes stays off.", "swarm_id", true, false),
+        Tool("swarm_decay", "Manager only. Append a decay row. pinned_goal is copied from the board goal in code.", "swarm_id", true, false)
     ];
 
     private const string ActWindowNote = "Runs only when Allow Grokbot control is on and the latest Grokbot-tab message is marked Act on and under 10 minutes old; otherwise the reply starts with Not switched and nothing happens.";
@@ -520,6 +570,29 @@ public sealed class ConnectorHost : IAsyncDisposable
         {
             properties["run_id"] = new { type = "string" };
             requiredNames.Add("run_id");
+        }
+        if (name is "grokbot_doctrine_overrule" or "grokbot_doctrine_owner_yes" or "swarm_assumption" or "swarm_rollback" or "swarm_decay")
+        {
+            properties["run_id"] = new { type = "string" };
+            properties["task_id"] = new { type = "string" };
+            requiredNames.Add("run_id");
+            requiredNames.Add("task_id");
+        }
+        if (name == "swarm_assumption")
+        {
+            properties["verdict"] = new { type = "string" };
+            properties["text"] = new { type = "string" };
+            requiredNames.Add("verdict");
+            requiredNames.Add("text");
+        }
+        if (name == "swarm_rollback")
+        {
+            properties["verdict"] = new { type = "string" };
+            properties["undo"] = new { type = "string" };
+            properties["path"] = new { type = "string" };
+            requiredNames.Add("verdict");
+            requiredNames.Add("undo");
+            requiredNames.Add("path");
         }
         if (name == "app_click")
         {

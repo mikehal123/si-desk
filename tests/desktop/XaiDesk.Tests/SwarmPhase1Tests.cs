@@ -19,6 +19,9 @@ public sealed class SwarmPhase1Tests
             var board = SwarmLoop.OpenGoal("Write the phase 1 proof file", "Write proof.txt", SwarmRole.Engineer, "One line in proof.txt", root);
             var id = board.Tasks.Single().Id;
             Assert.Equal(SwarmStatus.Todo, board.TaskById(id).Status);
+            board.TaskById(id).Files.Add(Path.Combine(work, "proof.txt"));
+            board.Save();
+            DoctrineFixture.ReadyForWork(board, id);
             var started = SwarmLoop.Begin(board, id, "engineer");
             Assert.Equal("running", started.State);
             Assert.Contains("swarm engineer", started.RolePrompt, StringComparison.OrdinalIgnoreCase);
@@ -37,7 +40,7 @@ public sealed class SwarmPhase1Tests
             Assert.Contains("How tested:", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Evidence:", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Paths covered:", verified.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Verdict: pass because findstr matched the current proof file", verified.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Verdict: pass because the file contained the task line", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("swarm phase 1 " + id, verified.VerifierNote, StringComparison.Ordinal);
             var saved = SwarmBoard.Load(board.Id, root).TaskById(id);
             Assert.Equal(SwarmStatus.Done, saved.Status);
@@ -55,6 +58,7 @@ public sealed class SwarmPhase1Tests
         {
             var board = SwarmLoop.OpenGoal("Check a claim", "Check it", SwarmRole.Researcher, "sources required", root);
             var id = board.Tasks.Single().Id;
+            DoctrineFixture.ReadyForWork(board, id);
             board.Start(id, "researcher");
             board.Submit(id, "finding", "source: local note");
             var first = board.Verify(id, false, "source missing");
@@ -86,6 +90,7 @@ public sealed class SwarmPhase1Tests
         {
             var board = SwarmLoop.OpenGoal("Need proof", "Do the work", SwarmRole.Engineer, "show the command", root);
             var id = board.Tasks.Single().Id;
+            DoctrineFixture.ReadyForWork(board, id);
             board.Start(id, "engineer");
             Assert.Throws<ArgumentException>(() => board.Submit(id, "diff", " "));
             Assert.Equal(SwarmStatus.Doing, board.TaskById(id).Status);
@@ -175,18 +180,22 @@ public sealed class SwarmPhase1Tests
         {
             var passBoard = SwarmLoop.OpenGoal("Prove the line is on disk", "Write proof.txt", SwarmRole.Engineer, "One line in proof.txt", root);
             var passId = passBoard.Tasks.Single().Id;
+            passBoard.TaskById(passId).Files.Add(Path.Combine(work, "proof.txt"));
+            passBoard.Save();
+            DoctrineFixture.ReadyForWork(passBoard, passId);
             passBoard.Start(passId, "engineer");
             await SwarmLoop.EngineerProofAsync(passBoard, passId, work);
             var passed = await SwarmLoop.VerifyProofAsync(passBoard, passId, work);
             Assert.Equal(SwarmStatus.Done, passed.Status);
             Assert.Contains("Claim: proof.txt contains swarm phase 1 " + passId, passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("How tested: Reran findstr on the current proof.txt at ", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("How tested: Read the current proof.txt in this process at ", passed.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Evidence: exit 0", passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Paths covered: Success: the file exists and findstr matched.", passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Verdict: pass because findstr matched the current proof file", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Paths covered: Success: the file exists and the task line is in it.", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Verdict: pass because the file contained the task line", passed.VerifierNote, StringComparison.Ordinal);
 
             var failBoard = SwarmLoop.OpenGoal("Do not accept a slogan", "Claim it builds", SwarmRole.Engineer, "No command output", root);
             var failId = failBoard.Tasks.Single().Id;
+            DoctrineFixture.ReadyForWork(failBoard, failId);
             failBoard.Start(failId, "engineer");
             failBoard.Submit(failId, "finished", "it builds");
             var failed = await SwarmLoop.VerifyProofAsync(failBoard, failId, work);
@@ -211,6 +220,7 @@ public sealed class SwarmPhase1Tests
         {
             var board = SwarmLoop.OpenGoal("Look up the note", "Read the desk note", SwarmRole.Researcher, "The note is on the board only.", root);
             var task = board.Tasks.Single();
+            DoctrineFixture.ReadyForWork(board, task.Id);
             board.Start(task.Id, "researcher");
             Assert.Equal(SwarmStatus.Doing, board.TaskById(task.Id).Status);
 
@@ -290,7 +300,7 @@ public sealed class SwarmPhase1Tests
                     Status = SwarmStatus.Doing,
                     Assignee = "worker-a"
                 }
-            ], Path.Combine(SwarmBoard.DefaultRoot(), swarmId, "runs"), runId);
+            ], Path.Combine(SwarmBoard.DefaultRoot(), swarmId, "runs"), runId, DoctrineFixture.Case);
             Assert.Equal(SwarmStatus.Doing, board.TaskById("task-1").Status);
 
             var desk = new SwarmDesk(deskRoot);

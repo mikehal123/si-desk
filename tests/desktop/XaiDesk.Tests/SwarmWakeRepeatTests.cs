@@ -180,7 +180,7 @@ public sealed class SwarmWakeRepeatTests
         var runId = Guid.NewGuid().ToString("N");
         var board = SwarmBoard.Create("Review the handoff",
             [new SwarmTask { Id = "task-1", Title = "Write the panel", Status = SwarmStatus.Doing }],
-            Path.Combine(root, swarmId, "runs"), runId);
+            Path.Combine(root, swarmId, "runs"), runId, DoctrineFixture.Case);
         return (root, swarmId, runId, board);
     }
 

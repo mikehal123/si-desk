@@ -493,7 +493,7 @@ public sealed class GrokBotConnectorTests
         try
         {
             desk.SwarmRoot = root;
-            var board = SwarmBoard.Create("Ship the thing", [new SwarmTask { Id = "t1", Title = "Build", Role = SwarmRole.Engineer }], root);
+            var board = SwarmBoard.Create("Ship the thing", [new SwarmTask { Id = "t1", Title = "Build", Role = SwarmRole.Engineer }], root, caseAgainst: DoctrineFixture.Case);
             var file = Path.Combine(root, board.Id, "board.json");
             var before = File.ReadAllBytes(file);
             var t0 = new DateTimeOffset(2026, 10, 14, 9, 0, 0, TimeSpan.Zero);

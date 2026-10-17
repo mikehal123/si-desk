@@ -67,6 +67,22 @@ public sealed class SwarmContinueTests
     }
 
     [Fact]
+    public void Done_verdict_does_not_change_task_status()
+    {
+        var fx = Open(SwarmStatus.Doing);
+        try
+        {
+            var before = SwarmBoard.Read(fx.Board.BoardPath).Tasks.ToDictionary(task => task.Id, task => task.Status);
+            SwarmContinue.Apply(fx.Desk, fx.SwarmId, fx.RunId, "done", "Stop the run.", fx.Data);
+            var after = SwarmBoard.Read(fx.Board.BoardPath);
+            Assert.Equal("Reviewed (done)", after.ReviewStatus);
+            foreach (var pair in before)
+                Assert.Equal(pair.Value, after.TaskById(pair.Key).Status);
+        }
+        finally { Delete(fx); }
+    }
+
+    [Fact]
     public void Done_does_not_resume()
     {
         var fx = Open(SwarmStatus.Doing);
@@ -493,7 +509,8 @@ public sealed class SwarmContinueTests
         [
             new SwarmTask { Id = "task-1", Title = "Write the panel", Status = taskStatus, Assignee = "worker-a" },
             new SwarmTask { Id = "task-2", Title = "Leave this", Status = SwarmStatus.Done }
-        ], Path.Combine(root, swarmId, "runs"), runId);
+        ], Path.Combine(root, swarmId, "runs"), runId, DoctrineFixture.Case);
+        DoctrineFixture.FinishFromTodo(board, "task-2");
         if (loops > 0)
         {
             board.ReviewLoops = loops;
