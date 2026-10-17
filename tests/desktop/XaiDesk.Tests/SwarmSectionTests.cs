@@ -29,7 +29,7 @@ public sealed class SwarmSectionTests
         try
         {
             var id = Guid.NewGuid().ToString("N");
-            var board = SwarmBoard.Create("Write a marker", [new SwarmTask { Id = "t-1", Title = "Write marker", Role = "engineer" }], root, id);
+            var board = SwarmBoard.Create("Write a marker", [new SwarmTask { Id = "t-1", Title = "Write marker", Role = "engineer" }], root, id, DoctrineFixture.Case);
             var first = SwarmSection.TryLoad(id, root);
             Assert.NotNull(first);
             Assert.Equal("todo", SwarmSection.StatusLabel(first!.TaskById("t-1").Status));

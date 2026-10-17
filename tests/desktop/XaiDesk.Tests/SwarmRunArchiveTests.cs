@@ -13,7 +13,7 @@ public sealed class SwarmRunArchiveTests
         {
             var conversationId = Guid.NewGuid().ToString("N");
             var board = SwarmSchedule.OpenRun(conversationId, "Write one marker line",
-                [new SwarmTask { Id = "t-1", Title = "Write marker", Role = SwarmRole.Engineer }], root);
+                [new SwarmTask { Id = "t-1", Title = "Write marker", Role = SwarmRole.Engineer }], root, DoctrineFixture.Case);
             var folder = Path.Combine(root, conversationId);
             var live = File.ReadAllBytes(board.BoardPath);
             var bakBytes = new byte[] { 4, 5, 6 };
@@ -45,7 +45,7 @@ public sealed class SwarmRunArchiveTests
         {
             var conversationId = Guid.NewGuid().ToString("N");
             var board = SwarmSchedule.OpenRun(conversationId, "Write one marker line",
-                [new SwarmTask { Id = "t-1", Title = "Write marker", Role = SwarmRole.Engineer }], root);
+                [new SwarmTask { Id = "t-1", Title = "Write marker", Role = SwarmRole.Engineer }], root, DoctrineFixture.Case);
             var folder = Path.Combine(root, conversationId);
             var archived = Path.Combine(folder, "runs", board.Id, "archived", "board.json");
             Directory.CreateDirectory(Path.GetDirectoryName(archived)!);

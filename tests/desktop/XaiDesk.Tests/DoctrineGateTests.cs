@@ -11,44 +11,40 @@ public sealed class DoctrineGateTests
     {
         using var fx = new Board("Simulate the doctrine");
         var before = File.ReadAllText(fx.Swarm.BoardPath);
-        var missing = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Start(fx.Id, "helper-a"));
-        Assert.Equal("no disagreement row", missing.Message);
+        var holds = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Start(fx.Id, "helper-a"));
+        Assert.Equal("disagreement holds", holds.Message);
         Assert.Equal(before, File.ReadAllText(fx.Swarm.BoardPath));
         Assert.Equal(SwarmStatus.Todo, Fresh(fx).Status);
         Assert.Contains("\"verdict\":\"blocked\"", File.ReadAllText(DoctrineGate.LogPath(fx.Swarm)), StringComparison.Ordinal);
-        Assert.Contains("no disagreement row", File.ReadAllText(DoctrineGate.LogPath(fx.Swarm)), StringComparison.Ordinal);
 
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow
-        {
-            TaskId = fx.Id,
-            Phase = DoctrinePhase.Disagreement,
-            Verdict = "holds",
-            Text = "The plan fails if two helpers write the same file.",
-            Read = fx.Swarm.Goal
-        });
-        var holds = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Start(fx.Id, "helper-a"));
-        Assert.Equal("disagreement holds", holds.Message);
-        Assert.Equal(SwarmStatus.Todo, Fresh(fx).Status);
-
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow
+        var refused = Assert.Throws<InvalidOperationException>(() => DoctrineGate.Record(fx.Swarm, new DoctrineLogRow
         {
             TaskId = fx.Id,
             Phase = DoctrinePhase.Disagreement,
             Verdict = "overruled",
-            Text = "The owner overruled the case against the plan.",
+            Text = "A worker tried to overrule it.",
             Read = fx.Swarm.Goal
-        });
+        }));
+        Assert.Equal("the manager cannot write a disagreement row", refused.Message);
+        DoctrineGate.Overrule(fx.Swarm, fx.Id);
         var assumption = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Start(fx.Id, "helper-a"));
         Assert.Equal("no assumption row", assumption.Message);
         Assert.Equal(before, File.ReadAllText(fx.Swarm.BoardPath));
+
+        File.Delete(DoctrineGate.LogPath(fx.Swarm));
+        var missing = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Start(fx.Id, "helper-a"));
+        Assert.Equal("no disagreement row", missing.Message);
+        Assert.Equal(SwarmStatus.Todo, Fresh(fx).Status);
     }
 
     [Fact]
     public void Submit_requires_rollback_with_undo_and_a_decay_row_that_matches_the_goal()
     {
         using var fx = new Board("simulate the doctrine");
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Disagreement, Verdict = "overruled", Text = "A shared file can be overwritten.", Read = fx.Swarm.Goal });
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Assumption, Verdict = "STATED", Text = "The goal names the deliverable.", Read = fx.Swarm.Goal });
+        DoctrineGate.Overrule(fx.Swarm, fx.Id);
+        DoctrineGate.AppendAssumption(fx.Swarm, fx.Id, "STATED", "The goal names the deliverable.");
+        var manager = Assert.Throws<InvalidOperationException>(() => DoctrineGate.AppendAssumption(fx.Swarm, fx.Id, "overruled", "no"));
+        Assert.Equal("the manager cannot overrule a disagreement", manager.Message);
         fx.Swarm.Start(fx.Id, "helper-a");
         Assert.Equal(SwarmStatus.Doing, Fresh(fx).Status);
 
@@ -60,19 +56,21 @@ public sealed class DoctrineGateTests
         var noUndo = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Submit(fx.Id, "wrote", "proof line"));
         Assert.Equal("rollback missing undo", noUndo.Message);
 
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Rollback, Verdict = "IRREVERSIBLE", Text = "The file would be gone.", Paths = "notes.txt", OwnerYes = false, Read = "notes.txt" });
+        DoctrineGate.AppendRollback(fx.Swarm, fx.Id, "IRREVERSIBLE", "The file would be gone.", "notes.txt");
+        Assert.Contains("\"owner_yes\":false", File.ReadAllText(DoctrineGate.LogPath(fx.Swarm)), StringComparison.Ordinal);
         var needsYes = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Submit(fx.Id, "wrote", "proof line"));
         Assert.Equal("IRREVERSIBLE needs the owner's yes", needsYes.Message);
-        var refused = Assert.Throws<InvalidOperationException>(() => DoctrineGate.GuardWrite(fx.Swarm, fx.Id, "notes.txt"));
-        Assert.Equal("IRREVERSIBLE needs the owner's yes", refused.Message);
+        var refusedWrite = Assert.Throws<InvalidOperationException>(() => DoctrineGate.GuardWrite(fx.Swarm, fx.Id, "notes.txt"));
+        Assert.Equal("IRREVERSIBLE needs the owner's yes", refusedWrite.Message);
         Assert.False(File.Exists(Path.Combine(fx.Root, "notes.txt")));
+        Assert.Throws<InvalidOperationException>(() => DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Rollback, Verdict = "IRREVERSIBLE", Text = "sneak", Paths = "notes.txt", OwnerYes = true }));
 
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Rollback, Verdict = "IRREVERSIBLE", Text = "The owner accepted the loss.", Paths = "notes.txt", OwnerYes = true, Read = "owner" });
+        DoctrineGate.OwnerYes(fx.Swarm, fx.Id);
         DoctrineGate.GuardWrite(fx.Swarm, fx.Id, "notes.txt");
         var noDecay = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Submit(fx.Id, "wrote", "proof line"));
         Assert.Equal("no decay row", noDecay.Message);
 
-        DoctrineGate.Record(fx.Swarm, new DoctrineLogRow { TaskId = fx.Id, Phase = DoctrinePhase.Decay, Verdict = "check", PinnedGoal = "simulate the doctrine", Text = "simulate the doctrine", Read = "simulate the doctrine" });
+        DoctrineGate.AppendDecay(fx.Swarm, fx.Id);
         fx.Swarm.Goal = "build a CN gate";
         var drifted = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Submit(fx.Id, "wrote", "proof line"));
         Assert.Equal("goal drifted", drifted.Message);
@@ -113,7 +111,7 @@ public sealed class DoctrineGateTests
         Assert.Equal("verification missing deviations", deviations.Message);
         Assert.Equal(SwarmStatus.Review, Fresh(fx).Status);
 
-        RecordVerification(fx, DoctrineFixture.Report("notes.txt"));
+        RecordVerification(fx, DoctrineFixture.Report(DoctrineFixture.ArtifactFile(fx.Swarm, fx.Id)));
         var noInterface = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Verify(fx.Id, true, "pass because the report exists"));
         Assert.Equal("no interface row", noInterface.Message);
 
@@ -149,6 +147,46 @@ public sealed class DoctrineGateTests
     }
 
     [Fact]
+    public void Rule_nine_refuses_a_green_check_that_cheated()
+    {
+        using var fx = new Board("simulate the doctrine");
+        DoctrineFixture.ReadyForWork(fx.Swarm, fx.Id);
+        fx.Swarm.Start(fx.Id, "helper-a");
+        fx.Swarm.Submit(fx.Id, "wrote", "proof line");
+        var real = DoctrineFixture.ArtifactFile(fx.Swarm, fx.Id);
+        RecordVerification(fx, "Existence audit: claim: on disk artifact: " + real + "\nRaw output: exit 0\nGap audit: skipped persistence\nDeviations: NONE\nUnverified claims: none");
+        var hidden = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Verify(fx.Id, true, "pass because the headings are filled"));
+        Assert.Equal("verification deviations hide a skip", hidden.Message);
+
+        RecordVerification(fx, "Existence audit: claim: on disk artifact: placeholder\nRaw output: exit 0\nGap audit: looked once\nDeviations: persistence was not rerun\nUnverified claims: none");
+        var missingFile = Assert.Throws<InvalidOperationException>(() => fx.Swarm.Verify(fx.Id, true, "pass because the headings are filled"));
+        Assert.Equal("verification artifact is not on disk", missingFile.Message);
+        Assert.Equal(SwarmStatus.Review, Fresh(fx).Status);
+    }
+
+    [Fact]
+    public void Create_writes_todo_and_a_holds_row()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "xai-desk-create-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var board = SwarmBoard.Create("Ship the panel", [new SwarmTask { Id = "t-1", Title = "Write", Status = SwarmStatus.Done, Role = SwarmRole.Engineer }], root, caseAgainst: "The plan fails if the file is shared.");
+            var json = File.ReadAllText(board.BoardPath);
+            Assert.Contains("\"status\": \"todo\"", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("\"status\": \"done\"", json, StringComparison.Ordinal);
+            var log = File.ReadAllText(DoctrineGate.LogPath(board));
+            Assert.Contains("\"verdict\":\"holds\"", log, StringComparison.Ordinal);
+            Assert.Contains("The plan fails if the file is shared.", log, StringComparison.Ordinal);
+            var blocked = Assert.Throws<InvalidOperationException>(() => board.Start("t-1", "helper-a"));
+            Assert.Equal("disagreement holds", blocked.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void A_direct_save_cannot_mark_done_and_only_verify_assigns_done()
     {
         using var fx = new Board("simulate the doctrine");
@@ -172,7 +210,12 @@ public sealed class DoctrineGateTests
         }
         Assert.Equal(1, assigns);
         var host = File.ReadAllText(Path.Combine(connector, "ConnectorHost.cs"));
-        Assert.DoesNotContain("doctrine", host, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("grokbot_doctrine_overrule", host, StringComparison.Ordinal);
+        Assert.Contains("grokbot_doctrine_owner_yes", host, StringComparison.Ordinal);
+        Assert.Contains("swarm_assumption", host, StringComparison.Ordinal);
+        Assert.Contains("swarm_rollback", host, StringComparison.Ordinal);
+        Assert.Contains("swarm_decay", host, StringComparison.Ordinal);
+        Assert.DoesNotContain("DoctrineGate.Record", host, StringComparison.Ordinal);
         var loop = File.ReadAllText(Path.Combine(connector, "SwarmLoop.cs"));
         var writeAt = loop.IndexOf("File.WriteAllText(file", StringComparison.Ordinal);
         var guardAt = loop.IndexOf("DoctrineGate.GuardWrite", StringComparison.Ordinal);
@@ -271,7 +314,7 @@ public sealed class DoctrineGateTests
         {
             Root = Path.Combine(Path.GetTempPath(), "xai-desk-doctrine-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Root);
-            Swarm = SwarmBoard.Create(goal, [new SwarmTask { Id = "t-1", Title = "The task", Role = SwarmRole.Engineer }], Root);
+            Swarm = SwarmBoard.Create(goal, [new SwarmTask { Id = "t-1", Title = "The task", Role = SwarmRole.Engineer }], Root, caseAgainst: DoctrineFixture.Case);
         }
 
         public string Root { get; }

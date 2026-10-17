@@ -98,9 +98,11 @@ public sealed class SwarmBoard
         _ => status
     };
 
-    public static SwarmBoard Create(string goal, IEnumerable<SwarmTask> tasks, string? root = null, string? id = null)
+    public static SwarmBoard Create(string goal, IEnumerable<SwarmTask> tasks, string? root = null, string? id = null, string? caseAgainst = null)
     {
         if (string.IsNullOrWhiteSpace(goal)) throw new ArgumentException("Swarm goal is required.", nameof(goal));
+        if (string.IsNullOrWhiteSpace(caseAgainst))
+            throw new ArgumentException("The disagreement case against the plan is required.", nameof(caseAgainst));
         var board = new SwarmBoard
         {
             Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id.Trim(),
@@ -112,10 +114,15 @@ public sealed class SwarmBoard
         if (board.Tasks.Any(task => string.IsNullOrWhiteSpace(task.Id) || string.IsNullOrWhiteSpace(task.Title)))
             throw new ArgumentException("Every task needs an id and a title.", nameof(tasks));
         foreach (var task in board.Tasks)
-            if (string.IsNullOrWhiteSpace(task.Status)) task.Status = SwarmStatus.Todo;
+        {
+            if (string.IsNullOrWhiteSpace(task.Status) || task.Status is SwarmStatus.Done or SwarmStatus.Failed)
+                task.Status = SwarmStatus.Todo;
+        }
         if (File.Exists(board.BoardPath))
             throw new IOException("A swarm board already exists at that path. Start a new run instead of overwriting it.");
         board.Save();
+        foreach (var task in board.Tasks)
+            DoctrineGate.AppendHolds(board, task.Id, caseAgainst);
         return board;
     }
 

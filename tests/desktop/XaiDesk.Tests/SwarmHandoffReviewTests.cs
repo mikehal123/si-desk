@@ -342,7 +342,7 @@ public sealed class SwarmHandoffReviewTests
         var root = Path.Combine(Path.GetTempPath(), "xai-desk-review-" + Guid.NewGuid().ToString("N"));
         try
         {
-            var board = SwarmBoard.Create("Ship the panel", [new SwarmTask { Id = "t1", Title = "Panel", Status = SwarmStatus.Todo }], root);
+            var board = SwarmBoard.Create("Ship the panel", [new SwarmTask { Id = "t1", Title = "Panel", Status = SwarmStatus.Todo }], root, caseAgainst: DoctrineFixture.Case);
             var before = File.ReadAllText(board.BoardPath);
             Assert.False(File.Exists(board.BoardPath + ".bak"));
             board.ReviewLoops = 1;
@@ -395,7 +395,7 @@ public sealed class SwarmHandoffReviewTests
                 Files = ["do-not-leak-file.txt"],
                 Details = "FILE-BODY-DO-NOT-SEND"
             }
-        ], Path.Combine(root, swarmId, "runs"), runId);
+        ], Path.Combine(root, swarmId, "runs"), runId, DoctrineFixture.Case);
         return (root, swarmId, runId, board);
     }
 
@@ -417,7 +417,9 @@ public sealed class SwarmHandoffReviewTests
         };
         if (failed)
             tasks.Add(new SwarmTask { Id = "task-2", Title = "Check risks", Status = SwarmStatus.Failed, Result = "broke" });
-        var board = SwarmBoard.Create("Review the handoff", tasks, Path.Combine(root, swarmId, "runs"), runId);
+        var board = SwarmBoard.Create("Review the handoff", tasks, Path.Combine(root, swarmId, "runs"), runId, DoctrineFixture.Case);
+        DoctrineFixture.FinishFromTodo(board, "task-1", proof: testsPassed ? "tests passed" : "shipped");
+        if (failed) DoctrineFixture.FailFromTodo(board, "task-2");
         return (root, swarmId, runId, board);
     }
 

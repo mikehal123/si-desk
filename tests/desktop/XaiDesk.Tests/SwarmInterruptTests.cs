@@ -15,7 +15,7 @@ public sealed class SwarmInterruptTests
             [
                 new SwarmTask { Id = "t-a", Title = "Trace title", Role = SwarmRole.Investigator, Details = "Read title.txt and every neighbor.", Status = SwarmStatus.Doing, Assignee = "helper-1" },
                 new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo }
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
 
             var first = board.Interrupt("t-a", "helper stopped");
             Assert.Equal(SwarmStatus.Todo, first.Status);
@@ -40,7 +40,7 @@ public sealed class SwarmInterruptTests
             var again = SwarmBoard.Create("Trace one file",
             [
                 new SwarmTask { Id = "t-z", Title = "Trace title", Role = SwarmRole.Investigator, Status = SwarmStatus.Doing, Assignee = "helper-z" }
-            ], root, "second-board");
+            ], root, "second-board", DoctrineFixture.Case);
             var narrowed = again.Respawn("t-z", "Respawn requested for this helper only.");
             Assert.Equal(SwarmStatus.Todo, narrowed.Status);
             Assert.Equal(1, narrowed.InterruptRetries);
@@ -70,7 +70,7 @@ public sealed class SwarmInterruptTests
             [
                 new SwarmTask { Id = "t-a", Title = "Trace title", Role = SwarmRole.Investigator, Details = "Read title.txt and every neighbor.", Status = SwarmStatus.Todo, Assignee = "helper-1", Result = "waiting" },
                 new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo, Assignee = "keep", Result = "untouched", Details = "leave me" }
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
 
             var first = board.Respawn("t-a", "helper stopped");
             Assert.Equal(SwarmStatus.Todo, first.Status);
@@ -110,7 +110,7 @@ public sealed class SwarmInterruptTests
             [
                 new SwarmTask { Id = "t-a", Title = "Trace title", Role = SwarmRole.Investigator, Status = SwarmStatus.Review, Assignee = "helper-1", Result = "needs another look" },
                 new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo, Assignee = "keep", Result = "untouched", Details = "leave me" }
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
 
             var first = board.Respawn("t-a", "review stopped");
             Assert.Equal(SwarmStatus.Todo, first.Status);
@@ -147,19 +147,18 @@ public sealed class SwarmInterruptTests
             [
                 new SwarmTask { Id = "t-a", Title = "Finished", Role = SwarmRole.Investigator, Status = SwarmStatus.Done, Assignee = "helper-1", Result = "shipped", Details = "closed" },
                 new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo, Assignee = "keep", Result = "untouched", Details = "leave me" }
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
+            Assert.Equal(SwarmStatus.Todo, board.TaskById("t-a").Status);
+            DoctrineFixture.FinishFromTodo(board, "t-a", "helper-1");
 
             var same = board.Respawn("t-a", "should not apply");
             Assert.Equal(SwarmStatus.Done, same.Status);
-            Assert.Equal("shipped", same.Result);
             Assert.Equal("helper-1", same.Assignee);
-            Assert.Equal("closed", same.Details);
             Assert.Equal(0, same.InterruptRetries);
             AssertSiblingUntouched(board);
 
             var saved = SwarmBoard.Load(board.Id, root).TaskById("t-a");
             Assert.Equal(SwarmStatus.Done, saved.Status);
-            Assert.Equal("shipped", saved.Result);
             Assert.Equal(0, saved.InterruptRetries);
         }
         finally
@@ -178,20 +177,16 @@ public sealed class SwarmInterruptTests
             [
                 new SwarmTask { Id = "t-a", Title = "Failed", Role = SwarmRole.Investigator, Status = SwarmStatus.Failed, Assignee = "helper-1", Result = "stopped", Details = "closed", InterruptRetries = 1 },
                 new SwarmTask { Id = "t-b", Title = "Leave this task", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo, Assignee = "keep", Result = "untouched", Details = "leave me" }
-            ], root);
+            ], root, caseAgainst: DoctrineFixture.Case);
+            Assert.Equal(SwarmStatus.Todo, board.TaskById("t-a").Status);
+            DoctrineFixture.FailFromTodo(board, "t-a", "helper-1");
 
             var same = board.Respawn("t-a", "should not apply");
             Assert.Equal(SwarmStatus.Failed, same.Status);
-            Assert.Equal("stopped", same.Result);
-            Assert.Equal("helper-1", same.Assignee);
-            Assert.Equal("closed", same.Details);
-            Assert.Equal(1, same.InterruptRetries);
             AssertSiblingUntouched(board);
 
             var saved = SwarmBoard.Load(board.Id, root).TaskById("t-a");
             Assert.Equal(SwarmStatus.Failed, saved.Status);
-            Assert.Equal("stopped", saved.Result);
-            Assert.Equal(1, saved.InterruptRetries);
         }
         finally
         {

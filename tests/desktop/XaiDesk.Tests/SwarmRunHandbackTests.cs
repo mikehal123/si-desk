@@ -82,7 +82,7 @@ public sealed class SwarmRunHandbackTests
     }
 
     private static SwarmBoard Open(string root, string swarm, string taskId) =>
-        SwarmSchedule.OpenRun(swarm, "Hand the result back", [new SwarmTask { Id = taskId, Title = "Hand the result back", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo }], root);
+        SwarmSchedule.OpenRun(swarm, "Hand the result back", [new SwarmTask { Id = taskId, Title = "Hand the result back", Role = SwarmRole.Researcher, Status = SwarmStatus.Todo }], root, DoctrineFixture.Case);
 
     private static void Stamp(SwarmBoard older, SwarmBoard newer)
     {

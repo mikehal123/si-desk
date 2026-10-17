@@ -40,7 +40,7 @@ public sealed class SwarmPhase1Tests
             Assert.Contains("How tested:", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Evidence:", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Paths covered:", verified.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Verdict: pass because findstr matched the current proof file", verified.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Verdict: pass because the file contained the task line", verified.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("swarm phase 1 " + id, verified.VerifierNote, StringComparison.Ordinal);
             var saved = SwarmBoard.Load(board.Id, root).TaskById(id);
             Assert.Equal(SwarmStatus.Done, saved.Status);
@@ -188,10 +188,10 @@ public sealed class SwarmPhase1Tests
             var passed = await SwarmLoop.VerifyProofAsync(passBoard, passId, work);
             Assert.Equal(SwarmStatus.Done, passed.Status);
             Assert.Contains("Claim: proof.txt contains swarm phase 1 " + passId, passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("How tested: Reran findstr on the current proof.txt at ", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("How tested: Read the current proof.txt in this process at ", passed.VerifierNote, StringComparison.Ordinal);
             Assert.Contains("Evidence: exit 0", passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Paths covered: Success: the file exists and findstr matched.", passed.VerifierNote, StringComparison.Ordinal);
-            Assert.Contains("Verdict: pass because findstr matched the current proof file", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Paths covered: Success: the file exists and the task line is in it.", passed.VerifierNote, StringComparison.Ordinal);
+            Assert.Contains("Verdict: pass because the file contained the task line", passed.VerifierNote, StringComparison.Ordinal);
 
             var failBoard = SwarmLoop.OpenGoal("Do not accept a slogan", "Claim it builds", SwarmRole.Engineer, "No command output", root);
             var failId = failBoard.Tasks.Single().Id;
@@ -300,7 +300,7 @@ public sealed class SwarmPhase1Tests
                     Status = SwarmStatus.Doing,
                     Assignee = "worker-a"
                 }
-            ], Path.Combine(SwarmBoard.DefaultRoot(), swarmId, "runs"), runId);
+            ], Path.Combine(SwarmBoard.DefaultRoot(), swarmId, "runs"), runId, DoctrineFixture.Case);
             Assert.Equal(SwarmStatus.Doing, board.TaskById("task-1").Status);
 
             var desk = new SwarmDesk(deskRoot);

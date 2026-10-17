@@ -135,7 +135,7 @@ public static class SwarmSchedule
         return ready;
     }
 
-    public static SwarmBoard OpenRun(string conversationId, string goal, IEnumerable<SwarmTask> tasks, string? root = null)
+    public static SwarmBoard OpenRun(string conversationId, string goal, IEnumerable<SwarmTask> tasks, string? root = null, string? caseAgainst = null)
     {
         if (string.IsNullOrEmpty(conversationId) || !Guid.TryParseExact(conversationId, "N", out _))
             throw new ArgumentException("Conversation id must be a Guid in N format.", nameof(conversationId));
@@ -145,7 +145,7 @@ public static class SwarmSchedule
         var folder = string.IsNullOrWhiteSpace(root) ? SwarmBoard.DefaultRoot() : root;
         var runId = Guid.NewGuid().ToString("N");
         var conversationDir = Path.Combine(folder, conversationId);
-        var board = SwarmBoard.Create(goal, plan, Path.Combine(conversationDir, "runs"), runId);
+        var board = SwarmBoard.Create(goal, plan, Path.Combine(conversationDir, "runs"), runId, caseAgainst);
         Directory.CreateDirectory(conversationDir);
         File.WriteAllText(Path.Combine(conversationDir, "current.txt"), board.Id, new UTF8Encoding(false));
         return board;

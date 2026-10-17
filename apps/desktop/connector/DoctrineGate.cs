@@ -39,8 +39,112 @@ public static class DoctrineGate
     {
         ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(row);
+        if (string.Equals(row.Phase, DoctrinePhase.Disagreement, StringComparison.Ordinal))
+            throw new InvalidOperationException("the manager cannot write a disagreement row");
+        if (row.OwnerYes)
+            throw new InvalidOperationException("the manager cannot set the owner's yes");
         Append(board, row);
     }
+
+    /// <summary>Owner only. Appends disagreement verdict overruled. The manager cannot call this.</summary>
+    public static void Overrule(SwarmBoard board, string taskId)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        _ = board.TaskById(taskId);
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Disagreement,
+            Verdict = "overruled",
+            Text = "The owner overruled the case against the plan.",
+            Read = board.Goal ?? ""
+        });
+    }
+
+    /// <summary>Owner only. Appends the latest IRREVERSIBLE rollback again with the owner's yes. The manager cannot call this.</summary>
+    public static void OwnerYes(SwarmBoard board, string taskId)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        DoctrineLogRow? prior = null;
+        foreach (var row in For(board, taskId, DoctrinePhase.Rollback))
+            if (row.Verdict == "IRREVERSIBLE") prior = row;
+        if (prior is null) throw new InvalidOperationException("no IRREVERSIBLE rollback row");
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Rollback,
+            Verdict = "IRREVERSIBLE",
+            Text = prior.Text,
+            Paths = prior.Paths,
+            OwnerYes = true,
+            Read = prior.Paths
+        });
+    }
+
+    public static void AppendAssumption(SwarmBoard board, string taskId, string verdict, string text)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        _ = board.TaskById(taskId);
+        if (string.Equals(verdict, "overruled", StringComparison.Ordinal) || string.Equals(verdict, "holds", StringComparison.Ordinal))
+            throw new InvalidOperationException("the manager cannot overrule a disagreement");
+        if (!Closed(verdict, DoctrineAnswer.Assumption))
+            throw new ArgumentException("Assumption verdict must be STATED, INFERRED, GUESSED, or OVERTURNED.");
+        if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException("Assumption text is required.");
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Assumption,
+            Verdict = verdict,
+            Text = text.Trim(),
+            Read = text.Trim()
+        });
+    }
+
+    public static void AppendRollback(SwarmBoard board, string taskId, string verdict, string undo, string path)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        _ = board.TaskById(taskId);
+        if (!Closed(verdict, DoctrineAnswer.Rollback))
+            throw new ArgumentException("Rollback class must be REVERSIBLE, RECOVERABLE, or IRREVERSIBLE.");
+        if (string.IsNullOrWhiteSpace(undo)) throw new ArgumentException("Rollback undo text is required.");
+        if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Rollback path is required.");
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Rollback,
+            Verdict = verdict,
+            Text = undo.Trim(),
+            Paths = path.Trim(),
+            OwnerYes = false,
+            Read = path.Trim()
+        });
+    }
+
+    public static void AppendDecay(SwarmBoard board, string taskId)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        _ = board.TaskById(taskId);
+        var pin = board.Goal ?? "";
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Decay,
+            Verdict = "check",
+            Text = pin,
+            PinnedGoal = pin,
+            Read = pin
+        });
+    }
+
+    internal static void AppendHolds(SwarmBoard board, string taskId, string caseAgainst) =>
+        Append(board, new DoctrineLogRow
+        {
+            TaskId = taskId.Trim(),
+            Phase = DoctrinePhase.Disagreement,
+            Verdict = "holds",
+            Text = caseAgainst.Trim(),
+            Read = board.Goal ?? ""
+        });
 
     public static void RequireForStart(SwarmBoard board, string taskId)
     {
@@ -88,6 +192,12 @@ public static class DoctrineGate
             throw Fail(board, taskId, "verify", "verification has a MISSING deliverable", report.Text);
         if (!Regex.IsMatch(report.Text ?? "", @"artifact:\s*\S+", RegexOptions.IgnoreCase))
             throw Fail(board, taskId, "verify", "verification pass has no artifact", report.Text);
+        if (!ArtifactsOnDisk(board, report.Text ?? ""))
+            throw Fail(board, taskId, "verify", "verification artifact is not on disk", report.Text);
+        var deviations = sections["Deviations"].Trim().TrimEnd('.', '!', '?');
+        if (deviations.Equals("none", StringComparison.OrdinalIgnoreCase)
+            && Regex.IsMatch(report.Text ?? "", @"\b(skip|skipped|stub|deferred|todo)\b", RegexOptions.IgnoreCase))
+            throw Fail(board, taskId, "verify", "verification deviations hide a skip", report.Text);
         var faces = For(board, taskId, DoctrinePhase.Interface);
         if (faces.Count == 0) throw Fail(board, taskId, "verify", "no interface row", board.Goal);
         var face = faces[^1].Text ?? "";
@@ -196,6 +306,22 @@ public static class DoctrineGate
         foreach (var line in (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
             if (line.Trim().Length > 0) return line.Trim();
         return "";
+    }
+
+    static bool ArtifactsOnDisk(SwarmBoard board, string report)
+    {
+        var matches = Regex.Matches(report, @"artifact:\s*(\S+)", RegexOptions.IgnoreCase);
+        if (matches.Count == 0) return false;
+        var folder = Path.GetDirectoryName(board.BoardPath) ?? "";
+        foreach (Match match in matches)
+        {
+            var raw = match.Groups[1].Value.Trim().TrimEnd('.', ',', ';');
+            if (raw.Length == 0) return false;
+            if (File.Exists(raw)) continue;
+            if (folder.Length > 0 && File.Exists(Path.Combine(folder, raw))) continue;
+            return false;
+        }
+        return true;
     }
 
     static string Norm(string? path) => (path ?? "").Trim().Replace('/', '\\');

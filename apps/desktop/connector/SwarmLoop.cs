@@ -17,7 +17,7 @@ public static class SwarmLoop
             Details = details,
             Status = SwarmStatus.Todo
         };
-        return SwarmBoard.Create(goal, [task], root);
+        return SwarmBoard.Create(goal, [task], root, null, string.IsNullOrWhiteSpace(details) ? goal : details);
     }
 
     public static SwarmWorkerView View(SwarmBoard board, SwarmTask task) => new(
@@ -34,7 +34,7 @@ public static class SwarmLoop
         return View(board, task);
     }
 
-    public static async Task<SwarmTask> EngineerProofAsync(SwarmBoard board, string taskId, string workDir)
+    public static Task<SwarmTask> EngineerProofAsync(SwarmBoard board, string taskId, string workDir)
     {
         var task = board.TaskById(taskId);
         if (task.Status != SwarmStatus.Doing) throw new InvalidOperationException("Engineer proof starts from doing.");
@@ -44,52 +44,50 @@ public static class SwarmLoop
         var before = File.Exists(file) ? File.ReadAllText(file).Replace("\r", "").Replace("\n", "") : "";
         var body = "swarm phase 1 " + task.Id;
         File.WriteAllText(file, body + Environment.NewLine);
-        var output = await CommandAsync("cmd.exe", "/d /c findstr /C:\"" + body + "\" \"" + file + "\"").ConfigureAwait(false);
-        if (output.ExitCode != 0 || !output.Text.Contains(body, StringComparison.Ordinal))
-            throw new IOException("Engineer proof command failed.");
+        var output = ReadProof(file, body);
+        if (output.ExitCode != 0)
+            throw new IOException("Engineer proof file did not contain the task line.");
         var diff = "--- a/proof.txt\n+++ b/proof.txt\n-" + before + "\n+" + body;
         var proof = VerifyResultSkill.Format(
             "proof.txt contains the line for " + task.Id,
-            "Wrote proof.txt and ran findstr /C on that file.",
+            "Read proof.txt in this process.",
             "exit " + output.ExitCode + "\n" + output.Text.Trim(),
-            "Success: the new proof.txt line is findable. Skipped: error, empty, cancel, and persistence were not part of this write.",
-            "pass because findstr printed the task line");
-        return board.Submit(taskId, diff + "\n" + proof, proof);
+            "Success: the new proof.txt line is in the file. Skipped: error, empty, cancel, and persistence were not part of this write.",
+            "pass because the file contained the task line");
+        return Task.FromResult(board.Submit(taskId, diff + "\n" + proof, proof));
     }
 
-    public static async Task<SwarmTask> VerifyProofAsync(SwarmBoard board, string taskId, string workDir)
+    public static Task<SwarmTask> VerifyProofAsync(SwarmBoard board, string taskId, string workDir)
     {
         var task = board.TaskById(taskId);
         var review = VerifyResultSkill.Review(task.Proof);
-        if (!review.Pass) return board.Verify(taskId, false, review.Note);
+        if (!review.Pass) return Task.FromResult(board.Verify(taskId, false, review.Note));
         var file = Path.Combine(workDir, "proof.txt");
         if (!File.Exists(file))
-            return board.Verify(taskId, false, VerifyResultSkill.Format(
+            return Task.FromResult(board.Verify(taskId, false, VerifyResultSkill.Format(
                 "The proof file exists",
                 "Looked for proof.txt before rerunning findstr.",
                 "(missing)",
                 "The success path was not reached. Skipped: the file is not there.",
-                "fail because the proof file is missing"));
+                "fail because the proof file is missing")));
         var body = File.ReadAllText(file).Trim();
-        var output = await CommandAsync("cmd.exe", "/d /c findstr /C:\"" + body + "\" \"" + file + "\"").ConfigureAwait(false);
+        var output = ReadProof(file, body);
         var stamp = File.GetLastWriteTimeUtc(file).ToString("yyyy-MM-ddTHH:mm:ssZ");
-        var matched = output.ExitCode == 0
-            && output.Text.Contains(body, StringComparison.Ordinal)
-            && task.Proof.Contains(body, StringComparison.Ordinal);
+        var matched = output.ExitCode == 0 && task.Proof.Contains(body, StringComparison.Ordinal);
         if (!matched)
-            return board.Verify(taskId, false, VerifyResultSkill.Format(
+            return Task.FromResult(board.Verify(taskId, false, VerifyResultSkill.Format(
                 "proof.txt matches the submitted proof",
-                "Reran findstr on proof.txt at " + stamp + ".",
+                "Read proof.txt in this process at " + stamp + ".",
                 "exit " + output.ExitCode + "\n" + output.Text.Trim(),
                 "The success path failed. Skipped: no further paths.",
-                "fail because the proof did not match the file"));
+                "fail because the proof did not match the file")));
         RecordPass(board, taskId, file, body);
-        return board.Verify(taskId, true, VerifyResultSkill.Format(
+        return Task.FromResult(board.Verify(taskId, true, VerifyResultSkill.Format(
             "proof.txt contains " + body,
-            "Reran findstr on the current proof.txt at " + stamp + ". This is the file on disk, not a cached result.",
+            "Read the current proof.txt in this process at " + stamp + ". This is the file on disk, not a cached result.",
             "exit " + output.ExitCode + "\n" + output.Text.Trim(),
-            "Success: the file exists and findstr matched. Skipped: error, empty, cancel, and persistence were not part of this file check.",
-            "pass because findstr matched the current proof file"));
+            "Success: the file exists and the task line is in it. Skipped: error, empty, cancel, and persistence were not part of this file check.",
+            "pass because the file contained the task line")));
     }
 
     static void RecordPass(SwarmBoard board, string taskId, string file, string body)
@@ -100,7 +98,7 @@ public static class SwarmLoop
             Phase = DoctrinePhase.Verification,
             Verdict = "pass",
             Text = "Existence audit: claim: proof.txt contains " + body + " artifact: " + file + "\n"
-                + "Raw output: findstr matched " + body + "\n"
+                + "Raw output: read proof.txt\n" + body + "\n"
                 + "Gap audit: skipped error, empty, cancel, and persistence\n"
                 + "Deviations: error, empty, cancel, and persistence were not part of this file check\n"
                 + "Unverified claims: none named",
@@ -114,10 +112,17 @@ public static class SwarmLoop
             Text = "Answer: proof.txt contains " + body + "\n"
                 + "Failures: none\n"
                 + "Skips: error, empty, cancel, and persistence\n"
-                + "Open guesses: findstr is the check that was run\n"
+                + "Open guesses: the file read is the check that was run\n"
                 + "State changes: REVERSIBLE " + file,
             Read = file
         });
+    }
+
+    static (int ExitCode, string Text) ReadProof(string file, string body)
+    {
+        if (!File.Exists(file)) return (1, "missing " + file);
+        var text = File.ReadAllText(file);
+        return text.Contains(body, StringComparison.Ordinal) ? (0, text) : (1, text);
     }
 
     public static async Task<(int ExitCode, string Text)> CommandAsync(string file, string arguments)
